@@ -17,10 +17,13 @@ public abstract class BowAttackGoalMixin {
     /**
      * Vanilla's isHoldingBow checks the exact Items.BOW; let the goal run while the
      * actor holds a unique bow as well.
+     * Fabric-only: NeoForge patches this to isHolding(Predicate) with an
+     * instanceof-BowItem test, which already accepts unique bows (require = 0).
      */
     @Redirect(
             method = "isHoldingBow",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/mob/HostileEntity;isHolding(Lnet/minecraft/item/Item;)Z")
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/mob/HostileEntity;isHolding(Lnet/minecraft/item/Item;)Z"),
+            require = 0
     )
     private boolean simplybows$acceptUniqueBows(HostileEntity actor, Item item) {
         return actor.isHolding(item)
@@ -32,10 +35,12 @@ public abstract class BowAttackGoalMixin {
      * with a unique bow in the main hand that resolves to the empty OFF_HAND, so
      * setCurrentHand no-ops and the mob never draws or fires. Resolve MAIN_HAND for
      * unique bows too.
+     * Fabric-only: NeoForge patches this to the Predicate overload (require = 0).
      */
     @Redirect(
             method = "tick",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/projectile/ProjectileUtil;getHandPossiblyHolding(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/Item;)Lnet/minecraft/util/Hand;")
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/projectile/ProjectileUtil;getHandPossiblyHolding(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/Item;)Lnet/minecraft/util/Hand;"),
+            require = 0
     )
     private Hand simplybows$resolveUniqueBowHand(LivingEntity entity, Item item) {
         ItemStack mainHand = entity.getMainHandStack();

@@ -20,10 +20,14 @@ public abstract class AbstractSkeletonEntityMixin {
 
     /**
      * Vanilla only selects BowAttackGoal for the exact Items.BOW; accept unique bows too.
+     * Fabric-only: NeoForge patches this method to use an instanceof-BowItem predicate,
+     * which already accepts unique bows, and the isOf instruction no longer exists there
+     * (hence require = 0).
      */
     @Redirect(
             method = "updateAttackType",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;isOf(Lnet/minecraft/item/Item;)Z")
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/item/ItemStack;isOf(Lnet/minecraft/item/Item;)Z"),
+            require = 0
     )
     private boolean simplybows$acceptUniqueBows(ItemStack stack, Item item) {
         return stack.isOf(item) || stack.getItem() instanceof SimplyBowItem;
@@ -33,10 +37,12 @@ public abstract class AbstractSkeletonEntityMixin {
      * getHandPossiblyHolding answers OFF_HAND unless the main hand holds the exact
      * Items.BOW, which would make updateAttackType inspect the (empty) offhand and
      * fall back to the melee goal. Resolve MAIN_HAND for unique bows too.
+     * Fabric-only: NeoForge patches this to the Predicate overload (require = 0).
      */
     @Redirect(
             method = "updateAttackType",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/projectile/ProjectileUtil;getHandPossiblyHolding(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/Item;)Lnet/minecraft/util/Hand;")
+            at = @At(value = "INVOKE", target = "Lnet/minecraft/entity/projectile/ProjectileUtil;getHandPossiblyHolding(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/item/Item;)Lnet/minecraft/util/Hand;"),
+            require = 0
     )
     private Hand simplybows$resolveUniqueBowHand(LivingEntity entity, Item item) {
         ItemStack mainHand = entity.getMainHandStack();
