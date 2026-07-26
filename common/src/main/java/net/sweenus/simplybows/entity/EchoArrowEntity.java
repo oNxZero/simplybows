@@ -119,8 +119,8 @@ public class EchoArrowEntity extends ArrowEntity {
 
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             if (hitLiving != null) {
-                if (this.getOwner() instanceof ServerPlayerEntity player && this.upgrades.runeEtching() == RuneEtching.PAIN) {
-                    EchoShoulderBowManager.setFocusedTarget(player, hitLiving);
+                if (this.getOwner() instanceof LivingEntity livingOwner && this.upgrades.runeEtching() == RuneEtching.PAIN) {
+                    EchoShoulderBowManager.setFocusedTarget(livingOwner, hitLiving);
                 }
                 if (this.upgrades.runeEtching() == RuneEtching.PAIN && wasAliveBeforeHit && !hitLiving.isAlive()) {
                     triggerPainArcaneChain(serverWorld, hitLiving);

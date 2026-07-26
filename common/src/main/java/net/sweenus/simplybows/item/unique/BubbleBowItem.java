@@ -14,6 +14,7 @@ import net.sweenus.simplybows.entity.BubblePainArrowEntity;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
+import net.sweenus.simplybows.util.BowUser;
 import net.sweenus.simplybows.util.HelperMethods;
 import net.sweenus.simplybows.world.BubbleChaosWaveManager;
 import org.jetbrains.annotations.Nullable;
@@ -86,16 +87,8 @@ public class BubbleBowItem extends SimplyBowItem {
 
     private void shootLine(ServerWorld world, LivingEntity shooter, Hand hand, ItemStack stack, List<ItemStack> projectiles,
                            float speed, boolean critical, @Nullable LivingEntity target, int quantity) {
-        if (!(shooter instanceof ServerPlayerEntity serverPlayerEntity)) {
-            this.shootAll(world, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.bubbleBow.painDivergence.get(), critical, target);
-            return;
-        }
-
-        boolean hasInfiniteAmmo = simplybows$hasInfiniteAmmo(serverPlayerEntity, stack);
-        Map<ItemStack, Integer> arrowStacks = HelperMethods.findArrowStacks(serverPlayerEntity);
         int additionalArrowsNeeded = Math.max(0, quantity - 1) * projectiles.size();
-        List<ItemStack> usableArrows = hasInfiniteAmmo ? List.of() : HelperMethods.collectArrows(arrowStacks, additionalArrowsNeeded);
-        int arrowsConsumed = 0;
+        BowUser.ExtraArrowSupply extraArrows = BowUser.extraArrows(shooter, stack, additionalArrowsNeeded);
         Vec3d forward = shooter.getRotationVec(1.0F).normalize();
         Vec3d horizontalForward = new Vec3d(forward.x, 0.0, forward.z);
         if (horizontalForward.lengthSquared() <= 1.0E-6) {
@@ -110,17 +103,11 @@ public class BubbleBowItem extends SimplyBowItem {
                 ItemStack arrowForProjectile;
                 if (p == 0) {
                     arrowForProjectile = projectiles.get(j);
-                } else if (hasInfiniteAmmo) {
-                    arrowForProjectile = projectiles.get(j).copy();
-                    arrowForProjectile.setCount(1);
-                } else if (arrowsConsumed < additionalArrowsNeeded && !usableArrows.isEmpty()) {
-                    arrowForProjectile = HelperMethods.consumeNextArrow(usableArrows);
+                } else {
+                    arrowForProjectile = extraArrows.next(projectiles.get(j));
                     if (arrowForProjectile == null || arrowForProjectile.isEmpty()) {
                         break;
                     }
-                    arrowsConsumed++;
-                } else {
-                    break;
                 }
 
                 ProjectileEntity projectileEntity = this.createArrowEntity(world, shooter, stack, arrowForProjectile, critical);

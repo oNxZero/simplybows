@@ -100,15 +100,15 @@ public final class CosmicBountyManager {
         playImplodeStart(world, pos, charge);
     }
 
-    public static boolean triggerAirborneDetonation(ServerPlayerEntity player) {
-        if (player == null || !(player.getWorld() instanceof ServerWorld world) || !isHoldingBountyCosmicBow(player)) {
+    public static boolean triggerAirborneDetonation(LivingEntity living) {
+        if (living == null || !(living.getWorld() instanceof ServerWorld world) || !isHoldingBountyCosmicBow(living)) {
             return false;
         }
-        if (!isBountyReady(world, player.getUuid())) {
+        if (!isBountyReady(world, living.getUuid())) {
             return false;
         }
 
-        Box searchBox = player.getBoundingBox().expand(192.0);
+        Box searchBox = living.getBoundingBox().expand(192.0);
         CosmicArrowEntity bestArrow = null;
         double bestDistanceSq = Double.MAX_VALUE;
         for (CosmicArrowEntity arrow : world.getEntitiesByClass(CosmicArrowEntity.class, searchBox, arrow ->
@@ -116,8 +116,8 @@ public final class CosmicBountyManager {
                         && !arrow.isRemoved()
                         && arrow.isBountyMode()
                         && !arrow.isOnGround()
-                        && player.equals(arrow.getOwner()))) {
-            double distanceSq = arrow.squaredDistanceTo(player);
+                        && living.equals(arrow.getOwner()))) {
+            double distanceSq = arrow.squaredDistanceTo(living);
             if (distanceSq < bestDistanceSq) {
                 bestDistanceSq = distanceSq;
                 bestArrow = arrow;
@@ -128,9 +128,9 @@ public final class CosmicBountyManager {
             return false;
         }
 
-        createImplosion(world, player, bestArrow.getPos(), bestArrow.getBountyChargeTicks(), bestArrow.getUpgrades(), true);
+        createImplosion(world, living, bestArrow.getPos(), bestArrow.getBountyChargeTicks(), bestArrow.getUpgrades(), true);
         bestArrow.discard();
-        world.playSound(null, player.getX(), player.getY(), player.getZ(), SoundEvents.ENTITY_ILLUSIONER_CAST_SPELL, SoundCategory.PLAYERS, 0.55F, 1.75F);
+        world.playSound(null, living.getX(), living.getY(), living.getZ(), SoundEvents.ENTITY_ILLUSIONER_CAST_SPELL, SoundCategory.PLAYERS, 0.55F, 1.75F);
         return true;
     }
 
@@ -183,8 +183,8 @@ public final class CosmicBountyManager {
         tickStardustFields(world);
     }
 
-    private static boolean isHoldingBountyCosmicBow(ServerPlayerEntity player) {
-        return isBountyCosmicBow(player.getStackInHand(Hand.MAIN_HAND)) || isBountyCosmicBow(player.getStackInHand(Hand.OFF_HAND));
+    public static boolean isHoldingBountyCosmicBow(LivingEntity living) {
+        return isBountyCosmicBow(living.getStackInHand(Hand.MAIN_HAND)) || isBountyCosmicBow(living.getStackInHand(Hand.OFF_HAND));
     }
 
     private static boolean isBountyCosmicBow(ItemStack stack) {

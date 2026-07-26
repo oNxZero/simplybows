@@ -8,7 +8,7 @@ import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.model.json.ModelTransformationMode;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.entity.Entity;
-import net.minecraft.entity.player.PlayerEntity;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -45,7 +45,7 @@ public class ShoulderBowEntityRenderer extends EntityRenderer<ShoulderBowEntity>
         Entity ownerEntity = entity.getWorld().getEntityById(entity.getOwnerEntityId());
         
         if (entity.getPullStage() == 0) {
-            if (ownerEntity instanceof PlayerEntity owner) {
+            if (ownerEntity instanceof LivingEntity owner) {
                 Vec3d ownerLook = owner.getRotationVec(tickDelta).normalize();
                 renderYaw = (float) (Math.atan2(ownerLook.x, ownerLook.z) * (180.0F / Math.PI));
                 renderPitch = (float) (-(Math.atan2(ownerLook.y, ownerLook.horizontalLength()) * (180.0F / Math.PI)));
@@ -55,7 +55,7 @@ public class ShoulderBowEntityRenderer extends EntityRenderer<ShoulderBowEntity>
         ItemStack renderStack = getStackForPullStage(entity, entity.getPullStage());
 
         matrices.push();
-        if (ownerEntity instanceof PlayerEntity owner) {
+        if (ownerEntity instanceof LivingEntity owner) {
             applyRenderFollowAnchor(entity, owner, tickDelta, matrices);
         }
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(renderYaw));
@@ -78,7 +78,7 @@ public class ShoulderBowEntityRenderer extends EntityRenderer<ShoulderBowEntity>
         matrices.pop();
     }
 
-    private static void applyRenderFollowAnchor(ShoulderBowEntity shoulderBow, PlayerEntity owner, float tickDelta, MatrixStack matrices) {
+    private static void applyRenderFollowAnchor(ShoulderBowEntity shoulderBow, LivingEntity owner, float tickDelta, MatrixStack matrices) {
         float ownerYaw = MathHelper.lerpAngleDegrees(tickDelta, owner.prevYaw, owner.getYaw());
         Vec3d ownerPos = new Vec3d(
                 MathHelper.lerp(tickDelta, owner.prevX, owner.getX()),

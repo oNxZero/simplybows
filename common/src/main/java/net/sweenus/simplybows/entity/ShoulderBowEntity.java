@@ -85,7 +85,7 @@ public class ShoulderBowEntity extends Entity {
         this.setNoGravity(true);
     }
 
-    public ShoulderBowEntity(World world, ServerPlayerEntity owner, int side) {
+    public ShoulderBowEntity(World world, LivingEntity owner, int side) {
         this(EntityRegistry.SHOULDER_BOW.get(), world);
         this.ownerUuid = owner.getUuid();
         this.setSide(side);
@@ -169,7 +169,7 @@ public class ShoulderBowEntity extends Entity {
             return;
         }
 
-        ServerPlayerEntity owner = getOwnerPlayer();
+        LivingEntity owner = getOwnerLiving();
         if (owner == null || !owner.isAlive() || !(owner.getMainHandStack().getItem() instanceof EchoBowItem)) {
             this.discard();
             return;
@@ -225,14 +225,14 @@ public class ShoulderBowEntity extends Entity {
         }
     }
 
-    private ServerPlayerEntity getOwnerPlayer() {
+    private LivingEntity getOwnerLiving() {
         if (!(this.getWorld() instanceof ServerWorld serverWorld) || this.ownerUuid == null) {
             return null;
         }
-        return serverWorld.getServer().getPlayerManager().getPlayer(this.ownerUuid);
+        return serverWorld.getEntity(this.ownerUuid) instanceof LivingEntity living ? living : null;
     }
 
-    private void refreshShoulderTransform(PlayerEntity owner) {
+    private void refreshShoulderTransform(LivingEntity owner) {
         Vec3d forward = Vec3d.fromPolar(0.0F, owner.getYaw()).normalize();
         Vec3d right = new Vec3d(-forward.z, 0.0, forward.x);
         double sideOffset = SHOULDER_SIDE_OFFSET * (double) this.getSide();
@@ -253,8 +253,9 @@ public class ShoulderBowEntity extends Entity {
         }
     }
 
-    private LivingEntity findNearestTarget(ServerPlayerEntity owner, double targetRadius) {
-        boolean supportMode = EchoShoulderBowManager.isGraceSupportActive(owner);
+    private LivingEntity findNearestTarget(LivingEntity owner, double targetRadius) {
+        boolean supportMode = owner instanceof ServerPlayerEntity serverOwner
+                && EchoShoulderBowManager.isGraceSupportActive(serverOwner);
         LivingEntity nearest = null;
         double nearestDist = targetRadius * targetRadius;
         for (LivingEntity candidate : this.getWorld().getEntitiesByClass(
@@ -262,7 +263,7 @@ public class ShoulderBowEntity extends Entity {
                 owner.getBoundingBox().expand(targetRadius, 8.0, targetRadius),
                 entity -> entity.isAlive() && (supportMode
                         ? entity != owner
-                        : CombatTargeting.isOffensiveTargetCandidate(entity))
+                        : CombatTargeting.isOffensiveTargetCandidate(entity, owner))
         )) {
             if (supportMode) {
                 if (candidate == owner || !CombatTargeting.isFriendlyTo(candidate, owner)) {
@@ -282,7 +283,7 @@ public class ShoulderBowEntity extends Entity {
         return nearest;
     }
 
-    private LivingEntity resolveForcedTarget(ServerPlayerEntity owner, double targetRadius) {
+    private LivingEntity resolveForcedTarget(LivingEntity owner, double targetRadius) {
         if (this.forcedTargetUuid == null || !(this.getWorld() instanceof ServerWorld serverWorld)) {
             return null;
         }
@@ -311,7 +312,7 @@ public class ShoulderBowEntity extends Entity {
         this.setPullStage(1);
     }
 
-    private void updateAimDuringDraw(ServerPlayerEntity owner) {
+    private void updateAimDuringDraw(LivingEntity owner) {
         if (this.trackedTargetUuid != null && this.getWorld() instanceof ServerWorld serverWorld) {
             Entity tracked = serverWorld.getEntity(this.trackedTargetUuid);
             if (tracked instanceof LivingEntity living && living.isAlive()) {
@@ -343,7 +344,7 @@ public class ShoulderBowEntity extends Entity {
         return compensated.lengthSquared() > 1.0E-6 ? compensated.normalize() : delta.normalize();
     }
 
-    private void firePreparedArrow(ServerPlayerEntity owner) {
+    private void firePreparedArrow(LivingEntity owner) {
         if (!(this.getWorld() instanceof ServerWorld serverWorld)) {
             return;
         }
@@ -358,7 +359,9 @@ public class ShoulderBowEntity extends Entity {
             return;
         }
 
-        if (!EchoShoulderBowManager.isGraceSupportActive(owner) && isTrackedTargetFriendly(owner)) {
+        boolean graceSupport = owner instanceof ServerPlayerEntity serverOwner
+                && EchoShoulderBowManager.isGraceSupportActive(serverOwner);
+        if (!graceSupport && isTrackedTargetFriendly(owner)) {
             this.preparedShotDirection = null;
             this.trackedTargetUuid = null;
             this.cooldownTicks = Math.max(this.cooldownTicks, 2);
@@ -388,7 +391,7 @@ public class ShoulderBowEntity extends Entity {
         this.setPullStage(0);
     }
 
-    private boolean isTrackedTargetFriendly(ServerPlayerEntity owner) {
+    private boolean isTrackedTargetFriendly(LivingEntity owner) {
         if (owner == null || this.trackedTargetUuid == null || !(this.getWorld() instanceof ServerWorld serverWorld)) {
             return false;
         }
@@ -415,7 +418,7 @@ public class ShoulderBowEntity extends Entity {
         return MathHelper.clamp(cooldown / 4, 2, TARGET_SCAN_TICKS);
     }
 
-    private ProjectileEntity createCompanionArrow(ServerWorld world, ServerPlayerEntity owner, Vec3d direction) {
+    private ProjectileEntity createCompanionArrow(ServerWorld world, LivingEntity owner, Vec3d direction) {
         ItemStack mainHand = owner.getMainHandStack();
         ItemStack offHand = owner.getOffHandStack();
         ItemStack arrowStack = owner.getProjectileType(this.isMirroringOffhand() ? offHand : mainHand);
@@ -507,14 +510,18 @@ public class ShoulderBowEntity extends Entity {
 
         if (projectile instanceof net.minecraft.entity.projectile.PersistentProjectileEntity persistent) {
             persistent.setCritical(this.getPullStage() >= 3);
+            persistent.setDamage(CombatTargeting.applyNonPlayerProjectileDamageModifier(owner, (float) persistent.getDamage()));
         }
         projectile.setPosition(this.getX(), this.getY() + 0.02, this.getZ());
         projectile.setVelocity(direction.x, direction.y, direction.z, speed, divergence);
         return projectile;
     }
 
-    private static void applyGracePotionPayload(ServerPlayerEntity owner, EchoArrowEntity arrow) {
-        EchoShoulderBowManager.GracePotionPayload payload = EchoShoulderBowManager.consumeGracePotionShot(owner);
+    private static void applyGracePotionPayload(LivingEntity owner, EchoArrowEntity arrow) {
+        if (!(owner instanceof ServerPlayerEntity player)) {
+            return;
+        }
+        EchoShoulderBowManager.GracePotionPayload payload = EchoShoulderBowManager.consumeGracePotionShot(player);
         if (payload != null && arrow != null) {
             arrow.setGracePotionPayload(payload.effects(), payload.supportMode(), payload.splashRadius());
         }
@@ -522,7 +529,7 @@ public class ShoulderBowEntity extends Entity {
 
     private ProjectileEntity spawnOffhandIceVolley(
             ServerWorld world,
-            ServerPlayerEntity owner,
+            LivingEntity owner,
             ItemStack offHand,
             ItemStack arrowStack,
             Vec3d direction,
@@ -560,7 +567,7 @@ public class ShoulderBowEntity extends Entity {
 
     private ProjectileEntity createOffhandIceProjectile(
             ServerWorld world,
-            ServerPlayerEntity owner,
+            LivingEntity owner,
             ItemStack offHand,
             ItemStack arrowStack,
             double damageMultiplier,
@@ -632,8 +639,7 @@ public class ShoulderBowEntity extends Entity {
             return;
         }
         serverWorld.spawnParticles(ParticleTypes.ENCHANT, this.getX(), this.getY() + 0.08, this.getZ(), 2, 0.08, 0.04, 0.08, 0.0);
-        ServerPlayerEntity owner = getOwnerPlayer();
-        if (owner != null && EchoShoulderBowManager.hasGracePotionCharge(owner)) {
+        if (getOwnerLiving() instanceof ServerPlayerEntity owner && EchoShoulderBowManager.hasGracePotionCharge(owner)) {
             serverWorld.spawnParticles(ParticleTypes.WITCH, this.getX(), this.getY() + 0.1, this.getZ(), 1, 0.05, 0.03, 0.05, 0.0);
             if (this.age % 6 == 0) {
                 serverWorld.spawnParticles(ParticleTypes.INSTANT_EFFECT, this.getX(), this.getY() + 0.12, this.getZ(), 2, 0.06, 0.04, 0.06, 0.0);

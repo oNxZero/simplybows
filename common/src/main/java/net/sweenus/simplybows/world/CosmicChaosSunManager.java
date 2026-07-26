@@ -413,19 +413,18 @@ public final class CosmicChaosSunManager {
     }
 
     private static void grantCelestialSwiftness(ServerWorld world, ActiveSun sun) {
-        if (sun.ownerId == null) {
+        LivingEntity owner = getOwner(world, sun);
+        if (owner == null || !owner.isAlive()) {
             return;
         }
-        ServerPlayerEntity player = world.getServer().getPlayerManager().getPlayer(sun.ownerId);
-        if (player == null || !player.isAlive()) {
-            return;
-        }
-        int stacks = CelestialSwiftnessTracker.getStacks(player.getUuid(), world.getTime()) + 1;
+        int stacks = CelestialSwiftnessTracker.getStacks(owner.getUuid(), world.getTime()) + 1;
         stacks = Math.min(Math.max(1, maxSwiftnessStacks()), stacks);
         int duration = Math.max(20, swiftnessDurationTicks());
-        CelestialSwiftnessTracker.set(player.getUuid(), stacks, world.getTime() + duration);
-        NetworkManager.sendToPlayer(player, new CelestialSwiftnessPayload(player.getUuid(), stacks, duration));
-        player.sendMessage(Text.translatable("message.simplybows.cosmic.celestial_swiftness", stacks), true);
+        CelestialSwiftnessTracker.set(owner.getUuid(), stacks, world.getTime() + duration);
+        if (owner instanceof ServerPlayerEntity player) {
+            NetworkManager.sendToPlayer(player, new CelestialSwiftnessPayload(player.getUuid(), stacks, duration));
+            player.sendMessage(Text.translatable("message.simplybows.cosmic.celestial_swiftness", stacks), true);
+        }
     }
 
     private static LivingEntity getOwner(ServerWorld world, ActiveSun sun) {

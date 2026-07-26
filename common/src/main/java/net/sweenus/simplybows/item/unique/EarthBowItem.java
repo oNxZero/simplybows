@@ -43,9 +43,7 @@ public class EarthBowItem extends SimplyBowItem {
             int durationTicks = Math.max(20,
                     SimplyBowsConfig.INSTANCE.earthBow.chaosSunderDurationTicks.get()
                             + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.earthBow.chaosSunderDurationPerStringTicks.get());
-            if (shooter instanceof ServerPlayerEntity serverPlayer) {
-                simplybows$startAbilityItemCooldown(serverPlayer, durationTicks);
-            }
+            simplybows$startAbilityItemCooldown(shooter, durationTicks);
         }
 
         CHAOS_SUNDER_ON_IMPACT.set(chaosSunderReady);

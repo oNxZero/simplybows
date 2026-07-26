@@ -36,6 +36,7 @@ import net.sweenus.simplybows.client.renderer.CosmicStrikeVisualEntityRenderer;
 import net.sweenus.simplybows.client.renderer.CosmicTetherVisualEntityRenderer;
 import net.sweenus.simplybows.client.renderer.SimplyBowsArrowEntityRenderer;
 import net.sweenus.simplybows.client.renderer.VineFlowerVisualEntityRenderer;
+import net.sweenus.simplybows.command.SimplyBowsCommands;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.registry.EntityRegistry;
@@ -68,6 +69,7 @@ public final class SimplyBows {
         SimplyBowsCreativeTabRegistry.register();
         EntityRegistry.registerEntities();
         ParticleRegistry.registerParticles();
+        SimplyBowsCommands.register();
         if (Platform.getEnvironment() != Env.CLIENT) {
             NetworkManager.registerS2CPayloadType(AbilityCooldownPayload.ID, AbilityCooldownPayload.CODEC);
             NetworkManager.registerS2CPayloadType(CelestialSwiftnessPayload.ID, CelestialSwiftnessPayload.CODEC);

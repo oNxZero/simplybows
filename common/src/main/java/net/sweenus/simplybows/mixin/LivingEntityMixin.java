@@ -21,8 +21,8 @@ public abstract class LivingEntityMixin {
     @Inject(method = "swingHand(Lnet/minecraft/util/Hand;Z)V", at = @At("HEAD"))
     private void simplybows$triggerCosmicBountyDetonation(Hand hand, boolean fromServerPlayer, CallbackInfo ci) {
         LivingEntity living = (LivingEntity) (Object) this;
-        if (living instanceof ServerPlayerEntity serverPlayer) {
-            CosmicBountyManager.triggerAirborneDetonation(serverPlayer);
+        if (living.getWorld() instanceof ServerWorld) {
+            CosmicBountyManager.triggerAirborneDetonation(living);
         }
     }
 

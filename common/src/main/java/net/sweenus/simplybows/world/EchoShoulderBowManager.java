@@ -5,6 +5,7 @@ import net.minecraft.component.type.PotionContentsComponent;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.projectile.ProjectileUtil;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
@@ -46,9 +47,15 @@ public final class EchoShoulderBowManager {
     }
 
     public static void tickPlayer(ServerPlayerEntity player) {
-        ServerWorld world = player.getServerWorld();
-        UUID ownerId = player.getUuid();
-        boolean holdingEchoBow = player.getMainHandStack().getItem() instanceof EchoBowItem;
+        tickOwner(player);
+    }
+
+    public static void tickOwner(LivingEntity owner) {
+        if (!(owner.getWorld() instanceof ServerWorld world)) {
+            return;
+        }
+        UUID ownerId = owner.getUuid();
+        boolean holdingEchoBow = owner.getMainHandStack().getItem() instanceof EchoBowItem;
         if (!holdingEchoBow) {
             discardTracked(world, ownerId);
             ACTIVE_BOWS.remove(ownerId);
@@ -62,48 +69,50 @@ public final class EchoShoulderBowManager {
         ShoulderBowEntity right = resolveTracked(world, pair != null ? pair.rightId() : null, ownerId, 1);
 
         if (left == null) {
-            left = new ShoulderBowEntity(world, player, -1);
+            left = new ShoulderBowEntity(world, owner, -1);
             world.spawnEntity(left);
         }
         if (right == null) {
-            right = new ShoulderBowEntity(world, player, 1);
+            right = new ShoulderBowEntity(world, owner, 1);
             world.spawnEntity(right);
         }
 
-        BowUpgradeData upgrades = BowUpgradeData.from(player.getMainHandStack());
+        BowUpgradeData upgrades = BowUpgradeData.from(owner.getMainHandStack());
         if (upgrades.runeEtching() != RuneEtching.GRACE) {
             GRACE_POTION_CHARGES.remove(ownerId);
         }
         boolean mirrorOffhandBow = upgrades.runeEtching() == RuneEtching.BOUNTY
-                && player.getOffHandStack().getItem() instanceof SimplyBowItem
-                && !(player.getOffHandStack().getItem() instanceof EchoBowItem);
+                && owner.getOffHandStack().getItem() instanceof SimplyBowItem
+                && !(owner.getOffHandStack().getItem() instanceof EchoBowItem);
         UUID focusedTargetId = null;
         if (upgrades.runeEtching() == RuneEtching.PAIN) {
             focusedTargetId = FOCUSED_TARGETS.get(ownerId);
-            validateFocusedTarget(player, focusedTargetId);
+            validateFocusedTarget(owner, focusedTargetId);
             focusedTargetId = FOCUSED_TARGETS.get(ownerId);
         } else {
             FOCUSED_TARGETS.remove(ownerId);
         }
 
         left.configureOffhandMirror(false, ItemStack.EMPTY);
-        right.configureOffhandMirror(mirrorOffhandBow, mirrorOffhandBow ? player.getOffHandStack() : ItemStack.EMPTY);
+        right.configureOffhandMirror(mirrorOffhandBow, mirrorOffhandBow ? owner.getOffHandStack() : ItemStack.EMPTY);
         left.setForcedTargetUuid(focusedTargetId);
         right.setForcedTargetUuid(focusedTargetId);
 
         ACTIVE_BOWS.put(ownerId, new CompanionPair(left.getUuid(), right.getUuid()));
 
-        if ((world.getTime() + player.getId()) % 40L == 0L) {
+        if ((world.getTime() + owner.getId()) % 40L == 0L) {
             cleanupOwnerOrphans(world, ownerId, left.getUuid(), right.getUuid());
         }
     }
 
-    public static void onPlayerFired(ServerPlayerEntity player) {
-        ServerWorld world = player.getServerWorld();
-        UUID ownerId = player.getUuid();
-        tickPlayer(player);
-        Vec3d lookDirection = player.getRotationVec(1.0F);
-        UUID focusedTarget = resolveLookFocusedTarget(player);
+    public static void onOwnerFired(LivingEntity owner) {
+        if (!(owner.getWorld() instanceof ServerWorld world)) {
+            return;
+        }
+        UUID ownerId = owner.getUuid();
+        tickOwner(owner);
+        Vec3d lookDirection = owner.getRotationVec(1.0F);
+        UUID focusedTarget = resolveLookFocusedTarget(owner);
         if (focusedTarget != null) {
             FOCUSED_TARGETS.put(ownerId, focusedTarget);
         } else {
@@ -124,12 +133,12 @@ public final class EchoShoulderBowManager {
         }
     }
 
-    public static void setFocusedTarget(ServerPlayerEntity player, @Nullable LivingEntity target) {
-        if (player == null) {
+    public static void setFocusedTarget(LivingEntity owner, @Nullable LivingEntity target) {
+        if (owner == null) {
             return;
         }
-        UUID ownerId = player.getUuid();
-        if (target == null || !target.isAlive() || !CombatTargeting.checkFriendlyFire(target, player)) {
+        UUID ownerId = owner.getUuid();
+        if (target == null || !target.isAlive() || !CombatTargeting.checkFriendlyFire(target, owner)) {
             FOCUSED_TARGETS.remove(ownerId);
             return;
         }
@@ -150,7 +159,7 @@ public final class EchoShoulderBowManager {
                 shoulderBow.discard();
                 continue;
             }
-            ServerPlayerEntity owner = world.getServer().getPlayerManager().getPlayer(ownerId);
+            LivingEntity owner = world.getEntity(ownerId) instanceof LivingEntity living ? living : null;
             if (owner == null || !owner.isAlive() || !(owner.getMainHandStack().getItem() instanceof EchoBowItem)) {
                 shoulderBow.discard();
                 ACTIVE_BOWS.remove(ownerId);
@@ -251,38 +260,47 @@ public final class EchoShoulderBowManager {
         return copied;
     }
 
-    private static void validateFocusedTarget(ServerPlayerEntity player, @Nullable UUID focusedTargetId) {
-        if (focusedTargetId == null) {
+    private static void validateFocusedTarget(LivingEntity owner, @Nullable UUID focusedTargetId) {
+        if (focusedTargetId == null || !(owner.getWorld() instanceof ServerWorld world)) {
             return;
         }
-        Entity focusedEntity = player.getServerWorld().getEntity(focusedTargetId);
-        if (!(focusedEntity instanceof LivingEntity living) || !living.isAlive() || !CombatTargeting.checkFriendlyFire(living, player)) {
-            FOCUSED_TARGETS.remove(player.getUuid());
+        Entity focusedEntity = world.getEntity(focusedTargetId);
+        if (!(focusedEntity instanceof LivingEntity living) || !living.isAlive() || !CombatTargeting.checkFriendlyFire(living, owner)) {
+            FOCUSED_TARGETS.remove(owner.getUuid());
         }
     }
 
     @Nullable
-    private static UUID resolveLookFocusedTarget(ServerPlayerEntity player) {
-        Vec3d start = player.getCameraPosVec(1.0F);
-        Vec3d look = player.getRotationVec(1.0F);
+    private static UUID resolveLookFocusedTarget(LivingEntity owner) {
+        // Mobs have no crosshair; their focused target is whatever their AI is attacking.
+        if (owner instanceof MobEntity mob) {
+            LivingEntity target = mob.getTarget();
+            if (target != null && target.isAlive() && CombatTargeting.checkFriendlyFire(target, mob)) {
+                return target.getUuid();
+            }
+            return null;
+        }
+
+        Vec3d start = owner.getCameraPosVec(1.0F);
+        Vec3d look = owner.getRotationVec(1.0F);
         Vec3d end = start.add(look.multiply(lookTargetDistance()));
-        Box searchBox = player.getBoundingBox().stretch(look.multiply(lookTargetDistance())).expand(1.0);
+        Box searchBox = owner.getBoundingBox().stretch(look.multiply(lookTargetDistance())).expand(1.0);
 
         EntityHitResult entityHit = ProjectileUtil.getEntityCollision(
-                player.getWorld(),
-                player,
+                owner.getWorld(),
+                owner,
                 start,
                 end,
                 searchBox,
                 entity -> entity instanceof LivingEntity living
                         && living.isAlive()
-                        && CombatTargeting.checkFriendlyFire(living, player)
+                        && CombatTargeting.checkFriendlyFire(living, owner)
         );
         if (entityHit == null || !(entityHit.getEntity() instanceof LivingEntity living)) {
             return null;
         }
 
-        HitResult blockHit = player.raycast(lookTargetDistance(), 1.0F, false);
+        HitResult blockHit = owner.raycast(lookTargetDistance(), 1.0F, false);
         double entityDistanceSq = start.squaredDistanceTo(entityHit.getPos());
         double blockDistanceSq = blockHit.getType() == HitResult.Type.MISS
                 ? Double.MAX_VALUE

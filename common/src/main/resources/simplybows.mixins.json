@@ -8,10 +8,13 @@
     "client.ItemRendererMixin"
   ],
   "mixins": [
+    "AbstractSkeletonEntityMixin",
     "AnvilScreenHandlerMixin",
+    "BowAttackGoalMixin",
     "EntityAccessor",
     "ItemStackMixin",
     "LivingEntityMixin",
+    "MobEntityMixin",
     "ProjectileEntityMixin",
     "ServerPlayerEntityMixin",
     "ServerWorldMixin"

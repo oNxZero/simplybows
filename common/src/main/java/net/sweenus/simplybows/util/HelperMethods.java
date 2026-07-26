@@ -22,21 +22,21 @@ public class HelperMethods {
 
     public static void spawnParticlesAtItem(
             ServerWorld serverWorld,
-            PlayerEntity player,
+            LivingEntity user,
             Item item,
             ParticleEffect particle,
             int particleCount) {
-        ItemStack mainHandItem = player.getMainHandStack();
-        ItemStack offHandItem = player.getOffHandStack();
+        ItemStack mainHandItem = user.getMainHandStack();
+        ItemStack offHandItem = user.getOffHandStack();
 
         boolean isBowInMainHand = mainHandItem.getItem().equals(item);
         boolean isBowInOffHand = offHandItem.getItem().equals(item);
 
         Vec3d handPosition;
         if (isBowInMainHand) {
-            handPosition = getHandPosition(player, Hand.OFF_HAND);
+            handPosition = getHandPosition(user, Hand.OFF_HAND);
         } else if (isBowInOffHand) {
-            handPosition = getHandPosition(player, Hand.MAIN_HAND);
+            handPosition = getHandPosition(user, Hand.MAIN_HAND);
         } else {
             return;
         }
@@ -44,7 +44,7 @@ public class HelperMethods {
         double bowLength = 1.2;
         double bowWidth = 0.1;
 
-        Vec3d bowDirection = player.getRotationVec(1.0F).normalize();
+        Vec3d bowDirection = user.getRotationVec(1.0F).normalize();
 
         for (int i = 0; i < particleCount; i++) {
             double lengthOffset = (serverWorld.random.nextDouble() - 0.5) * bowLength;
@@ -68,12 +68,12 @@ public class HelperMethods {
 
     public static void spawnParticlesInFrontOfPlayer(
             ServerWorld serverWorld,
-            PlayerEntity player,
+            LivingEntity user,
             ParticleEffect particle,
             int particleCount) {
 
-        Vec3d eyePosition = player.getEyePos();
-        Vec3d lookDirection = player.getRotationVec(1.0F).normalize();
+        Vec3d eyePosition = user.getEyePos();
+        Vec3d lookDirection = user.getRotationVec(1.0F).normalize();
         Vec3d particleStartPosition = eyePosition.add(lookDirection.multiply(0.5));
 
         for (int i = 0; i < particleCount; i++) {
@@ -159,15 +159,15 @@ public class HelperMethods {
 
 
 
-    public static Vec3d getHandPosition(PlayerEntity player, Hand hand) {
-        Vec3d eyePosition = player.getEyePos();
+    public static Vec3d getHandPosition(LivingEntity user, Hand hand) {
+        Vec3d eyePosition = user.getEyePos();
 
-        boolean isRightHand = (hand == Hand.MAIN_HAND) == (player.getMainArm() == Arm.RIGHT);
+        boolean isRightHand = (hand == Hand.MAIN_HAND) == (user.getMainArm() == Arm.RIGHT);
 
         double horizontalOffset = isRightHand ? 0.35 : -0.35;
-        Vec3d handOffset = player.getRotationVec(1.0F).rotateY((float) Math.PI / 2).multiply(horizontalOffset);
+        Vec3d handOffset = user.getRotationVec(1.0F).rotateY((float) Math.PI / 2).multiply(horizontalOffset);
 
-        double verticalOffset = player.isSneaking() ? -0.8 : -0.6;
+        double verticalOffset = user.isSneaking() ? -0.8 : -0.6;
 
         return eyePosition.add(handOffset).add(0, verticalOffset, 0);
     }

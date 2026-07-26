@@ -536,5 +536,13 @@ public class SimplyBowsConfig extends Config {
         public ValidatedBoolean debugMode = new ValidatedBoolean(false);
         public ValidatedBoolean modernTooltipsEnabled = new ValidatedBoolean(true);
         public ValidatedDouble rangedWeaponApiDamageMultiplier = new ValidatedDouble(1.0, 100.0, 0.0);
+
+        // Non-player (mob) usage of unique bows
+        public ValidatedBoolean enableNonPlayerBowUse = new ValidatedBoolean(true);
+        public ValidatedInt nonPlayerBowCheckInterval = new ValidatedInt(60, 6000, 1);
+        public ValidatedInt nonPlayerBowChance = new ValidatedInt(50, 100, 0);
+        public ValidatedDouble nonPlayerBowAbilityDamageModifier = new ValidatedDouble(0.5, 100.0, 0.0);
+        public ValidatedDouble nonPlayerBowProjectileDamageModifier = new ValidatedDouble(0.5, 100.0, 0.0);
+        public ValidatedDouble nonPlayerBowDamageToPlayersModifier = new ValidatedDouble(0.5, 100.0, 0.0);
     }
 }

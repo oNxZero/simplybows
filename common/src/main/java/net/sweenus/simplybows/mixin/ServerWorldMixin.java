@@ -17,6 +17,7 @@ import net.sweenus.simplybows.world.EarthSpikeFieldManager;
 import net.sweenus.simplybows.world.EchoChaosBlackHoleManager;
 import net.sweenus.simplybows.world.EchoShoulderBowManager;
 import net.sweenus.simplybows.world.IceChaosWallManager;
+import net.sweenus.simplybows.world.MobBowFireManager;
 import net.sweenus.simplybows.world.VineFlowerFieldManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -80,5 +81,6 @@ public abstract class ServerWorldMixin {
             CosmicChaosSunManager.tick(world);
         }
         EchoShoulderBowManager.tickWorld(world);
+        MobBowFireManager.tick(world);
     }
 }

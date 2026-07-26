@@ -44,9 +44,7 @@ public class BeeBowItem extends SimplyBowItem {
                     SimplyBowsConfig.INSTANCE.beeBow.chaosBaseDurationTicks.get()
                             + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.beeBow.chaosDurationPerStringTicks.get());
             int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.beeBow.chaosCooldownTicks.get());
-            if (shooter instanceof ServerPlayerEntity serverPlayer) {
-                simplybows$startAbilityItemCooldown(serverPlayer, durationTicks + cooldownTicks);
-            }
+            simplybows$startAbilityItemCooldown(shooter, durationTicks + cooldownTicks);
         }
 
         CHAOS_HONEY_STORM_ON_IMPACT.set(chaosStormReady);
