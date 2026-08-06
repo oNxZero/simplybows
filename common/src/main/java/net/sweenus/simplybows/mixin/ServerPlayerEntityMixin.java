@@ -36,7 +36,7 @@ public abstract class ServerPlayerEntityMixin {
     public void simplybows$tick(CallbackInfo ci) {
         PlayerEntity player = (PlayerEntity) (Object) this;
         if (player instanceof ServerPlayerEntity serverPlayer) {
-            BowPassiveParticleManager.tick(serverPlayer, player, getServerWorld());
+            BowPassiveParticleManager.tick(serverPlayer, getServerWorld());
             EchoShoulderBowManager.tickPlayer(serverPlayer);
             simplybows$debugLogLookedEntity(serverPlayer);
         }

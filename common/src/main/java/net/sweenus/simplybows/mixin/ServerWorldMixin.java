@@ -8,11 +8,16 @@ import net.sweenus.simplybows.world.BeeGraceShieldManager;
 import net.sweenus.simplybows.world.BeeHiveSwarmManager;
 import net.sweenus.simplybows.world.BubbleColumnFieldManager;
 import net.sweenus.simplybows.world.BubbleChaosWaveManager;
+import net.sweenus.simplybows.world.CosmicBountyManager;
+import net.sweenus.simplybows.world.CosmicChaosSunManager;
+import net.sweenus.simplybows.world.CosmicGraceTrailManager;
+import net.sweenus.simplybows.world.CosmicOrbitManager;
 import net.sweenus.simplybows.world.EarthChaosSunderManager;
 import net.sweenus.simplybows.world.EarthSpikeFieldManager;
 import net.sweenus.simplybows.world.EchoChaosBlackHoleManager;
 import net.sweenus.simplybows.world.EchoShoulderBowManager;
 import net.sweenus.simplybows.world.IceChaosWallManager;
+import net.sweenus.simplybows.world.MobBowFireManager;
 import net.sweenus.simplybows.world.VineFlowerFieldManager;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
@@ -63,6 +68,19 @@ public abstract class ServerWorldMixin {
         if (BeeGraceShieldManager.hasActive(world)) {
             BeeGraceShieldManager.tick(world);
         }
+        if (CosmicOrbitManager.hasActive(world)) {
+            CosmicOrbitManager.tick(world);
+        }
+        if (CosmicGraceTrailManager.hasActive(world)) {
+            CosmicGraceTrailManager.tick(world);
+        }
+        if (CosmicBountyManager.hasActive(world)) {
+            CosmicBountyManager.tick(world);
+        }
+        if (CosmicChaosSunManager.hasActive(world)) {
+            CosmicChaosSunManager.tick(world);
+        }
         EchoShoulderBowManager.tickWorld(world);
+        MobBowFireManager.tick(world);
     }
 }

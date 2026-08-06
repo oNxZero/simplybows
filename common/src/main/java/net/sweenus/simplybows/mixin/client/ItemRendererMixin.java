@@ -15,6 +15,7 @@ import net.minecraft.util.Identifier;
 import net.sweenus.simplybows.item.unique.BeeBowItem;
 import net.sweenus.simplybows.item.unique.BlossomBowItem;
 import net.sweenus.simplybows.item.unique.BubbleBowItem;
+import net.sweenus.simplybows.item.unique.CosmicBowItem;
 import net.sweenus.simplybows.item.unique.EchoBowItem;
 import net.sweenus.simplybows.item.unique.EarthBowItem;
 import net.sweenus.simplybows.item.unique.IceBowItem;
@@ -41,13 +42,14 @@ public class ItemRendererMixin {
     // Per-bow overrides. Key = exact item class; value = inventory model to use.
     // Add an entry here whenever a bow gets its own small inventory textures.
     @Unique
-    private static final Map<Class<? extends Item>, ModelIdentifier> PER_BOW_INVENTORY_MODELS = Map.of(
-            EchoBowItem.class, new ModelIdentifier(new Identifier("simplybows", "echo_bow/echo_bow_inventory"), "inventory"),
-            EarthBowItem.class, new ModelIdentifier(new Identifier("simplybows", "earth_bow/earth_bow_inventory"), "inventory"),
-            IceBowItem.class, new ModelIdentifier(new Identifier("simplybows", "ice_bow/ice_bow_inventory"), "inventory"),
-            BlossomBowItem.class, new ModelIdentifier(new Identifier("simplybows", "blossom_bow/blossom_bow_inventory"), "inventory"),
-            BubbleBowItem.class, new ModelIdentifier(new Identifier("simplybows", "bubble_bow/bubble_bow_inventory"), "inventory"),
-            BeeBowItem.class, new ModelIdentifier(new Identifier("simplybows", "bee_bow/bee_bow_inventory"), "inventory")
+    private static final Map<Class<? extends Item>, ModelIdentifier> PER_BOW_INVENTORY_MODELS = Map.ofEntries(
+            Map.entry(EchoBowItem.class, new ModelIdentifier(new Identifier("simplybows", "echo_bow/echo_bow_inventory"), "inventory")),
+            Map.entry(EarthBowItem.class, new ModelIdentifier(new Identifier("simplybows", "earth_bow/earth_bow_inventory"), "inventory")),
+            Map.entry(IceBowItem.class, new ModelIdentifier(new Identifier("simplybows", "ice_bow/ice_bow_inventory"), "inventory")),
+            Map.entry(BlossomBowItem.class, new ModelIdentifier(new Identifier("simplybows", "blossom_bow/blossom_bow_inventory"), "inventory")),
+            Map.entry(BubbleBowItem.class, new ModelIdentifier(new Identifier("simplybows", "bubble_bow/bubble_bow_inventory"), "inventory")),
+            Map.entry(BeeBowItem.class, new ModelIdentifier(new Identifier("simplybows", "bee_bow/bee_bow_inventory"), "inventory")),
+            Map.entry(CosmicBowItem.class, new ModelIdentifier(new Identifier("simplybows", "cosmic_bow/cosmic_bow_inventory"), "inventory"))
     );
 
     @Inject(

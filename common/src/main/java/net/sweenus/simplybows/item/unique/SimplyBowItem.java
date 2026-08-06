@@ -1,4 +1,5 @@
 package net.sweenus.simplybows.item.unique;
+import net.minecraft.item.ArrowItem;
 import dev.architectury.networking.NetworkManager;
 import io.netty.buffer.Unpooled;
 import net.minecraft.client.item.TooltipContext;
@@ -6,6 +7,7 @@ import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.Enchantments;
 import net.minecraft.entity.EquipmentSlot;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.entity.projectile.PersistentProjectileEntity;
@@ -19,11 +21,14 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.stat.Stats;
 import net.minecraft.text.Text;
 import net.minecraft.util.Hand;
+import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.sweenus.simplybows.network.AbilityCooldownPayload;
 import net.sweenus.simplybows.util.BowTooltipHelper;
+import net.sweenus.simplybows.util.BowUser;
 import net.sweenus.simplybows.util.CombatTargeting;
 import net.sweenus.simplybows.util.HelperMethods;
+import net.sweenus.simplybows.world.CosmicChaosSunManager;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -112,46 +117,65 @@ public class SimplyBowItem extends BowItem {
 
     @Override
     public void onStoppedUsing(ItemStack stack, World world, LivingEntity user, int remainingUseTicks) {
-        if (user instanceof PlayerEntity playerEntity) {
-            ItemStack projectileStack = playerEntity.getProjectileType(stack);
-            if (projectileStack.isEmpty() && playerEntity.getAbilities().creativeMode) {
-                projectileStack = new ItemStack(Items.ARROW);
-            }
-            if (projectileStack.isEmpty()) {
-                return;
-            }
-            boolean hasInfiniteAmmo = simplybows$hasInfiniteAmmo(playerEntity, stack, projectileStack);
+        ItemStack projectileStack = BowUser.getProjectile(user, stack);
+        if (projectileStack.isEmpty()) {
+            return;
+        }
+        boolean hasInfiniteAmmo = BowUser.hasInfiniteAmmo(user, stack, projectileStack);
 
-            int i = this.getMaxUseTime(stack) - remainingUseTicks;
-            float f = getPullProgress(i);
-            if (!((double)f < 0.1)) {
-                List<ItemStack> list;
-                if (hasInfiniteAmmo) {
-                    ItemStack virtualProjectile = projectileStack.copy();
-                    virtualProjectile.setCount(1);
-                    list = List.of(virtualProjectile);
-                } else {
-                    ItemStack arrowCopy = projectileStack.copy();
-                    arrowCopy.setCount(1);
-                    projectileStack.decrement(1);
-                    list = List.of(arrowCopy);
+        int i = this.getMaxUseTime(stack) - remainingUseTicks;
+        if (stack.getItem() instanceof CosmicBowItem) {
+            i = Math.round(i * CosmicChaosSunManager.getCelestialBowPullMultiplier(user));
+        }
+        float f = getPullProgress(i);
+        if (!((double)f < 0.1)) {
+            List<ItemStack> list;
+            if (hasInfiniteAmmo) {
+                ItemStack virtualProjectile = projectileStack.copy();
+                virtualProjectile.setCount(1);
+                list = List.of(virtualProjectile);
+            } else {
+                ItemStack consumed = projectileStack.copy();
+                consumed.setCount(1);
+                projectileStack.decrement(1);
+                if (projectileStack.isEmpty() && user instanceof PlayerEntity playerEntity) {
+                    playerEntity.getInventory().removeOne(projectileStack);
                 }
-                if (world instanceof ServerWorld serverWorld) {
-                    if (!list.isEmpty()) {
-                        performStoppedUsing(stack, world, user, remainingUseTicks, f, playerEntity, serverWorld, list);
-                    }
+                list = List.of(consumed);
+            }
+            if (world instanceof ServerWorld serverWorld) {
+                if (!list.isEmpty()) {
+                    performStoppedUsing(stack, world, user, remainingUseTicks, f, user.getActiveHand(), serverWorld, list, null);
                 }
+            }
 
-                world.playSound((PlayerEntity)null, playerEntity.getX(), playerEntity.getY(), playerEntity.getZ(), SoundEvents.ENTITY_ARROW_SHOOT, SoundCategory.PLAYERS, 1.0F, 1.0F / (world.getRandom().nextFloat() * 0.4F + 1.2F) + f * 0.5F);
+            SoundCategory soundCategory = user instanceof PlayerEntity ? SoundCategory.PLAYERS : SoundCategory.HOSTILE;
+            world.playSound(null, user.getX(), user.getY(), user.getZ(), SoundEvents.ENTITY_ARROW_SHOOT, soundCategory, 1.0F, 1.0F / (world.getRandom().nextFloat() * 0.4F + 1.2F) + f * 0.5F);
+            if (user instanceof PlayerEntity playerEntity) {
                 playerEntity.incrementStat(Stats.USED.getOrCreateStat(this));
             }
         }
     }
 
-    protected void shoot(LivingEntity shooter, ProjectileEntity projectile, int index, float speed, float divergence, float yaw, @Nullable LivingEntity target) {
-        projectile.setVelocity(shooter, shooter.getPitch(), shooter.getYaw() + yaw, 0.0F, speed, divergence);
+    /**
+     * Full-draw shot fired by a mob at its current target: same pipeline as a player's
+     * released shot (custom arrows + rune abilities), no stats/packets/ammo consumption.
+     */
+    public void performMobShot(ServerWorld world, MobEntity mob, ItemStack stack, @Nullable LivingEntity target) {
+        ItemStack projectileStack = BowUser.getProjectile(mob, stack);
+        if (projectileStack.isEmpty()) {
+            return;
+        }
+        ItemStack virtualProjectile = projectileStack.copy();
+        virtualProjectile.setCount(1);
+        performStoppedUsing(stack, world, mob, 0, 1.0F, Hand.MAIN_HAND, world, List.of(virtualProjectile), target);
+        world.playSound(null, mob.getX(), mob.getY(), mob.getZ(), SoundEvents.ENTITY_ARROW_SHOOT, SoundCategory.HOSTILE, 1.0F, 1.0F / (world.getRandom().nextFloat() * 0.4F + 1.2F) + 0.5F);
     }
 
+    /**
+     * 1.20.1 has no RangedWeaponItem.createArrowEntity; this is the mod's own hook and the one
+     * the existing bow subclasses override.
+     */
     protected ProjectileEntity createArrow(World world, LivingEntity shooter, ItemStack arrowStack) {
         Item item = arrowStack.getItem();
         if (item instanceof ArrowItem arrowItem) {
@@ -160,88 +184,113 @@ public class SimplyBowItem extends BowItem {
         return new ArrowEntity(world, shooter);
     }
 
+    /**
+     * Bridge to the 1.21 hook name used by shootFan and by bows ported from master
+     * (CosmicBowItem overrides this directly). Defaults to {@link #createArrow}.
+     */
+    protected ProjectileEntity createArrowEntity(World world, LivingEntity shooter, ItemStack weaponStack, ItemStack arrowStack, boolean critical) {
+        ProjectileEntity projectileEntity = createArrow(world, shooter, arrowStack);
+        if (projectileEntity instanceof PersistentProjectileEntity persistentProjectile) {
+            persistentProjectile.setCritical(critical);
+        }
+        return projectileEntity;
+    }
+
+    /** 1.20.1 has no RangedWeaponItem.getWeaponStackDamage; bows always take 1 durability per shot. */
+    protected int getWeaponStackDamage(ItemStack arrowStack) {
+        return 1;
+    }
+
     protected void shootAll(ServerWorld world, LivingEntity shooter, Hand hand, ItemStack bow,
                             List<ItemStack> projectiles, float speed, float divergence,
                             boolean critical, @Nullable LivingEntity target) {
         EquipmentSlot bowSlot = hand == Hand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
         for (int i = 0; i < projectiles.size(); i++) {
             ItemStack arrowStack = projectiles.get(i);
-            ProjectileEntity projectileEntity = createArrow(world, shooter, arrowStack);
-            if (projectileEntity instanceof PersistentProjectileEntity p) {
-                p.setCritical(critical);
-                simplybows$applyRangedWeaponProjectileBonus(shooter, projectileEntity);
-            }
+            ProjectileEntity projectileEntity = createArrowEntity(world, shooter, bow, arrowStack, critical);
+            simplybows$applyRangedWeaponProjectileBonus(shooter, projectileEntity);
             shoot(shooter, projectileEntity, i, speed, divergence, 0.0F, target);
             world.spawnEntity(projectileEntity);
         }
-        bow.damage(1, shooter, e -> e.sendEquipmentBreakStatus(bowSlot));
+        bow.damage(getWeaponStackDamage(projectiles.isEmpty() ? ItemStack.EMPTY : projectiles.get(0)),
+                shooter, e -> e.sendEquipmentBreakStatus(bowSlot));
     }
 
+    protected void shoot(LivingEntity shooter, ProjectileEntity projectile, int index, float speed, float divergence, float yaw, @Nullable LivingEntity target) {
+        if (target != null && !(shooter instanceof PlayerEntity)) {
+            Vec3d targetPos = new Vec3d(target.getX(), target.getBodyY(1.0 / 3.0), target.getZ());
+            Vec3d direction = simplybows$getCompensatedAimDirection(projectile.getPos(), targetPos, speed, 0.05F);
+            if (direction.lengthSquared() > 1.0E-6) {
+                Vec3d aimed = direction.rotateY((float) Math.toRadians(-yaw));
+                projectile.setVelocity(aimed.x, aimed.y, aimed.z, speed, divergence);
+                simplybows$applyNonPlayerProjectileDamageModifier(shooter, projectile);
+                return;
+            }
+        }
+        projectile.setVelocity(shooter, shooter.getPitch(), shooter.getYaw() + yaw, 0.0F, speed, divergence);
+        simplybows$applyNonPlayerProjectileDamageModifier(shooter, projectile);
+    }
 
-    private void performStoppedUsing(ItemStack stack, World world, LivingEntity user, int remainingUseTicks, float f, PlayerEntity playerEntity, ServerWorld serverWorld, List<ItemStack> list) {
-        Item item = stack.getItem();
-        //playerEntity.sendMessage(Text.literal("Object is: " + item.getClass().getName()), false);
-
-        if (item instanceof IceBowItem iceBowItem) {
-            if (f < 1.0F) {
-                simplybows$shootVanillaArrow(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, false, null);
-            } else {
-                iceBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, true, null);
-            }
-        } else if (item instanceof VineBowItem vineBowItem) {
-            if (f < 1.0F) {
-                simplybows$shootVanillaArrow(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, false, null);
-            } else {
-                vineBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, true, null);
-            }
-        } else if (item instanceof BubbleBowItem bubbleBowItem) {
-            bubbleBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
-        } else if (item instanceof BeeBowItem beeBowItem) {
-            beeBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
-        } else if (item instanceof BlossomBowItem blossomBowItem) {
-            if (f < 1.0F) {
-                simplybows$shootVanillaArrow(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, false, null);
-            } else {
-                blossomBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, true, null);
-            }
-        } else if (item instanceof EarthBowItem earthBowItem) {
-            if (f < 1.0F) {
-                simplybows$shootVanillaArrow(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, false, null);
-            } else {
-                earthBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, true, null);
-            }
-        } else if (item instanceof EchoBowItem echoBowItem) {
-            echoBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
-        } else if (item instanceof CrossbowItem) {
-            playerEntity.sendMessage(Text.literal("You stopped using the Crossbow!"), false);
-        } else {
-            this.shootAll(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
+    private static Vec3d simplybows$getCompensatedAimDirection(Vec3d origin, Vec3d targetPos, float speed, float gravityPerTick) {
+        Vec3d delta = targetPos.subtract(origin);
+        double horizontalDistance = Math.sqrt(delta.x * delta.x + delta.z * delta.z);
+        if (horizontalDistance <= 1.0E-6) {
+            return delta.lengthSquared() > 1.0E-6 ? delta.normalize() : Vec3d.ZERO;
         }
 
+        double safeSpeed = Math.max(0.1, speed);
+        double travelTicks = horizontalDistance / safeSpeed;
+        double dropCompensation = 0.5 * gravityPerTick * travelTicks * travelTicks;
+        Vec3d compensated = new Vec3d(delta.x, delta.y + dropCompensation, delta.z);
+        return compensated.lengthSquared() > 1.0E-6 ? compensated.normalize() : delta.normalize();
     }
 
-    private void performShoot(ItemStack stack, World world, LivingEntity user, int remainingUseTicks, float f, PlayerEntity playerEntity, ServerWorld serverWorld, List<ItemStack> list) {
-        Item item = stack.getItem();
-        playerEntity.sendMessage(Text.literal("Object is: " + item.getClass().getName()), false);
+    private static void simplybows$applyNonPlayerProjectileDamageModifier(LivingEntity shooter, ProjectileEntity projectile) {
+        if (!(shooter instanceof PlayerEntity) && projectile instanceof PersistentProjectileEntity persistentProjectile) {
+            persistentProjectile.setDamage(
+                    CombatTargeting.applyNonPlayerProjectileDamageModifier(shooter, (float) persistentProjectile.getDamage()));
+        }
+    }
 
+
+    private void performStoppedUsing(ItemStack stack, World world, LivingEntity user, int remainingUseTicks, float f, Hand hand, ServerWorld serverWorld, List<ItemStack> list, @Nullable LivingEntity target) {
+        Item item = stack.getItem();
+
+        // Java 17 target: instanceof chain rather than a pattern-matching switch.
         if (item instanceof IceBowItem iceBowItem) {
-            iceBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
+            if (f < 1.0F) {
+                simplybows$shootVanillaArrow(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, false, target);
+            } else {
+                iceBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, true, target);
+            }
         } else if (item instanceof VineBowItem vineBowItem) {
-            vineBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
+            if (f < 1.0F) {
+                simplybows$shootVanillaArrow(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, false, target);
+            } else {
+                vineBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, true, target);
+            }
         } else if (item instanceof BubbleBowItem bubbleBowItem) {
-            bubbleBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
+            bubbleBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
         } else if (item instanceof BeeBowItem beeBowItem) {
-            beeBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
+            beeBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
         } else if (item instanceof BlossomBowItem blossomBowItem) {
-            blossomBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
+            if (f < 1.0F) {
+                simplybows$shootVanillaArrow(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, false, target);
+            } else {
+                blossomBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, true, target);
+            }
         } else if (item instanceof EarthBowItem earthBowItem) {
-            earthBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
+            if (f < 1.0F) {
+                simplybows$shootVanillaArrow(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, false, target);
+            } else {
+                earthBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, true, target);
+            }
         } else if (item instanceof EchoBowItem echoBowItem) {
-            echoBowItem.performStoppedUsing(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
-        } else if (item instanceof CrossbowItem) {
-            playerEntity.sendMessage(Text.literal("You stopped using the Crossbow!"), false);
+            echoBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
+        } else if (item instanceof CosmicBowItem cosmicBowItem) {
+            cosmicBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
         } else {
-            this.shootAll(serverWorld, playerEntity, playerEntity.getActiveHand(), stack, list, f * 3.0F, 1.0F, f == 1.0F, null);
+            this.shootAll(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
         }
 
     }
@@ -257,59 +306,40 @@ public class SimplyBowItem extends BowItem {
         float i = 1.0F;
         EquipmentSlot bowSlot = hand == Hand.MAIN_HAND ? EquipmentSlot.MAINHAND : EquipmentSlot.OFFHAND;
 
-        if (shooter instanceof ServerPlayerEntity serverPlayerEntity) {
-            boolean hasInfiniteAmmo = simplybows$hasInfiniteAmmo(serverPlayerEntity, stack);
-            // Get arrows from player inventory
-            Map<ItemStack, Integer> arrowStacks = HelperMethods.findArrowStacks(serverPlayerEntity);
+        int additionalArrowsNeeded = Math.max(0, quantity - 1) * projectiles.size();
+        BowUser.ExtraArrowSupply extraArrows = BowUser.extraArrows(shooter, stack, additionalArrowsNeeded);
 
-            int additionalArrowsNeeded = Math.max(0, quantity - 1) * projectiles.size();
-
-            // Collect arrows from player inventory
-            List<ItemStack> usableArrows = hasInfiniteAmmo ? List.of() : HelperMethods.collectArrows(arrowStacks, additionalArrowsNeeded);
-
-            int arrowsConsumed = 0;
-
-            // Iterate through the projectiles
-            for (int j = 0; j < projectiles.size(); ++j) {
-                for (int p = 0; p < quantity; ++p) {
-                    ItemStack arrowForProjectile;
-                    if (p == 0) {
-                        // First shot for this projectile uses the arrow already consumed by Minecraft
-                        arrowForProjectile = projectiles.get(j);
-                    } else if (hasInfiniteAmmo) {
-                        arrowForProjectile = projectiles.get(j).copy();
-                        arrowForProjectile.setCount(1);
-                    } else if (arrowsConsumed < additionalArrowsNeeded && !usableArrows.isEmpty()) {
-                        arrowForProjectile = HelperMethods.consumeNextArrow(usableArrows);
-                        if (arrowForProjectile == null || arrowForProjectile.isEmpty()) {
-                            break;
-                        }
-                        arrowsConsumed++;
-                    } else {
+        // Iterate through the projectiles
+        for (int j = 0; j < projectiles.size(); ++j) {
+            for (int p = 0; p < quantity; ++p) {
+                ItemStack arrowForProjectile;
+                if (p == 0) {
+                    // First shot for this projectile uses the arrow already consumed by Minecraft
+                    arrowForProjectile = projectiles.get(j);
+                } else {
+                    arrowForProjectile = extraArrows.next(projectiles.get(j));
+                    if (arrowForProjectile == null || arrowForProjectile.isEmpty()) {
                         // insufficient arrows to continue
                         break;
                     }
+                }
 
-                    // Calculate the spread
-                    float k = h + i * (float) ((j + 1) / 2) * g;
-                    i = -i;
+                // Calculate the spread
+                float k = h + i * (float) ((j + 1) / 2) * g;
+                i = -i;
 
-                    // Create and shoot the projectile
-                    ProjectileEntity projectileEntity = bow.createArrow(world, shooter, arrowForProjectile);
-                    if (projectileEntity instanceof PersistentProjectileEntity p2) {
-                        p2.setCritical(critical);
-                    }
-                    bow.simplybows$applyRangedWeaponProjectileBonus(shooter, projectileEntity);
-                    bow.shoot(shooter, projectileEntity, j, speed, divergence, k + (p - ((float) quantity / 2)) * quantity, target);
-                    world.spawnEntity(projectileEntity);
+                // Create and shoot the projectile
+                ProjectileEntity projectileEntity = bow.createArrowEntity(world, shooter, stack, arrowForProjectile, critical);
+                bow.simplybows$applyRangedWeaponProjectileBonus(shooter, projectileEntity);
+                bow.shoot(shooter, projectileEntity, j, speed, divergence, k + (p - ((float) quantity / 2)) * quantity, target);
+                world.spawnEntity(projectileEntity);
 
-                    // Damage the bow after firing
-                    stack.damage(1, shooter, e -> e.sendEquipmentBreakStatus(bowSlot));
+                // Damage the bow after firing
+                stack.damage(bow.getWeaponStackDamage(arrowForProjectile), shooter, e -> e.sendEquipmentBreakStatus(bowSlot));
 
-                    // Stop processing if the bow breaks
-                    if (stack.isEmpty()) {
-                        return;
-                    }
+                // Stop processing if the bow breaks
+                if (stack.isEmpty()) {
+                    return;
                 }
             }
         }
@@ -329,6 +359,17 @@ public class SimplyBowItem extends BowItem {
         }
         long endMs = System.currentTimeMillis() + Math.max(1, cooldownTicks) * 50L;
         simplybows$sendCooldownPacket(player, getTooltipBowKey(), endMs, cooldownTicks);
+    }
+
+    /**
+     * Cooldown-bar sync for any wielder: sends the packet when the wielder is a player,
+     * no-ops for mobs (whose shot cadence is governed by MobBowFireManager and the
+     * managers' own server-side cooldown storage).
+     */
+    protected void simplybows$startAbilityItemCooldown(LivingEntity user, int cooldownTicks) {
+        if (user instanceof ServerPlayerEntity player) {
+            simplybows$startAbilityItemCooldown(player, cooldownTicks);
+        }
     }
 
     /**

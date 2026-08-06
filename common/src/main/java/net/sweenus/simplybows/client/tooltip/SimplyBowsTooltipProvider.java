@@ -3,6 +3,8 @@ package net.sweenus.simplybows.client.tooltip;
 import net.minecraft.item.ItemStack;
 import net.minecraft.registry.Registries;
 import net.minecraft.text.Text;
+import net.minecraft.text.TextContent;
+import net.minecraft.text.TranslatableTextContent;
 import net.minecraft.util.Identifier;
 import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
@@ -17,8 +19,11 @@ import net.sweenus.simplytooltips.api.UpgradeSection;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Predicate;
 
 public final class SimplyBowsTooltipProvider implements TooltipProvider {
+
+    private static final String SLOT_HEADER_PREFIX = "item.modifiers.";
 
     @Override
     public boolean supports(ItemStack stack) {
@@ -35,6 +40,7 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
                 : rawLines.get(0).getString();
 
         List<String> abilityLines = getAbilityLines(bowKey, rawLines);
+        appendEnchantmentLines(abilityLines, rawLines);
 
         TooltipTheme defaults = TooltipTheme.defaultTheme();
 
@@ -128,6 +134,94 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
         return result;
     }
 
+    private static void appendEnchantmentLines(List<String> abilityLines, List<Text> rawLines) {
+        List<String> enchantmentLines = getEnchantmentLines(rawLines);
+        if (enchantmentLines.isEmpty()) {
+            return;
+        }
+
+        abilityLines.add(ModernTooltipModel.SECTION_MARKER + "Enchantments");
+        abilityLines.addAll(enchantmentLines);
+    }
+
+    private static List<String> getEnchantmentLines(List<Text> rawLines) {
+        if (rawLines.size() < 2) return List.of();
+
+        String holdAltText = Text.translatable("tooltip.simplybows.hold_alt").getString().trim();
+        boolean afterBowSections = false;
+        boolean inAttributeBlock = false;
+        List<String> result = new ArrayList<>();
+
+        for (int i = 1; i < rawLines.size(); i++) {
+            Text line = rawLines.get(i);
+            String trimmed = line.getString().trim();
+
+            if (!afterBowSections) {
+                if (trimmed.equals(holdAltText)) {
+                    afterBowSections = true;
+                }
+                continue;
+            }
+
+            if (trimmed.isEmpty()) {
+                inAttributeBlock = false;
+                continue;
+            }
+            if (isAttributeContextLine(line)) {
+                inAttributeBlock = true;
+                continue;
+            }
+            if (inAttributeBlock) {
+                continue;
+            }
+
+            if (!trimmed.isEmpty()) {
+                result.add(trimmed);
+            }
+        }
+
+        return result;
+    }
+
+    private static boolean isAttributeContextLine(Text line) {
+        if (hasTranslatableKey(line, key -> key.startsWith(SLOT_HEADER_PREFIX))) {
+            return true;
+        }
+
+        String s = line.getString().replace('\u00A0', ' ').trim();
+        String lower = s.toLowerCase(java.util.Locale.ROOT);
+        return lower.equals("when held:")
+                || (lower.startsWith("when in ") && lower.endsWith(":"));
+    }
+
+    private static boolean hasTranslatableKey(Text text, Predicate<String> matcher) {
+        if (text == null) return false;
+        return hasTranslatableKey0(text, matcher, 0);
+    }
+
+    private static boolean hasTranslatableKey0(Text text, Predicate<String> matcher, int depth) {
+        if (depth > 8) return false;
+
+        TextContent content = text.getContent();
+        if (content instanceof TranslatableTextContent translatable) {
+            if (matcher.test(translatable.getKey())) return true;
+            for (Object arg : translatable.getArgs()) {
+                if (arg instanceof Text nested && hasTranslatableKey0(nested, matcher, depth + 1)) {
+                    return true;
+                }
+            }
+        }
+
+        for (Text sibling : text.getSiblings()) {
+            if (hasTranslatableKey0(sibling, matcher, depth + 1)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    // --- Bow key from registry ID ---
+
     private static String getBowKey(ItemStack stack) {
         Identifier id = Registries.ITEM.getId(stack.getItem());
         if (id == null || !"simplybows".equals(id.getNamespace())) return "generic";
@@ -139,12 +233,13 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
 
     private static String getStringEffectKey(String bowKey) {
         return switch (bowKey) {
-            case "vine" -> "tooltip.simplybows.bow.vine.string_effect";
-            case "earth" -> "tooltip.simplybows.bow.earth.string_effect";
-            case "echo" -> "tooltip.simplybows.bow.echo.string_effect";
-            case "ice" -> "tooltip.simplybows.bow.ice.string_effect";
-            case "bee" -> "tooltip.simplybows.bow.bee.string_effect";
-            case "bubble" -> "tooltip.simplybows.bow.bubble.string_effect";
+            case "vine"    -> "tooltip.simplybows.bow.vine.string_effect";
+            case "earth"   -> "tooltip.simplybows.bow.earth.string_effect";
+            case "echo"    -> "tooltip.simplybows.bow.echo.string_effect";
+            case "cosmic"  -> "tooltip.simplybows.bow.cosmic.string_effect";
+            case "ice"     -> "tooltip.simplybows.bow.ice.string_effect";
+            case "bee"     -> "tooltip.simplybows.bow.bee.string_effect";
+            case "bubble"  -> "tooltip.simplybows.bow.bubble.string_effect";
             case "blossom" -> "tooltip.simplybows.bow.blossom.string_effect";
             default -> "tooltip.simplybows.bow.generic.string_effect";
         };
@@ -152,12 +247,13 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
 
     private static String getFrameEffectKey(String bowKey) {
         return switch (bowKey) {
-            case "vine" -> "tooltip.simplybows.bow.vine.frame_effect";
-            case "earth" -> "tooltip.simplybows.bow.earth.frame_effect";
-            case "echo" -> "tooltip.simplybows.bow.echo.frame_effect";
-            case "ice" -> "tooltip.simplybows.bow.ice.frame_effect";
-            case "bee" -> "tooltip.simplybows.bow.bee.frame_effect";
-            case "bubble" -> "tooltip.simplybows.bow.bubble.frame_effect";
+            case "vine"    -> "tooltip.simplybows.bow.vine.frame_effect";
+            case "earth"   -> "tooltip.simplybows.bow.earth.frame_effect";
+            case "echo"    -> "tooltip.simplybows.bow.echo.frame_effect";
+            case "cosmic"  -> "tooltip.simplybows.bow.cosmic.frame_effect";
+            case "ice"     -> "tooltip.simplybows.bow.ice.frame_effect";
+            case "bee"     -> "tooltip.simplybows.bow.bee.frame_effect";
+            case "bubble"  -> "tooltip.simplybows.bow.bubble.frame_effect";
             case "blossom" -> "tooltip.simplybows.bow.blossom.frame_effect";
             default -> "tooltip.simplybows.bow.generic.frame_effect";
         };
@@ -165,8 +261,8 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
 
     private static String getRuneEffectKey(String bowKey, RuneEtching rune) {
         return switch (bowKey) {
-            case "bee", "vine", "earth", "ice", "echo", "bubble", "blossom" ->
-                    "tooltip.simplybows.bow." + bowKey + ".rune." + rune.id();
+            case "bee", "vine", "earth", "ice", "echo", "cosmic", "bubble", "blossom" ->
+                "tooltip.simplybows.bow." + bowKey + ".rune." + rune.id();
             default -> "tooltip.simplybows.bow.generic.rune." + rune.id();
         };
     }

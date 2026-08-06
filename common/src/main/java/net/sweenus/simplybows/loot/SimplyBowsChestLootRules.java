@@ -54,7 +54,8 @@ public final class SimplyBowsChestLootRules {
                 ItemRegistry.BEE_BOW.get(),
                 ItemRegistry.BLOSSOM_BOW.get(),
                 ItemRegistry.EARTH_BOW.get(),
-                ItemRegistry.ECHO_BOW.get()
+                ItemRegistry.ECHO_BOW.get(),
+                ItemRegistry.COSMIC_BOW.get()
         ));
     }
 
@@ -88,6 +89,9 @@ public final class SimplyBowsChestLootRules {
                     ItemRegistry.RUNE_ETCHING_BOUNTY.get(),
                     ItemRegistry.RUNE_ETCHING_CHAOS.get()
             ));
+        }
+        if (matchesAny(path, "chests/end_city_treasure")) {
+            pools.add(singleItemChancePool(ItemRegistry.COSMIC_BOW.get(), boostedBowChance()));
         }
     }
 

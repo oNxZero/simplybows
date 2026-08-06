@@ -24,6 +24,7 @@ public final class SimplyBowsCreativeTabRegistry {
                         entries.add(new ItemStack(ItemRegistry.BLOSSOM_BOW.get()));
                         entries.add(new ItemStack(ItemRegistry.EARTH_BOW.get()));
                         entries.add(new ItemStack(ItemRegistry.ECHO_BOW.get()));
+                        entries.add(new ItemStack(ItemRegistry.COSMIC_BOW.get()));
                         entries.add(new ItemStack(ItemRegistry.ENCHANTED_BOW_STRING.get()));
                         entries.add(new ItemStack(ItemRegistry.REINFORCED_BOW_FRAME.get()));
                         entries.add(new ItemStack(ItemRegistry.RUNE_ETCHING_PAIN.get()));

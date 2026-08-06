@@ -50,28 +50,26 @@ public class IceBowItem extends SimplyBowItem {
     }
 
 
-    public static void passiveParticles(ServerPlayerEntity serverPlayer, PlayerEntity player, ServerWorld world) {
+    public static void passiveParticles(LivingEntity user, ServerWorld world) {
         int random = (int) (Math.random() * 30);
         Item item = ItemRegistry.ICE_BOW.get();
-        if (HelperMethods.isHoldingItem(item, serverPlayer) && serverPlayer.age % (5 + random) == 0) {
-            HelperMethods.spawnParticlesAtItem(world, player, item, ParticleTypes.SNOWFLAKE, 1);
-            HelperMethods.spawnParticlesAtItem(world, player, item, ParticleTypes.WHITE_ASH, 3);
+        if (HelperMethods.isHoldingItem(item, user) && user.age % (5 + random) == 0) {
+            HelperMethods.spawnParticlesAtItem(world, user, item, ParticleTypes.SNOWFLAKE, 1);
+            HelperMethods.spawnParticlesAtItem(world, user, item, ParticleTypes.WHITE_ASH, 3);
         }
     }
 
-    public void performStoppedUsing(ServerWorld serverWorld, PlayerEntity player, Hand hand, ItemStack stack, List<ItemStack> list, float f, float g, boolean bl, @Nullable LivingEntity livingEntity) {
+    public void performStoppedUsing(ServerWorld serverWorld, LivingEntity shooter, Hand hand, ItemStack stack, List<ItemStack> list, float f, float g, boolean bl, @Nullable LivingEntity livingEntity) {
         BowUpgradeData upgrades = BowUpgradeData.from(stack);
         RuneEtching rune = upgrades.runeEtching();
-        boolean chaosWallReady = rune == RuneEtching.CHAOS && IceChaosWallManager.isWallReady(serverWorld, player.getUuid());
+        boolean chaosWallReady = rune == RuneEtching.CHAOS && IceChaosWallManager.isWallReady(serverWorld, shooter.getUuid());
 
         if (chaosWallReady) {
             int durationTicks = Math.max(20,
                     SimplyBowsConfig.INSTANCE.iceBow.chaosWallDurationTicks.get()
                             + Math.max(0, upgrades.frameLevel()) * SimplyBowsConfig.INSTANCE.iceBow.chaosWallDurationPerFrameTicks.get());
             int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.iceBow.chaosWallCooldownTicks.get());
-            if (player instanceof ServerPlayerEntity serverPlayer) {
-                simplybows$startAbilityItemCooldown(serverPlayer, durationTicks + cooldownTicks);
-            }
+            simplybows$startAbilityItemCooldown(shooter, durationTicks + cooldownTicks);
         }
 
         int quantity = getArrowQuantity(upgrades);
@@ -84,7 +82,9 @@ public class IceBowItem extends SimplyBowItem {
 
         LivingEntity painTarget = null;
         if (rune == RuneEtching.PAIN) {
-            painTarget = findNearestHostile(serverWorld, player);
+            painTarget = livingEntity != null && CombatTargeting.isOffensiveTargetCandidate(livingEntity, shooter)
+                    ? livingEntity
+                    : findNearestHostile(serverWorld, shooter);
         }
 
         NbtCompound customData = stack.getOrCreateNbt();
@@ -108,12 +108,12 @@ public class IceBowItem extends SimplyBowItem {
         }
 
         if (chaosWallReady) {
-            this.shootAll(serverWorld, player, player.getActiveHand(), stack, list, f * SimplyBowsConfig.INSTANCE.iceBow.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.iceBow.chaosWallArrowDivergence.get() * 0.01F, f == 1.0F, null);
+            this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.iceBow.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.iceBow.chaosWallArrowDivergence.get() * 0.01F, f == 1.0F, livingEntity);
         } else {
-            this.shootFan(this, serverWorld, player, player.getActiveHand(), stack, list, f * SimplyBowsConfig.INSTANCE.iceBow.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.iceBow.arrowDivergence.get(), f == 1.0F, null, quantity);
+            this.shootFan(this, serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.iceBow.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.iceBow.arrowDivergence.get(), f == 1.0F, livingEntity, quantity);
         }
-        HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, player, ParticleTypes.SNOWFLAKE, 6);
-        HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, player, ParticleTypes.WHITE_ASH, 8);
+        HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, shooter, ParticleTypes.SNOWFLAKE, 6);
+        HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, shooter, ParticleTypes.WHITE_ASH, 8);
 
     }
 
@@ -217,19 +217,19 @@ public class IceBowItem extends SimplyBowItem {
         return quantity;
     }
 
-    private LivingEntity findNearestHostile(ServerWorld world, PlayerEntity player) {
+    private LivingEntity findNearestHostile(ServerWorld world, LivingEntity shooter) {
         List<LivingEntity> hostiles = world.getEntitiesByClass(
                 LivingEntity.class,
-                player.getBoundingBox().expand(painTargetHorizontalRange(), painTargetVerticalRange(), painTargetHorizontalRange()),
-                CombatTargeting::isOffensiveTargetCandidate
+                shooter.getBoundingBox().expand(painTargetHorizontalRange(), painTargetVerticalRange(), painTargetHorizontalRange()),
+                candidate -> CombatTargeting.isOffensiveTargetCandidate(candidate, shooter)
         );
         LivingEntity best = null;
         double bestDist = Double.MAX_VALUE;
         for (LivingEntity hostile : hostiles) {
-            if (!CombatTargeting.checkFriendlyFire(hostile, player)) {
+            if (!CombatTargeting.checkFriendlyFire(hostile, shooter)) {
                 continue;
             }
-            double dist = hostile.squaredDistanceTo(player);
+            double dist = hostile.squaredDistanceTo(shooter);
             if (dist < bestDist) {
                 bestDist = dist;
                 best = hostile;

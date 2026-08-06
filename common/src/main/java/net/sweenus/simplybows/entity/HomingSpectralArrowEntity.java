@@ -14,6 +14,7 @@ import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.util.CombatTargeting;
 import net.sweenus.simplybows.world.IceChaosWallManager;
 
@@ -48,8 +49,12 @@ public class HomingSpectralArrowEntity extends SpectralArrowEntity {
     }
 
     public HomingSpectralArrowEntity(World world, LivingEntity owner, ItemStack arrowStack, ItemStack weaponStack) {
-        super(world, owner);
+        super(EntityRegistry.HOMING_SPECTRAL_ARROW.get(), world);
         this.setOwner(owner);
+        this.setPosition(owner.getX(), owner.getEyeY() - 0.1, owner.getZ());
+        this.prevX = owner.getX();
+        this.prevY = owner.getEyeY() - 0.1;
+        this.prevZ = owner.getZ();
     }
 
     @Override

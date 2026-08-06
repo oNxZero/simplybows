@@ -25,6 +25,7 @@ public class SimplyBowsConfig extends Config {
     public BlossomBowSection blossomBow = new BlossomBowSection();
     public EarthBowSection earthBow = new EarthBowSection();
     public EchoBowSection echoBow = new EchoBowSection();
+    public CosmicBowSection cosmicBow = new CosmicBowSection();
     public LootSection loot = new LootSection();
     public UpgradeSection upgrades = new UpgradeSection();
     public GeneralSection general = new GeneralSection();
@@ -414,6 +415,81 @@ public class SimplyBowsConfig extends Config {
         public ValidatedFloat chaosBlackHoleDamagePerTick = new ValidatedFloat(2.0F, 20.0F, 0.1F);
     }
 
+    // ── Cosmic Bow ─────────────────────────────────────────────
+
+    public static class CosmicBowSection extends ConfigSection {
+        // Arrow
+        public ConfigGroup arrowGroup = new ConfigGroup("arrow");
+        public ValidatedFloat arrowSpeedMultiplier = new ValidatedFloat(0.9F, 3.0F, 0.1F);
+        public ValidatedFloat arrowDivergence = new ValidatedFloat(0.8F, 5.0F, 0.0F);
+        @ConfigGroup.Pop
+        public ValidatedDouble baseDamage = new ValidatedDouble(2.0, 20.0, 0.1);
+
+        // Constellation Trail
+        public ConfigGroup trailGroup = new ConfigGroup("constellationTrail");
+        public ValidatedInt trailDurationTicks = new ValidatedInt(25, 300, 10);
+        public ValidatedInt trailLineDurationTicks = new ValidatedInt(12, 300, 5);
+        public ValidatedFloat trailMaxConnectionDist = new ValidatedFloat(2.5F, 6.0F, 0.5F);
+        @ConfigGroup.Pop
+        public ValidatedFloat trailConnectionProbability = new ValidatedFloat(0.35F, 1.0F, 0.05F);
+
+        // Orbit
+        public ConfigGroup orbitGroup = new ConfigGroup("orbit");
+        public ValidatedInt orbitDurationTicks = new ValidatedInt(180, 600, 20);
+        public ValidatedInt orbitDurationBonusPerString = new ValidatedInt(20, 200, 0);
+        public ValidatedDouble orbitAttackRadius = new ValidatedDouble(10.0, 32.0, 1.0);
+        public ValidatedFloat orbitAttackDamage = new ValidatedFloat(4.0F, 40.0F, 0.1F);
+        public ValidatedInt orbitAttackIntervalMinTicks = new ValidatedInt(18, 200, 1);
+        public ValidatedInt orbitMaxJumps = new ValidatedInt(5, 20, 1);
+        @ConfigGroup.Pop
+        public ValidatedInt orbitAttackIntervalMaxTicks = new ValidatedInt(36, 400, 1);
+
+        // Rune: Pain
+        public ConfigGroup painGroup = new ConfigGroup("pain");
+        public ValidatedInt painOrbitCooldownTicks = new ValidatedInt(1600, 12000, 20);
+        public ValidatedInt painMaxTetherTargets = new ValidatedInt(6, 32, 0);
+        @ConfigGroup.Pop
+        public ValidatedDouble painTetherPullStrength = new ValidatedDouble(0.08, 1.0, 0.0);
+
+        // Rune: Grace
+        public ConfigGroup graceGroup = new ConfigGroup("grace");
+        public ValidatedInt graceFieldDurationTicks = new ValidatedInt(160, 600, 20);
+        public ValidatedInt graceFieldCooldownTicks = new ValidatedInt(400, 12000, 20);
+        public ValidatedDouble graceFieldRadius = new ValidatedDouble(4.5, 12.0, 1.0);
+        public ValidatedInt graceFieldBuffDurationTicks = new ValidatedInt(30, 200, 10);
+        public ValidatedFloat graceFieldCocoonChance = new ValidatedFloat(0.20F, 1.0F, 0.0F);
+        public ValidatedFloat graceFieldCocoonNightChanceBonus = new ValidatedFloat(0.20F, 1.0F, 0.0F);
+        @ConfigGroup.Pop
+        public ValidatedInt graceFieldBuffAmplifier = new ValidatedInt(0, 4, 0);
+
+        // Rune: Bounty
+        public ConfigGroup bountyGroup = new ConfigGroup("bounty");
+        public ValidatedInt bountyCooldownTicks = new ValidatedInt(40, 12000, 0);
+        public ValidatedFloat bountyArrowSpeedMultiplier = new ValidatedFloat(0.62F, 1.0F, 0.1F);
+        public ValidatedInt bountyMaxChargeTicks = new ValidatedInt(60, 400, 20);
+        public ValidatedInt bountyImplodeTicks = new ValidatedInt(42, 120, 10);
+        public ValidatedDouble bountyMinRadius = new ValidatedDouble(3.0, 16.0, 1.0);
+        public ValidatedDouble bountyMaxRadius = new ValidatedDouble(7.0, 24.0, 1.0);
+        public ValidatedFloat bountyMinDamage = new ValidatedFloat(5.0F, 80.0F, 0.0F);
+        public ValidatedFloat bountyMaxDamage = new ValidatedFloat(13.0F, 120.0F, 0.0F);
+        @ConfigGroup.Pop
+        public ValidatedDouble bountyPullStrength = new ValidatedDouble(0.18, 1.5, 0.0);
+
+        // Rune: Chaos
+        public ConfigGroup chaosGroup = new ConfigGroup("chaos");
+        public ValidatedInt chaosSunDurationTicks = new ValidatedInt(200, 1200, 20);
+        public ValidatedInt chaosSunMaxDurationTicks = new ValidatedInt(1200, 2400, 20);
+        public ValidatedInt chaosSunCooldownTicks = new ValidatedInt(1200, 12000, 20);
+        public ValidatedDouble chaosSunRadius = new ValidatedDouble(8.0, 32.0, 1.0);
+        public ValidatedInt chaosSunMaxCapturedProjectiles = new ValidatedInt(40, 400, 1);
+        public ValidatedInt chaosSunFireIntervalTicks = new ValidatedInt(60, 300, 20);
+        public ValidatedInt chaosSunDurationBonusPerShotTicks = new ValidatedInt(40, 400, 20);
+        public ValidatedInt chaosCelestialSwiftnessDurationTicks = new ValidatedInt(140, 600, 20);
+        public ValidatedInt chaosCelestialSwiftnessMaxStacks = new ValidatedInt(15, 15, 1);
+        @ConfigGroup.Pop
+        public ValidatedFloat chaosCelestialBowPullBonusPerStack = new ValidatedFloat(0.16F, 1.0F, 0.0F);
+    }
+
     // ── Loot ─────────────────────────────────────────────────
 
     public static class LootSection extends ConfigSection {
@@ -450,8 +526,9 @@ public class SimplyBowsConfig extends Config {
         public ValidatedFloat drawSpeedBee = new ValidatedFloat(20.0F, 100.0F, 1.0F);
         public ValidatedFloat drawSpeedBlossom = new ValidatedFloat(20.0F, 100.0F, 1.0F);
         public ValidatedFloat drawSpeedEarth = new ValidatedFloat(40.0F, 100.0F, 1.0F);
-        @ConfigGroup.Pop
         public ValidatedFloat drawSpeedEcho = new ValidatedFloat(30.0F, 100.0F, 1.0F);
+        @ConfigGroup.Pop
+        public ValidatedFloat drawSpeedCosmic = new ValidatedFloat(30.0F, 100.0F, 1.0F);
     }
 
     // ── General ──────────────────────────────────────────────
@@ -460,5 +537,13 @@ public class SimplyBowsConfig extends Config {
         public ValidatedBoolean debugMode = new ValidatedBoolean(false);
         public ValidatedBoolean modernTooltipsEnabled = new ValidatedBoolean(true);
         public ValidatedDouble rangedWeaponApiDamageMultiplier = new ValidatedDouble(1.0, 100.0, 0.0);
+
+        // Non-player (mob) usage of unique bows
+        public ValidatedBoolean enableNonPlayerBowUse = new ValidatedBoolean(true);
+        public ValidatedInt nonPlayerBowCheckInterval = new ValidatedInt(60, 6000, 1);
+        public ValidatedInt nonPlayerBowChance = new ValidatedInt(50, 100, 0);
+        public ValidatedDouble nonPlayerBowAbilityDamageModifier = new ValidatedDouble(0.5, 100.0, 0.0);
+        public ValidatedDouble nonPlayerBowProjectileDamageModifier = new ValidatedDouble(0.5, 100.0, 0.0);
+        public ValidatedDouble nonPlayerBowDamageToPlayersModifier = new ValidatedDouble(0.5, 100.0, 0.0);
     }
 }

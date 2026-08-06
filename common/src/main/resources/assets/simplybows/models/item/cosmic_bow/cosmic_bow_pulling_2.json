@@ -1,0 +1,6 @@
+{
+  "parent": "simplybows:item/bow_large_template",
+  "textures": {
+    "layer0": "simplybows:item/echo_bow/echo_bow_pulling_2"
+  }
+}

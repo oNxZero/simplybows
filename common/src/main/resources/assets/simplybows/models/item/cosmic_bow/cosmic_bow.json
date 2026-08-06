@@ -1,0 +1,28 @@
+{
+  "parent": "simplybows:item/bow_large_template",
+  "textures": {
+    "layer0": "simplybows:item/echo_bow/echo_bow"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "pulling": 1
+      },
+      "model": "simplybows:item/cosmic_bow/cosmic_bow_pulling_0"
+    },
+    {
+      "predicate": {
+        "pulling": 1,
+        "pull": 0.65
+      },
+      "model": "simplybows:item/cosmic_bow/cosmic_bow_pulling_1"
+    },
+    {
+      "predicate": {
+        "pulling": 1,
+        "pull": 0.9
+      },
+      "model": "simplybows:item/cosmic_bow/cosmic_bow_pulling_2"
+    }
+  ]
+}

@@ -13,6 +13,7 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.world.BlossomChaosKoiManager;
@@ -29,7 +30,12 @@ public class BlossomArrowEntity extends ArrowEntity {
     }
 
     public BlossomArrowEntity(World world, LivingEntity owner, ItemStack arrowStack, ItemStack weaponStack) {
-        super(world, owner);
+        super(EntityRegistry.BLOSSOM_ARROW.get(), world);
+        this.setOwner(owner);
+        this.setPosition(owner.getX(), owner.getEyeY() - 0.1, owner.getZ());
+        this.prevX = owner.getX();
+        this.prevY = owner.getEyeY() - 0.1;
+        this.prevZ = owner.getZ();
         this.upgrades = BowUpgradeData.from(weaponStack);
     }
 

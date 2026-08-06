@@ -6,6 +6,7 @@ import net.fabricmc.api.Environment;
 import net.minecraft.item.Item;
 import net.minecraft.util.Identifier;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
+import net.sweenus.simplybows.world.CosmicChaosSunManager;
 
 @Environment(EnvType.CLIENT)
 public class SimplyBowsItemProperties {
@@ -21,6 +22,7 @@ public class SimplyBowsItemProperties {
         makeBows(ItemRegistry.BLOSSOM_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedBlossom.get());
         makeBows(ItemRegistry.EARTH_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedEarth.get());
         makeBows(ItemRegistry.ECHO_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedEcho.get());
+        makeBows(ItemRegistry.COSMIC_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedCosmic.get());
     }
 
     public static void makeBows(Item item, float drawSpeed) {
@@ -30,7 +32,10 @@ public class SimplyBowsItemProperties {
                 return 0.0F;
             } else {
                 int useTicks = itemStack.getMaxUseTime() - livingEntity.getItemUseTimeLeft();
-                return livingEntity.getActiveItem() != itemStack ? 0.0F : (float) useTicks / drawSpeed;
+                float multiplier = itemStack.isOf(ItemRegistry.COSMIC_BOW.get())
+                        ? CosmicChaosSunManager.getCelestialBowPullMultiplier(livingEntity)
+                        : 1.0F;
+                return livingEntity.getActiveItem() != itemStack ? 0.0F : (float) useTicks * multiplier / drawSpeed;
             }
         });
 

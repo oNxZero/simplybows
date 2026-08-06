@@ -60,9 +60,7 @@ public class EchoBowItem extends SimplyBowItem {
                     SimplyBowsConfig.INSTANCE.echoBow.chaosBlackHoleDurationTicks.get()
                             + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.echoBow.chaosBlackHoleDurationPerStringTicks.get());
             int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.echoBow.chaosBlackHoleCooldownTicks.get());
-            if (shooter instanceof ServerPlayerEntity serverPlayer) {
-                simplybows$startAbilityItemCooldown(serverPlayer, durationTicks + cooldownTicks);
-            }
+            simplybows$startAbilityItemCooldown(shooter, durationTicks + cooldownTicks);
         }
 
         CHAOS_BLACK_HOLE_ON_IMPACT.set(chaosBlackHoleReady);
@@ -72,9 +70,7 @@ public class EchoBowItem extends SimplyBowItem {
             CHAOS_BLACK_HOLE_ON_IMPACT.set(false);
         }
 
-        if (shooter instanceof ServerPlayerEntity serverPlayer) {
-            EchoShoulderBowManager.onPlayerFired(serverPlayer);
-        }
+        EchoShoulderBowManager.onOwnerFired(shooter);
     }
 
     @Override

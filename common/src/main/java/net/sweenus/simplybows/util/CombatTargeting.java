@@ -6,6 +6,7 @@ import net.minecraft.entity.attribute.EntityAttribute;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.Tameable;
 import net.minecraft.entity.mob.HostileEntity;
+import net.minecraft.entity.mob.Monster;
 import net.minecraft.entity.passive.VillagerEntity;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.registry.Registries;
@@ -21,6 +22,7 @@ import org.jetbrains.annotations.Nullable;
 import java.util.HashSet;
 import java.util.Locale;
 import java.util.Set;
+import java.util.UUID;
 
 public final class CombatTargeting {
 
@@ -40,6 +42,9 @@ public final class CombatTargeting {
         if (livingEntity == null || attackingEntity == null) {
             return false;
         }
+        if (livingEntity instanceof PlayerEntity player && (player.isCreative() || player.isSpectator())) {
+            return false;
+        }
         if (!checkEntityBlacklist(livingEntity, attackingEntity)) {
             return false;
         }
@@ -50,6 +55,9 @@ public final class CombatTargeting {
             return true;
         }
         if (livingEntity instanceof VillagerEntity && !(attackingEntity instanceof HostileEntity)) {
+            return false;
+        }
+        if (isMonsterFaction(attackingEntity) && isMonsterFaction(livingEntity)) {
             return false;
         }
 
@@ -68,21 +76,82 @@ public final class CombatTargeting {
             }
             return playerEntity.shouldDamagePlayer(player);
         }
+        if (attackingEntity instanceof Tameable attackingTameable) {
+            UUID attackerOwnerUuid = attackingTameable.getOwnerUuid();
+            if (attackerOwnerUuid != null) {
+                if (attackerOwnerUuid.equals(livingEntity.getUuid())) {
+                    return false;
+                }
+                if (livingEntity instanceof Tameable targetTameable) {
+                    UUID targetOwnerUuid = targetTameable.getOwnerUuid();
+                    if (targetOwnerUuid != null && targetOwnerUuid.equals(attackerOwnerUuid)) {
+                        return false;
+                    }
+                }
+            }
+        }
         if (livingEntity instanceof Tameable tameable) {
-            if (tameable.getOwner() != null) {
-                if (tameable.getOwner() != attackingEntity
-                        && tameable.getOwner() instanceof PlayerEntity ownerPlayer
+            UUID ownerUuid = tameable.getOwnerUuid();
+            if (ownerUuid != null) {
+                if (ownerUuid.equals(attackingEntity.getUuid())) {
+                    return false;
+                }
+                if (attackingEntity instanceof Tameable attackingTameable) {
+                    UUID attackerOwnerUuid = attackingTameable.getOwnerUuid();
+                    if (attackerOwnerUuid != null && attackerOwnerUuid.equals(ownerUuid)) {
+                        return false;
+                    }
+                }
+                LivingEntity owner = tameable.getOwner();
+                if (owner != null && owner != attackingEntity
+                        && owner instanceof PlayerEntity ownerPlayer
                         && attackingEntity instanceof PlayerEntity playerEntity) {
                     if (isOpacLoaded()) {
                         return OpacCompat.checkOpacFriendlyFire(ownerPlayer, playerEntity);
                     }
                     return playerEntity.shouldDamagePlayer(ownerPlayer);
                 }
-                return tameable.getOwner() != attackingEntity;
+                return true;
             }
             return true;
         }
         return true;
+    }
+
+    /**
+     * An entity belongs to the monster faction if it is a {@link Monster}; tamed
+     * entities inherit their owner's faction (a player-tamed monster is not
+     * monster-faction, a monster-owned minion is).
+     */
+    public static boolean isMonsterFaction(LivingEntity entity) {
+        if (entity instanceof Monster) {
+            if (entity instanceof Tameable tameable) {
+                LivingEntity resolvedOwner = resolveTameableOwner(tameable, entity);
+                return resolvedOwner != null && isMonsterFaction(resolvedOwner);
+            }
+            return true;
+        }
+        if (entity instanceof Tameable tameable) {
+            LivingEntity resolvedOwner = resolveTameableOwner(tameable, entity);
+            if (resolvedOwner != null) {
+                return isMonsterFaction(resolvedOwner);
+            }
+        }
+        return false;
+    }
+
+    @Nullable
+    private static LivingEntity resolveTameableOwner(Tameable tameable, LivingEntity entity) {
+        LivingEntity owner = tameable.getOwner();
+        if (owner != null) {
+            return owner;
+        }
+        UUID ownerUuid = tameable.getOwnerUuid();
+        if (ownerUuid != null && entity.getWorld() instanceof ServerWorld world
+                && world.getEntity(ownerUuid) instanceof LivingEntity ownerLiving) {
+            return ownerLiving;
+        }
+        return null;
     }
 
     public static boolean isFriendlyTo(LivingEntity livingEntity, LivingEntity otherEntity) {
@@ -102,6 +171,12 @@ public final class CombatTargeting {
     }
 
     public static boolean isOffensiveTargetCandidate(LivingEntity target, @Nullable LivingEntity attacker) {
+        if (attacker != null && isMonsterFaction(attacker)) {
+            if (target == null || !target.isAlive() || target.isRemoved()) {
+                return false;
+            }
+            return !isMonsterFaction(target) && checkFriendlyFire(target, attacker);
+        }
         if (!isOffensiveTargetCandidate(target)) {
             return false;
         }
@@ -135,6 +210,7 @@ public final class CombatTargeting {
 
         Vec3d velocityBeforeDamage = applyKnockback ? null : target.getVelocity();
         float adjustedAmount = amount + getRangedWeaponDamageBonus(attackingEntity, "ability");
+        adjustedAmount = applyNonPlayerAbilityDamageModifiers(attackingEntity, target, adjustedAmount);
         boolean damaged;
         if (attackingEntity instanceof PlayerEntity playerEntity) {
             damaged = target.damage(world.getDamageSources().playerAttack(playerEntity), adjustedAmount);
@@ -153,6 +229,24 @@ public final class CombatTargeting {
         }
 
         return damaged;
+    }
+
+    public static float applyNonPlayerAbilityDamageModifiers(@Nullable Entity attackingEntity, LivingEntity target, float amount) {
+        if (!(attackingEntity instanceof LivingEntity) || attackingEntity instanceof PlayerEntity) {
+            return amount;
+        }
+        double modifier = SimplyBowsConfig.INSTANCE.general.nonPlayerBowAbilityDamageModifier.get();
+        if (target instanceof PlayerEntity) {
+            modifier *= SimplyBowsConfig.INSTANCE.general.nonPlayerBowDamageToPlayersModifier.get();
+        }
+        return (float) Math.max(0.0, amount * modifier);
+    }
+
+    public static float applyNonPlayerProjectileDamageModifier(@Nullable LivingEntity shooter, float damage) {
+        if (shooter == null || shooter instanceof PlayerEntity) {
+            return damage;
+        }
+        return (float) Math.max(0.0, damage * SimplyBowsConfig.INSTANCE.general.nonPlayerBowProjectileDamageModifier.get());
     }
 
     public static float getRangedWeaponDamageBonus(@Nullable Entity attackingEntity) {

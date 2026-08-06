@@ -33,7 +33,12 @@ public class EarthArrowEntity extends ArrowEntity {
     }
 
     public EarthArrowEntity(World world, LivingEntity owner, ItemStack arrowStack, ItemStack weaponStack) {
-        super(world, owner);
+        super(EntityRegistry.EARTH_ARROW.get(), world);
+        this.setOwner(owner);
+        this.setPosition(owner.getX(), owner.getEyeY() - 0.1, owner.getZ());
+        this.prevX = owner.getX();
+        this.prevY = owner.getEyeY() - 0.1;
+        this.prevZ = owner.getZ();
         this.upgrades = BowUpgradeData.from(weaponStack);
     }
 

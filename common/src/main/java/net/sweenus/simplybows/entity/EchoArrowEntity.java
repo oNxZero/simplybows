@@ -18,6 +18,7 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
+import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
@@ -50,7 +51,12 @@ public class EchoArrowEntity extends ArrowEntity {
     }
 
     public EchoArrowEntity(World world, LivingEntity owner, ItemStack arrowStack, ItemStack weaponStack) {
-        super(world, owner);
+        super(EntityRegistry.ECHO_ARROW.get(), world);
+        this.setOwner(owner);
+        this.setPosition(owner.getX(), owner.getEyeY() - 0.1, owner.getZ());
+        this.prevX = owner.getX();
+        this.prevY = owner.getEyeY() - 0.1;
+        this.prevZ = owner.getZ();
         this.upgrades = BowUpgradeData.from(weaponStack);
     }
 
@@ -112,8 +118,8 @@ public class EchoArrowEntity extends ArrowEntity {
 
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             if (hitLiving != null) {
-                if (this.getOwner() instanceof ServerPlayerEntity player && this.upgrades.runeEtching() == RuneEtching.PAIN) {
-                    EchoShoulderBowManager.setFocusedTarget(player, hitLiving);
+                if (this.getOwner() instanceof LivingEntity livingOwner && this.upgrades.runeEtching() == RuneEtching.PAIN) {
+                    EchoShoulderBowManager.setFocusedTarget(livingOwner, hitLiving);
                 }
                 if (this.upgrades.runeEtching() == RuneEtching.PAIN && wasAliveBeforeHit && !hitLiving.isAlive()) {
                     triggerPainArcaneChain(serverWorld, hitLiving);
@@ -212,7 +218,7 @@ public class EchoArrowEntity extends ArrowEntity {
         world.spawnParticles(ParticleTypes.PORTAL, center.x, center.y, center.z, 22, radius * 0.4, radius * 0.3, radius * 0.4, 0.2);
 
         world.playSound(null, center.x, center.y, center.z, SoundEvents.ENTITY_ILLUSIONER_CAST_SPELL, SoundCategory.PLAYERS, 0.7F, 0.65F + world.random.nextFloat() * 0.1F);
-        world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE, SoundCategory.PLAYERS, 0.45F, 1.2F + world.random.nextFloat() * 0.15F, world.random.nextLong());
+        world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_RESPAWN_ANCHOR_DEPLETE.value(), SoundCategory.PLAYERS, 0.45F, 1.2F + world.random.nextFloat() * 0.15F, world.random.nextLong());
     }
 
     private static void spawnArcaneDomeShell(ServerWorld world, Vec3d center, double radius) {

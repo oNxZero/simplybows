@@ -1,5 +1,6 @@
 package net.sweenus.simplybows.client.renderer;
 
+import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.render.entity.ProjectileEntityRenderer;
 import net.minecraft.client.render.VertexConsumer;
@@ -7,11 +8,14 @@ import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.OverlayTexture;
 import net.minecraft.client.util.math.MatrixStack;
 import net.minecraft.util.Identifier;
+import net.sweenus.simplybows.SimplyBows;
 import net.sweenus.simplybows.entity.HomingArrowEntity;
 
 public class HomingArrowEntityRenderer extends ProjectileEntityRenderer<HomingArrowEntity> {
     private static final Identifier TEXTURE = new Identifier("minecraft", "textures/entity/projectiles/arrow.png");
     private static final Identifier TIPPED_TEXTURE = new Identifier("minecraft", "textures/entity/projectiles/tipped_arrow.png");
+    private static final Identifier SPECTRAL_TEXTURE = new Identifier("minecraft", "textures/entity/projectiles/spectral_arrow.png");
+    private static final Identifier ICE_ARROW_TEXTURE = new Identifier(SimplyBows.MOD_ID, "textures/item/ice_bow/ice_bow_arrow.png");
     private int currentColor = -1;
 
     public HomingArrowEntityRenderer(EntityRendererFactory.Context context) {
@@ -23,7 +27,9 @@ public class HomingArrowEntityRenderer extends ProjectileEntityRenderer<HomingAr
         if (entity.getColor() > 0) {
             return TIPPED_TEXTURE;
         }
-        return TEXTURE;
+        return MinecraftClient.getInstance().getResourceManager().getResource(ICE_ARROW_TEXTURE).isPresent()
+                ? ICE_ARROW_TEXTURE
+                : TEXTURE;
     }
 
     @Override

@@ -11,6 +11,7 @@ import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
+import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.world.BubbleColumnFieldManager;
 
@@ -28,8 +29,12 @@ public class BubbleArrowEntity extends ArrowEntity {
     }
 
     public BubbleArrowEntity(World world, LivingEntity owner, ItemStack arrowStack, ItemStack weaponStack) {
-        super(world, owner);
+        super(EntityRegistry.BUBBLE_ARROW.get(), world);
         this.setOwner(owner);
+        this.setPosition(owner.getX(), owner.getEyeY() - 0.1, owner.getZ());
+        this.prevX = owner.getX();
+        this.prevY = owner.getEyeY() - 0.1;
+        this.prevZ = owner.getZ();
         this.columnOwnerId = owner != null ? owner.getUuid() : null;
         this.columnUpgrades = BowUpgradeData.from(weaponStack);
     }
