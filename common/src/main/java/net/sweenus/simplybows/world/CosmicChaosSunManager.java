@@ -48,6 +48,7 @@ public final class CosmicChaosSunManager {
     private static int maxDurationTicks() { return SimplyBowsConfig.INSTANCE.cosmicBow.chaosSunMaxDurationTicks.get(); }
     private static int cooldownTicks() { return SimplyBowsConfig.INSTANCE.cosmicBow.chaosSunCooldownTicks.get(); }
     private static double radius() { return SimplyBowsConfig.INSTANCE.cosmicBow.chaosSunRadius.get(); }
+    private static int maxCapturedProjectiles() { return SimplyBowsConfig.INSTANCE.cosmicBow.chaosSunMaxCapturedProjectiles.get(); }
     private static int fireIntervalTicks() { return SimplyBowsConfig.INSTANCE.cosmicBow.chaosSunFireIntervalTicks.get(); }
     private static int durationBonusPerShotTicks() { return SimplyBowsConfig.INSTANCE.cosmicBow.chaosSunDurationBonusPerShotTicks.get(); }
     private static int swiftnessDurationTicks() { return SimplyBowsConfig.INSTANCE.cosmicBow.chaosCelestialSwiftnessDurationTicks.get(); }
@@ -73,12 +74,12 @@ public final class CosmicChaosSunManager {
         visual.discard();
     }
 
-    public static boolean createSun(ServerWorld world, Entity owner, Vec3d pos, BowUpgradeData upgrades) {
+    public static boolean createSun(ServerWorld world, Entity owner, UUID snapshotOwnerId, Vec3d pos, BowUpgradeData upgrades) {
         if (world == null || pos == null) {
             return false;
         }
-        UUID ownerId = owner == null ? null : owner.getUuid();
-        if (ownerId != null && !isSunReady(world, ownerId)) {
+        UUID ownerId = snapshotOwnerId != null ? snapshotOwnerId : (owner == null ? null : owner.getUuid());
+        if (ownerId == null || !isSunReady(world, ownerId)) {
             return false;
         }
         BowUpgradeData sunUpgrades = upgrades == null ? BowUpgradeData.none() : upgrades;
@@ -95,6 +96,7 @@ public final class CosmicChaosSunManager {
             return false;
         }
 
+        discardSunsOwnedBy(world, ownerId);
         ACTIVE_SUNS.add(new ActiveSun(
                 world,
                 visual.getUuid(),
@@ -106,14 +108,12 @@ public final class CosmicChaosSunManager {
                 world.getTime() + maxDuration,
                 world.getTime() + Math.max(1, fireIntervalTicks())
         ));
-        if (ownerId != null) {
-            startSunCooldown(world, ownerId);
-            if (owner instanceof ServerPlayerEntity player) {
-                int ticks = Math.max(0, cooldownTicks());
-                if (ticks > 0) {
-                    SimplyBowItem.simplybows$sendCooldownPacket(player, "cosmic", System.currentTimeMillis() + ticks * 50L, ticks);
-                }
-            }
+        // Floor covering the sun's guaranteed life; finishSunCooldown extends it to cover however
+        // long the sun actually ran, so the gap between suns never collapses to zero.
+        int initialCooldown = duration + Math.max(0, cooldownTicks());
+        startSunCooldown(world, ownerId, initialCooldown);
+        if (owner instanceof ServerPlayerEntity player && initialCooldown > 0) {
+            SimplyBowItem.simplybows$sendCooldownPacket(player, "cosmic", System.currentTimeMillis() + initialCooldown * 50L, initialCooldown);
         }
         world.playSound(null, pos.x, pos.y, pos.z, SoundEvents.BLOCK_BEACON_ACTIVATE, SoundCategory.PLAYERS, 0.75F, 0.85F);
         world.playSound(null, pos.x, pos.y, pos.z, SoundEvents.BLOCK_RESPAWN_ANCHOR_CHARGE, SoundCategory.PLAYERS, 0.55F, 1.25F);
@@ -139,11 +139,12 @@ public final class CosmicChaosSunManager {
                 continue;
             }
             Entity visualEntity = world.getEntity(sun.visualId);
-            if (visualEntity == null || visualEntity.isRemoved() || now >= sun.expiresAt) {
+            if (visualEntity == null || visualEntity.isRemoved() || now >= sun.expiresAt || !hasLivingOwner(world, sun)) {
                 releaseOrbitingProjectiles(world, sun);
                 if (visualEntity != null) {
                     visualEntity.discard();
                 }
+                finishSunCooldown(world, sun, now);
                 iterator.remove();
                 continue;
             }
@@ -161,6 +162,25 @@ public final class CosmicChaosSunManager {
                 spawnAmbientParticles(world, sun);
             }
         }
+    }
+
+    private static boolean hasLivingOwner(ServerWorld world, ActiveSun sun) {
+        LivingEntity owner = getOwner(world, sun);
+        return owner != null && owner.isAlive();
+    }
+
+    private static void discardSunsOwnedBy(ServerWorld world, UUID ownerId) {
+        ACTIVE_SUNS.removeIf(existing -> {
+            if (existing.world != world || !ownerId.equals(existing.ownerId)) {
+                return false;
+            }
+            releaseOrbitingProjectiles(world, existing);
+            Entity existingVisual = world.getEntity(existing.visualId);
+            if (existingVisual != null) {
+                existingVisual.discard();
+            }
+            return true;
+        });
     }
 
     private static void releaseOrbitingProjectiles(ServerWorld world, ActiveSun sun) {
@@ -250,7 +270,10 @@ public final class CosmicChaosSunManager {
             if (sun.recentlyFired.containsKey(projectile.getUuid()) || !shouldCaptureProjectile(projectile, sun, captureRadius)) {
                 continue;
             }
-            addOrbiter(world, sun, projectile);
+            if (!addOrbiter(world, sun, projectile)) {
+                // This sun is full; let another sun in range have it rather than stalling it here.
+                continue;
+            }
             projectile.setNoGravity(true);
             projectile.setVelocity(Vec3d.ZERO);
             projectile.velocityModified = true;
@@ -303,9 +326,14 @@ public final class CosmicChaosSunManager {
         }
     }
 
-    private static void addOrbiter(ServerWorld world, ActiveSun sun, ProjectileEntity projectile) {
-        sun.orbiters.computeIfAbsent(projectile.getUuid(), ignored -> createOrbiter(world, sun, projectile));
+    private static boolean addOrbiter(ServerWorld world, ActiveSun sun, ProjectileEntity projectile) {
+        UUID projectileId = projectile.getUuid();
+        if (!sun.orbiters.containsKey(projectileId) && sun.orbiters.size() >= Math.max(1, maxCapturedProjectiles())) {
+            return false;
+        }
+        sun.orbiters.computeIfAbsent(projectileId, ignored -> createOrbiter(world, sun, projectile));
         projectile.addCommandTag(ORBITING_PROJECTILE_TAG);
+        return true;
     }
 
     private static boolean shouldCaptureProjectile(ProjectileEntity projectile, ActiveSun sun, double captureRadius) {
@@ -461,12 +489,30 @@ public final class CosmicChaosSunManager {
         return cooldownEnd == null || cooldownEnd <= now;
     }
 
-    private static void startSunCooldown(ServerWorld world, UUID ownerId) {
-        int ticks = Math.max(0, cooldownTicks());
+    private static void startSunCooldown(ServerWorld world, UUID ownerId, int ticks) {
         if (ticks <= 0) {
             return;
         }
         getCooldowns(world).put(ownerId, CooldownStorage.currentTick(world) + ticks);
+    }
+
+    private static void finishSunCooldown(ServerWorld world, ActiveSun sun, long now) {
+        if (sun.ownerId == null) {
+            return;
+        }
+        int ticks = Math.max(0, cooldownTicks());
+        if (ticks <= 0) {
+            return;
+        }
+        long readyAt = now + ticks;
+        if (getCooldowns(world).merge(sun.ownerId, readyAt, Math::max) != readyAt) {
+            return;
+        }
+        MinecraftServer server = world.getServer();
+        ServerPlayerEntity player = server == null ? null : server.getPlayerManager().getPlayer(sun.ownerId);
+        if (player != null) {
+            SimplyBowItem.simplybows$sendCooldownPacket(player, "cosmic", System.currentTimeMillis() + ticks * 50L, ticks);
+        }
     }
 
     private static Map<UUID, Long> getCooldowns(ServerWorld world) {

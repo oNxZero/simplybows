@@ -22,6 +22,9 @@ import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.world.CosmicChaosSunManager;
 import net.sweenus.simplybows.world.CosmicGraceTrailManager;
 import net.sweenus.simplybows.world.CosmicOrbitManager;
+import org.jetbrains.annotations.Nullable;
+
+import java.util.UUID;
 
 public class CosmicArrowEntity extends ArrowEntity {
 
@@ -33,10 +36,13 @@ public class CosmicArrowEntity extends ArrowEntity {
             DataTracker.registerData(CosmicArrowEntity.class, TrackedDataHandlerRegistry.INTEGER);
 
     private final BowUpgradeData upgrades;
+    @Nullable
+    private final UUID ownerIdSnapshot;
 
     public CosmicArrowEntity(EntityType<? extends CosmicArrowEntity> type, World world) {
         super(type, world);
         this.upgrades = BowUpgradeData.none();
+        this.ownerIdSnapshot = null;
     }
 
     public CosmicArrowEntity(World world, LivingEntity owner, ItemStack arrowStack, ItemStack weaponStack) {
@@ -48,6 +54,7 @@ public class CosmicArrowEntity extends ArrowEntity {
         this.prevY = owner.getEyeY() - 0.1;
         this.prevZ = owner.getZ();
         this.upgrades = BowUpgradeData.from(weaponStack);
+        this.ownerIdSnapshot = owner.getUuid();
         this.setGraceMode(this.upgrades.runeEtching() == RuneEtching.GRACE);
         this.setBountyMode(this.upgrades.runeEtching() == RuneEtching.BOUNTY);
     }
@@ -115,7 +122,7 @@ public class CosmicArrowEntity extends ArrowEntity {
                 return;
             }
             if (this.upgrades.runeEtching() == RuneEtching.CHAOS) {
-                CosmicChaosSunManager.createSun(serverWorld, this.getOwner(), pos, this.upgrades);
+                CosmicChaosSunManager.createSun(serverWorld, this.getOwner(), this.ownerIdSnapshot, pos, this.upgrades);
                 this.discard();
                 return;
             }
@@ -141,7 +148,7 @@ public class CosmicArrowEntity extends ArrowEntity {
                 return;
             }
             if (this.upgrades.runeEtching() == RuneEtching.CHAOS) {
-                CosmicChaosSunManager.createSun(serverWorld, this.getOwner(), pos, this.upgrades);
+                CosmicChaosSunManager.createSun(serverWorld, this.getOwner(), this.ownerIdSnapshot, pos, this.upgrades);
                 this.discard();
                 return;
             }

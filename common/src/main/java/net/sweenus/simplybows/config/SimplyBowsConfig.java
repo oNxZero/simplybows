@@ -481,6 +481,7 @@ public class SimplyBowsConfig extends Config {
         public ValidatedInt chaosSunMaxDurationTicks = new ValidatedInt(1200, 2400, 20);
         public ValidatedInt chaosSunCooldownTicks = new ValidatedInt(1200, 12000, 20);
         public ValidatedDouble chaosSunRadius = new ValidatedDouble(8.0, 32.0, 1.0);
+        public ValidatedInt chaosSunMaxCapturedProjectiles = new ValidatedInt(40, 400, 1);
         public ValidatedInt chaosSunFireIntervalTicks = new ValidatedInt(60, 300, 20);
         public ValidatedInt chaosSunDurationBonusPerShotTicks = new ValidatedInt(40, 400, 20);
         public ValidatedInt chaosCelestialSwiftnessDurationTicks = new ValidatedInt(140, 600, 20);

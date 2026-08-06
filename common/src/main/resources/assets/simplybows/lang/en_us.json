@@ -678,6 +678,8 @@
   "simplybows.config.cosmicBow.chaosSunCooldownTicks.desc": "Cooldown before another Chaos sun can be created. 1200 = 60 seconds.",
   "simplybows.config.cosmicBow.chaosSunRadius": "Chaos Sun Radius",
   "simplybows.config.cosmicBow.chaosSunRadius.desc": "Radius where the Chaos sun captures nearby projectile entities.",
+  "simplybows.config.cosmicBow.chaosSunMaxCapturedProjectiles": "Chaos Sun Max Captured Projectiles",
+  "simplybows.config.cosmicBow.chaosSunMaxCapturedProjectiles.desc": "Most projectiles a single Chaos sun can hold in orbit at once. Further projectiles fly past untouched.",
   "simplybows.config.cosmicBow.chaosSunFireIntervalTicks": "Chaos Sun Fire Interval (ticks)",
   "simplybows.config.cosmicBow.chaosSunFireIntervalTicks.desc": "How often the Chaos sun fires an orbiting projectile at an enemy. 60 = 3 seconds.",
   "simplybows.config.cosmicBow.chaosSunDurationBonusPerShotTicks": "Chaos Sun Duration Bonus Per Shot (ticks)",
