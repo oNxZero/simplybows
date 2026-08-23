@@ -54,8 +54,9 @@ public final class SimplyBowsChestLootRules {
                 ItemRegistry.BEE_BOW.get(),
                 ItemRegistry.BLOSSOM_BOW.get(),
                 ItemRegistry.EARTH_BOW.get(),
-                ItemRegistry.ECHO_BOW.get(),
-                ItemRegistry.COSMIC_BOW.get()
+                ItemRegistry.ECHO_BOW.get()
+                // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
+                //, ItemRegistry.COSMIC_BOW.get()
         ));
     }
 
@@ -90,9 +91,10 @@ public final class SimplyBowsChestLootRules {
                     ItemRegistry.RUNE_ETCHING_CHAOS.get()
             ));
         }
-        if (matchesAny(path, "chests/end_city_treasure")) {
-            pools.add(singleItemChancePool(ItemRegistry.COSMIC_BOW.get(), boostedBowChance()));
-        }
+        // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
+        //if (matchesAny(path, "chests/end_city_treasure")) {
+        //    pools.add(singleItemChancePool(ItemRegistry.COSMIC_BOW.get(), boostedBowChance()));
+        //}
     }
 
     private static LootPool.Builder singleItemChancePool(Item item, float chance) {
