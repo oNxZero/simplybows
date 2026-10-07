@@ -42,22 +42,12 @@ public final class BowTooltipHelper {
         addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.section.upgrades"), STYLE_SECTION);
         addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.upgrades.slots", usedSlots, maxSlots), STYLE_BODY);
         addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.upgrades.string_level", upgrades.stringLevel(), maxString), STYLE_STRING);
-        if (altDown) {
-            addWrappedLine(tooltip, Text.translatable(getStringEffectKey(bowKey)), STYLE_DIM);
-        }
         addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.upgrades.frame_level", upgrades.frameLevel(), maxFrame), STYLE_FRAME);
-        if (altDown) {
-            addWrappedLine(tooltip, Text.translatable(getFrameEffectKey(bowKey)), STYLE_DIM);
-        }
         addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.upgrades.rune", Text.translatable("tooltip.simplybows.rune." + rune.id())), STYLE_RUNE);
-
-        if (altDown) {
-            if (rune != RuneEtching.NONE) {
-                addWrappedLine(tooltip, Text.translatable(getRuneEffectKey(bowKey, rune)), STYLE_DIM);
-            } else {
-                addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.rune.none_effect"), STYLE_DIM);
-            }
-        } else {
+        for (String line : BowUpgradeTooltip.detailLines(bowKey, upgrades)) {
+            addWrappedLine(tooltip, Text.literal(line), STYLE_DIM);
+        }
+        if (!altDown) {
             addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.hold_alt"), STYLE_HINT);
         }
     }
@@ -73,7 +63,6 @@ public final class BowTooltipHelper {
         return switch (bowKey) {
             case "vine" -> "tooltip.simplybows.bow.vine.string_effect";
             case "earth" -> "tooltip.simplybows.bow.earth.string_effect";
-            case "echo" -> "tooltip.simplybows.bow.echo.string_effect";
             case "ice" -> "tooltip.simplybows.bow.ice.string_effect";
             case "bee" -> "tooltip.simplybows.bow.bee.string_effect";
             case "bubble" -> "tooltip.simplybows.bow.bubble.string_effect";
@@ -86,7 +75,6 @@ public final class BowTooltipHelper {
         return switch (bowKey) {
             case "vine" -> "tooltip.simplybows.bow.vine.frame_effect";
             case "earth" -> "tooltip.simplybows.bow.earth.frame_effect";
-            case "echo" -> "tooltip.simplybows.bow.echo.frame_effect";
             case "ice" -> "tooltip.simplybows.bow.ice.frame_effect";
             case "bee" -> "tooltip.simplybows.bow.bee.frame_effect";
             case "bubble" -> "tooltip.simplybows.bow.bubble.frame_effect";
@@ -98,7 +86,7 @@ public final class BowTooltipHelper {
     private static String getRuneEffectKey(String bowKey, RuneEtching rune) {
         String special = "tooltip.simplybows.bow." + bowKey + ".rune." + rune.id();
         return switch (bowKey) {
-            case "bee", "vine", "earth", "ice", "echo", "bubble", "blossom" -> special;
+            case "bee", "vine", "earth", "ice", "bubble", "blossom" -> special;
             default -> "tooltip.simplybows.bow.generic.rune." + rune.id();
         };
     }

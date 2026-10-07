@@ -35,8 +35,8 @@ public class VineBowItem extends SimplyBowItem {
                 && ownerId != null
                 && VineFlowerFieldManager.isChaosFieldReady(serverWorld, ownerId);
 
-        float speed = (float) (f * SimplyBowsConfig.INSTANCE.vineBow.arrowSpeedMultiplier.get() * (1.0 + upgrades.stringLevel() * 0.05));
-        this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.vineBow.arrowDivergence.get(), critical, target);
+        float speed = (float) (f * SimplyBowsConfig.INSTANCE.everbloom.arrowSpeedMultiplier.get() * (1.0 + upgrades.stringLevel() * 0.05));
+        this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.everbloom.arrowDivergence.get(), critical, target);
     }
 
     @Override
@@ -52,8 +52,8 @@ public class VineBowItem extends SimplyBowItem {
 
         BowUpgradeData upgrades = BowUpgradeData.from(weaponStack);
         VineArrowEntity arrowEntity = new VineArrowEntity(world, shooter, firedArrowStack, weaponStack);
-        arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.vineBow.baseDamage.get() * upgrades.damageMultiplier());
-        //arrowEntity.setPunch(upgrades.bonusKnockback());
+        arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.everbloom.baseDamage.get() * upgrades.damageMultiplier());
+        arrowEntity.setPlantsFlowerField(critical);
         arrowEntity.setCritical(critical);
         return arrowEntity;
     }

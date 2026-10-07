@@ -1,11 +1,14 @@
 package net.sweenus.simplybows.upgrade;
 
+import com.mojang.serialization.Codec;
+import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.component.DataComponentTypes;
 import net.minecraft.component.type.NbtComponent;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.nbt.NbtElement;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
+import net.sweenus.simplybows.registry.ComponentRegistry;
 
 public record BowUpgradeData(int stringLevel, int frameLevel, RuneEtching runeEtching) {
 
@@ -18,6 +21,12 @@ public record BowUpgradeData(int stringLevel, int frameLevel, RuneEtching runeEt
     private static double sizeMultiplierPerString() { return SimplyBowsConfig.INSTANCE.upgrades.sizeMultiplierPerString.get(); }
     private static double damageMultiplierPerFrame() { return SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get(); }
 
+    public static final Codec<BowUpgradeData> CODEC = RecordCodecBuilder.create(instance -> instance.group(
+            Codec.INT.fieldOf(STRING_KEY).orElse(0).forGetter(BowUpgradeData::stringLevel),
+            Codec.INT.fieldOf(FRAME_KEY).orElse(0).forGetter(BowUpgradeData::frameLevel),
+            Codec.STRING.xmap(RuneEtching::fromId, RuneEtching::id).fieldOf(RUNE_KEY).orElse(RuneEtching.NONE).forGetter(BowUpgradeData::runeEtching)
+    ).apply(instance, BowUpgradeData::new));
+
     public static BowUpgradeData none() {
         return new BowUpgradeData(0, 0, RuneEtching.NONE);
     }
@@ -26,6 +35,36 @@ public record BowUpgradeData(int stringLevel, int frameLevel, RuneEtching runeEt
         if (stack == null || stack.isEmpty()) {
             return none();
         }
+        BowUpgradeData stored = stack.get(ComponentRegistry.UPGRADES.get());
+        if (stored != null) {
+            return stored.clamped();
+        }
+        return readLegacy(stack);
+    }
+
+    public static void migrateLegacy(ItemStack stack) {
+        if (stack == null || stack.isEmpty() || stack.get(ComponentRegistry.UPGRADES.get()) != null) {
+            return;
+        }
+        BowUpgradeData legacy = readLegacy(stack);
+        if (legacy.equals(none())) {
+            return;
+        }
+        stack.set(ComponentRegistry.UPGRADES.get(), legacy);
+    }
+
+    public void write(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) {
+            return;
+        }
+        stack.set(ComponentRegistry.UPGRADES.get(), this.clamped());
+    }
+
+    private BowUpgradeData clamped() {
+        return new BowUpgradeData(clampLevel(this.stringLevel), clampLevel(this.frameLevel), this.runeEtching == null ? RuneEtching.NONE : this.runeEtching);
+    }
+
+    private static BowUpgradeData readLegacy(ItemStack stack) {
         NbtComponent customData = stack.get(DataComponentTypes.CUSTOM_DATA);
         if (customData == null) {
             return none();
@@ -35,23 +74,11 @@ public record BowUpgradeData(int stringLevel, int frameLevel, RuneEtching runeEt
             return none();
         }
         NbtCompound upgrades = root.getCompound(ROOT_KEY);
-        int string = clampLevel(upgrades.getInt(STRING_KEY));
-        int frame = clampLevel(upgrades.getInt(FRAME_KEY));
-        RuneEtching rune = RuneEtching.fromId(upgrades.getString(RUNE_KEY));
-        return new BowUpgradeData(string, frame, rune);
-    }
-
-    public void write(ItemStack stack) {
-        if (stack == null || stack.isEmpty()) {
-            return;
-        }
-        NbtCompound root = getOrCreateCustomData(stack);
-        NbtCompound upgrades = new NbtCompound();
-        upgrades.putInt(STRING_KEY, clampLevel(this.stringLevel));
-        upgrades.putInt(FRAME_KEY, clampLevel(this.frameLevel));
-        upgrades.putString(RUNE_KEY, this.runeEtching.id());
-        root.put(ROOT_KEY, upgrades);
-        stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(root));
+        return new BowUpgradeData(
+                clampLevel(upgrades.getInt(STRING_KEY)),
+                clampLevel(upgrades.getInt(FRAME_KEY)),
+                RuneEtching.fromId(upgrades.getString(RUNE_KEY))
+        );
     }
 
     public BowUpgradeData withIncreasedString() {
@@ -86,11 +113,6 @@ public record BowUpgradeData(int stringLevel, int frameLevel, RuneEtching runeEt
 
     private static int clampLevel(int level) {
         return Math.max(0, Math.min(maxLevelPerType(), level));
-    }
-
-    private static NbtCompound getOrCreateCustomData(ItemStack stack) {
-        NbtComponent customData = stack.get(DataComponentTypes.CUSTOM_DATA);
-        return customData == null ? new NbtCompound() : customData.copyNbt();
     }
 
     public static int getMaxLevelPerType() {

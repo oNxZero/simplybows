@@ -12,10 +12,8 @@
     "AnvilScreenHandlerMixin",
     "BowAttackGoalMixin",
     "EntityAccessor",
-    "ItemStackMixin",
     "LivingEntityMixin",
     "MobEntityMixin",
-    "ProjectileEntityMixin",
     "ServerPlayerEntityMixin",
     "ServerWorldMixin"
   ],

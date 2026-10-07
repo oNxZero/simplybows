@@ -15,8 +15,6 @@ import net.minecraft.util.Identifier;
 import net.sweenus.simplybows.item.unique.BeeBowItem;
 import net.sweenus.simplybows.item.unique.BlossomBowItem;
 import net.sweenus.simplybows.item.unique.BubbleBowItem;
-import net.sweenus.simplybows.item.unique.CosmicBowItem;
-import net.sweenus.simplybows.item.unique.EchoBowItem;
 import net.sweenus.simplybows.item.unique.EarthBowItem;
 import net.sweenus.simplybows.item.unique.IceBowItem;
 import net.sweenus.simplybows.item.unique.SimplyBowItem;
@@ -43,13 +41,11 @@ public class ItemRendererMixin {
     // Add an entry here whenever a bow gets its own small inventory textures.
     @Unique
     private static final Map<Class<? extends Item>, ModelIdentifier> PER_BOW_INVENTORY_MODELS = Map.ofEntries(
-            Map.entry(EchoBowItem.class, ModelIdentifier.ofInventoryVariant(Identifier.of("simplybows", "echo_bow/echo_bow_inventory"))),
             Map.entry(EarthBowItem.class, ModelIdentifier.ofInventoryVariant(Identifier.of("simplybows", "earth_bow/earth_bow_inventory"))),
             Map.entry(IceBowItem.class, ModelIdentifier.ofInventoryVariant(Identifier.of("simplybows", "ice_bow/ice_bow_inventory"))),
             Map.entry(BlossomBowItem.class, ModelIdentifier.ofInventoryVariant(Identifier.of("simplybows", "blossom_bow/blossom_bow_inventory"))),
             Map.entry(BubbleBowItem.class, ModelIdentifier.ofInventoryVariant(Identifier.of("simplybows", "bubble_bow/bubble_bow_inventory"))),
-            Map.entry(BeeBowItem.class, ModelIdentifier.ofInventoryVariant(Identifier.of("simplybows", "bee_bow/bee_bow_inventory"))),
-            Map.entry(CosmicBowItem.class, ModelIdentifier.ofInventoryVariant(Identifier.of("simplybows", "cosmic_bow/cosmic_bow_inventory")))
+            Map.entry(BeeBowItem.class, ModelIdentifier.ofInventoryVariant(Identifier.of("simplybows", "bee_bow/bee_bow_inventory")))
     );
 
     @Inject(

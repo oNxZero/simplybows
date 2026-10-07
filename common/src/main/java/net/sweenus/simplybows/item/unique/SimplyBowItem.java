@@ -2,6 +2,7 @@ package net.sweenus.simplybows.item.unique;
 import dev.architectury.networking.NetworkManager;
 import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.enchantment.Enchantments;
+import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.mob.MobEntity;
 import net.minecraft.entity.player.PlayerEntity;
@@ -21,11 +22,11 @@ import net.minecraft.util.Hand;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.sweenus.simplybows.network.AbilityCooldownPayload;
+import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.util.BowTooltipHelper;
 import net.sweenus.simplybows.util.BowUser;
 import net.sweenus.simplybows.util.CombatTargeting;
 import net.sweenus.simplybows.util.HelperMethods;
-import net.sweenus.simplybows.world.CosmicChaosSunManager;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -35,12 +36,18 @@ import java.util.function.LongSupplier;
 
 public class SimplyBowItem extends BowItem {
     private static final ThreadLocal<Boolean> FORCE_VANILLA_ARROW = ThreadLocal.withInitial(() -> false);
-    private static final int ABILITY_COOLDOWN_BAR_COLOR = 0x24C4FF;
     public static Function<String, long[]> CLIENT_COOLDOWN_READER = null;
     public static LongSupplier CLIENT_COOLDOWN_TICK_READER = null;
 
     public SimplyBowItem(Settings settings) {
         super(settings.maxCount(1).maxDamage(1920).fireproof());
+    }
+
+    @Override
+    public void inventoryTick(ItemStack stack, World world, Entity entity, int slot, boolean selected) {
+        if (!world.isClient()) {
+            BowUpgradeData.migrateLegacy(stack);
+        }
     }
 
     @Override
@@ -50,8 +57,7 @@ public class SimplyBowItem extends BowItem {
 
     @Override
     public boolean isItemBarVisible(ItemStack stack) {
-        // Keep vanilla item bar behavior (durability only). Ability cooldown is rendered
-        // via a separate top overlay in DrawContextMixin.
+        // Durability stays on the vanilla bar. Ability cooldown uses the white sweep overlay.
         return super.isItemBarVisible(stack);
     }
 
@@ -77,33 +83,28 @@ public class SimplyBowItem extends BowItem {
         return data != null && tickReader.getAsLong() < data[0];
     }
 
-    public int simplybows$getAbilityCooldownBarStep() {
+    public float simplybows$getAbilityCooldownProgress(float tickDelta) {
         Function<String, long[]> reader = CLIENT_COOLDOWN_READER;
         LongSupplier tickReader = CLIENT_COOLDOWN_TICK_READER;
         if (reader == null || tickReader == null) {
-            return 0;
+            return 0.0F;
         }
         long[] data = reader.apply(getTooltipBowKey());
         if (data == null) {
-            return 0;
+            return 0.0F;
         }
 
         long nowTick = tickReader.getAsLong();
-        if (nowTick >= data[0]) {
-            return 0;
-        }
-
-        int remaining = (int) Math.max(0L, data[0] - nowTick);
         int total = (int) data[1];
-        if (remaining <= 0 || total <= 0) {
-            return 0;
+        if (total <= 0 || nowTick >= data[0]) {
+            return 0.0F;
         }
 
-        return Math.max(1, Math.min(13, Math.round(13.0F * ((float) remaining / (float) total))));
-    }
-
-    public int simplybows$getAbilityCooldownBarColor() {
-        return ABILITY_COOLDOWN_BAR_COLOR;
+        float remaining = (data[0] - nowTick) - tickDelta;
+        if (remaining <= 0.0F) {
+            return 0.0F;
+        }
+        return Math.min(1.0F, remaining / total);
     }
 
     @Override
@@ -121,9 +122,6 @@ public class SimplyBowItem extends BowItem {
         boolean hasInfiniteAmmo = BowUser.hasInfiniteAmmo(user, stack, projectileStack);
 
         int i = this.getMaxUseTime(stack, user) - remainingUseTicks;
-        if (stack.getItem() instanceof CosmicBowItem) {
-            i = Math.round(i * CosmicChaosSunManager.getCelestialBowPullMultiplier(user));
-        }
         float f = getPullProgress(i);
         if (!((double)f < 0.1)) {
             List<ItemStack> list;
@@ -213,17 +211,21 @@ public class SimplyBowItem extends BowItem {
                 }
             }
             case VineBowItem vineBowItem -> {
+                vineBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
+            }
+            case BubbleBowItem bubbleBowItem -> {
                 if (f < 1.0F) {
                     simplybows$shootVanillaArrow(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, false, target);
                 } else {
-                    vineBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, true, target);
+                    bubbleBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, true, target);
                 }
             }
-            case BubbleBowItem bubbleBowItem -> {
-                bubbleBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
-            }
             case BeeBowItem beeBowItem -> {
-                beeBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
+                if (f < 1.0F) {
+                    simplybows$shootVanillaArrow(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, false, target);
+                } else {
+                    beeBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, true, target);
+                }
             }
             case BlossomBowItem blossomBowItem -> {
                 if (f < 1.0F) {
@@ -238,12 +240,6 @@ public class SimplyBowItem extends BowItem {
                 } else {
                     earthBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, true, target);
                 }
-            }
-            case EchoBowItem echoBowItem -> {
-                echoBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
-            }
-            case CosmicBowItem cosmicBowItem -> {
-                cosmicBowItem.performStoppedUsing(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);
             }
             default -> {
                 this.shootAll(serverWorld, user, hand, stack, list, f * 3.0F, 1.0F, f == 1.0F, target);

@@ -1,28 +1,16 @@
 package net.sweenus.simplybows.world;
 
 import net.minecraft.block.Blocks;
-import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.Item;
 import net.minecraft.particle.BlockStateParticleEffect;
 import net.minecraft.particle.ParticleEffect;
 import net.minecraft.particle.ParticleTypes;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
-import net.minecraft.util.math.Vec3d;
-import net.sweenus.simplybows.entity.CosmicStrikeVisualEntity;
 import net.sweenus.simplybows.registry.ItemRegistry;
 import net.sweenus.simplybows.util.HelperMethods;
 
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
-
 public final class BowPassiveParticleManager {
-
-    // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-    //private static final int COSMIC_PASSIVE_TRAIL_LIFETIME_TICKS = 96;
-    //private static final Map<ServerWorld, Map<UUID, UUID>> ACTIVE_COSMIC_PASSIVE_TRAILS = new HashMap<>();
 
     private BowPassiveParticleManager() {
     }
@@ -47,57 +35,7 @@ public final class BowPassiveParticleManager {
                 ParticleTypes.DUST_PLUME,
                 1
         );
-        emit(user, world, ItemRegistry.ECHO_BOW.get(), 8, ParticleTypes.CRIMSON_SPORE, 2, ParticleTypes.WITCH, 1);
-        // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-        //emitCosmicTrail(user, world);
     }
-
-    // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-    //private static void emitCosmicTrail(LivingEntity user, ServerWorld world) {
-    //    if (!HelperMethods.isHoldingItem(ItemRegistry.COSMIC_BOW.get(), user)) {
-    //        return;
-    //    }
-    //    if (hasActiveCosmicPassiveTrail(world, user.getUuid())) {
-    //        return;
-    //    }
-
-    //    int interval = 56 + user.getRandom().nextInt(45);
-    //    if (user.age % interval != 0) {
-    //        return;
-    //    }
-
-    //    Vec3d userPos = user.getBoundingBox().getCenter();
-
-    //    CosmicStrikeVisualEntity visual = new CosmicStrikeVisualEntity(world, userPos, userPos, COSMIC_PASSIVE_TRAIL_LIFETIME_TICKS);
-    //    visual.setPointCount(2 + user.getRandom().nextInt(7));
-    //    visual.setPassiveMode(true);
-    //    visual.setPassiveOwnerId(user.getId());
-    //    if (world.spawnEntity(visual)) {
-    //        ACTIVE_COSMIC_PASSIVE_TRAILS
-    //                .computeIfAbsent(world, ignored -> new HashMap<>())
-    //                .put(user.getUuid(), visual.getUuid());
-    //    }
-    //}
-
-    //private static boolean hasActiveCosmicPassiveTrail(ServerWorld world, UUID playerId) {
-    //    Map<UUID, UUID> trails = ACTIVE_COSMIC_PASSIVE_TRAILS.get(world);
-    //    if (trails == null) {
-    //        return false;
-    //    }
-    //    UUID trailId = trails.get(playerId);
-    //    if (trailId == null) {
-    //        return false;
-    //    }
-    //    Entity trail = world.getEntity(trailId);
-    //    if (trail != null && !trail.isRemoved()) {
-    //        return true;
-    //    }
-    //    trails.remove(playerId);
-    //    if (trails.isEmpty()) {
-    //        ACTIVE_COSMIC_PASSIVE_TRAILS.remove(world);
-    //    }
-    //    return false;
-    //}
 
     private static void emit(
             LivingEntity user,

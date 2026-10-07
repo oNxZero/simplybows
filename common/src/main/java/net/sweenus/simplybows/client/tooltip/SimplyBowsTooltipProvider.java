@@ -9,6 +9,7 @@ import net.minecraft.util.Identifier;
 import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
+import net.sweenus.simplybows.util.BowUpgradeTooltip;
 import net.sweenus.simplytooltips.api.ModernTooltipModel;
 import net.sweenus.simplytooltips.api.TooltipBorderStyle;
 import net.sweenus.simplytooltips.api.TooltipProvider;
@@ -70,19 +71,15 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
         RuneEtching rune = upgrades.runeEtching();
         boolean isNone = rune == RuneEtching.NONE;
         String runeName = Text.translatable("tooltip.simplybows.rune." + rune.id()).getString();
-        String runeEffectKey = isNone
-                ? "tooltip.simplybows.rune.none_effect"
-                : getRuneEffectKey(bowKey, rune);
-        String runeEffectRaw = Text.translatable(runeEffectKey).getString();
-        List<String> runeEffectLines = runeEffectRaw.isBlank() ? List.of() : List.of("  " + runeEffectRaw);
+        List<String> runeEffectLines = BowUpgradeTooltip.runeLines(bowKey, upgrades);
 
         UpgradeRune upgradeRune = new UpgradeRune(runeName, isNone, defaults.runeColor(), runeEffectLines);
 
         List<UpgradeRow> rows = List.of(
                 new UpgradeRow("◇", "String", defaults.stringColor(), upgrades.stringLevel(), maxString,
-                        Text.translatable(getStringEffectKey(bowKey)).getString()),
+                        BowUpgradeTooltip.stringGain(bowKey)),
                 new UpgradeRow("◇", "Frame", defaults.frameColor(), upgrades.frameLevel(), maxFrame,
-                        Text.translatable(getFrameEffectKey(bowKey)).getString())
+                        BowUpgradeTooltip.frameGain(bowKey))
         );
 
         UpgradeSection upgradeSection = new UpgradeSection(maxSlots, usedSlots, rows, upgradeRune);
@@ -262,8 +259,6 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
         return switch (bowKey) {
             case "vine"    -> "tooltip.simplybows.bow.vine.string_effect";
             case "earth"   -> "tooltip.simplybows.bow.earth.string_effect";
-            case "echo"    -> "tooltip.simplybows.bow.echo.string_effect";
-            case "cosmic"  -> "tooltip.simplybows.bow.cosmic.string_effect";
             case "ice"     -> "tooltip.simplybows.bow.ice.string_effect";
             case "bee"     -> "tooltip.simplybows.bow.bee.string_effect";
             case "bubble"  -> "tooltip.simplybows.bow.bubble.string_effect";
@@ -276,8 +271,6 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
         return switch (bowKey) {
             case "vine"    -> "tooltip.simplybows.bow.vine.frame_effect";
             case "earth"   -> "tooltip.simplybows.bow.earth.frame_effect";
-            case "echo"    -> "tooltip.simplybows.bow.echo.frame_effect";
-            case "cosmic"  -> "tooltip.simplybows.bow.cosmic.frame_effect";
             case "ice"     -> "tooltip.simplybows.bow.ice.frame_effect";
             case "bee"     -> "tooltip.simplybows.bow.bee.frame_effect";
             case "bubble"  -> "tooltip.simplybows.bow.bubble.frame_effect";
@@ -288,7 +281,7 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
 
     private static String getRuneEffectKey(String bowKey, RuneEtching rune) {
         return switch (bowKey) {
-            case "bee", "vine", "earth", "ice", "echo", "cosmic", "bubble", "blossom" ->
+            case "bee", "vine", "earth", "ice", "bubble", "blossom" ->
                 "tooltip.simplybows.bow." + bowKey + ".rune." + rune.id();
             default -> "tooltip.simplybows.bow.generic.rune." + rune.id();
         };

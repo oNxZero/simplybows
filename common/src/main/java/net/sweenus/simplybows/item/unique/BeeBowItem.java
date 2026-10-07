@@ -33,7 +33,7 @@ public class BeeBowItem extends SimplyBowItem {
 
     public void performStoppedUsing(ServerWorld serverWorld, LivingEntity shooter, Hand hand, ItemStack stack, List<ItemStack> projectiles, float f, float g, boolean critical, @Nullable LivingEntity target) {
         BowUpgradeData upgrades = BowUpgradeData.from(stack);
-        float speed = f * SimplyBowsConfig.INSTANCE.beeBow.arrowSpeedMultiplier.get();
+        float speed = f * SimplyBowsConfig.INSTANCE.buzzkill.arrowSpeedMultiplier.get();
         UUID ownerId = shooter != null ? shooter.getUuid() : null;
         boolean chaosStormReady = upgrades.runeEtching() == RuneEtching.CHAOS
                 && ownerId != null
@@ -41,9 +41,9 @@ public class BeeBowItem extends SimplyBowItem {
 
         if (chaosStormReady) {
             int durationTicks = Math.max(20,
-                    SimplyBowsConfig.INSTANCE.beeBow.chaosBaseDurationTicks.get()
-                            + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.beeBow.chaosDurationPerStringTicks.get());
-            int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.beeBow.chaosCooldownTicks.get());
+                    SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDurationTicks.get()
+                            + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.buzzkill.chaosDurationPerStringTicks.get());
+            int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.buzzkill.chaosCooldownTicks.get());
             simplybows$startAbilityItemCooldown(shooter, durationTicks + cooldownTicks);
         }
 
@@ -51,10 +51,10 @@ public class BeeBowItem extends SimplyBowItem {
         try {
             if (upgrades.runeEtching() == RuneEtching.PAIN) {
                 int quantity = Math.max(1, upgrades.stringLevel() + 1);
-                this.shootFan(this, serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.beeBow.arrowDivergence.get(), critical, target, quantity);
+                this.shootFan(this, serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), critical, target, quantity);
                 return;
             }
-            this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.beeBow.arrowDivergence.get(), critical, target);
+            this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), critical, target);
         } finally {
             CHAOS_HONEY_STORM_ON_IMPACT.set(false);
         }
@@ -69,7 +69,7 @@ public class BeeBowItem extends SimplyBowItem {
 
         BowUpgradeData upgrades = BowUpgradeData.from(weaponStack);
         BeeArrowEntity arrowEntity = new BeeArrowEntity(world, shooter, firedArrowStack, weaponStack);
-        arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.beeBow.baseDamage.get() * upgrades.damageMultiplier());
+        arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.buzzkill.baseDamage.get() * upgrades.damageMultiplier());
         arrowEntity.setChaosHoneyStormOnImpact(CHAOS_HONEY_STORM_ON_IMPACT.get());
         arrowEntity.setCritical(critical);
         return arrowEntity;

@@ -29,17 +29,17 @@ import java.util.UUID;
 
 public final class BubbleColumnFieldManager {
 
-    private static int columnDurationTicks() { return SimplyBowsConfig.INSTANCE.bubbleBow.columnDurationTicks.get(); }
-    private static int columnDurationBonusPerString() { return SimplyBowsConfig.INSTANCE.bubbleBow.columnDurationBonusPerString.get(); }
-    private static double columnBaseRadius() { return SimplyBowsConfig.INSTANCE.bubbleBow.columnBaseRadius.get(); }
-    private static double columnBaseHeight() { return SimplyBowsConfig.INSTANCE.bubbleBow.columnBaseHeight.get(); }
-    private static double columnRadiusPerFrame() { return SimplyBowsConfig.INSTANCE.bubbleBow.columnRadiusPerFrame.get(); }
-    private static double columnHeightPerFrame() { return SimplyBowsConfig.INSTANCE.bubbleBow.columnHeightPerFrame.get(); }
-    private static int bountyDamageIntervalTicks() { return SimplyBowsConfig.INSTANCE.bubbleBow.bountyDamageIntervalTicks.get(); }
-    private static float bountyBaseDamage() { return SimplyBowsConfig.INSTANCE.bubbleBow.bountyBaseDamage.get(); }
-    private static int gracePulseIntervalTicks() { return SimplyBowsConfig.INSTANCE.bubbleBow.gracePulseIntervalTicks.get(); }
-    private static int graceResistanceDurationTicks() { return SimplyBowsConfig.INSTANCE.bubbleBow.graceResistanceDuration.get(); }
-    private static int graceSlownessDurationTicks() { return SimplyBowsConfig.INSTANCE.bubbleBow.graceSlownessDuration.get(); }
+    private static int columnDurationTicks() { return SimplyBowsConfig.INSTANCE.bubbleveil.columnDurationTicks.get(); }
+    private static int columnDurationBonusPerString() { return SimplyBowsConfig.INSTANCE.bubbleveil.columnDurationBonusPerString.get(); }
+    private static double columnBaseRadius() { return SimplyBowsConfig.INSTANCE.bubbleveil.columnBaseRadius.get(); }
+    private static double columnBaseHeight() { return SimplyBowsConfig.INSTANCE.bubbleveil.columnBaseHeight.get(); }
+    private static double columnRadiusPerFrame() { return SimplyBowsConfig.INSTANCE.bubbleveil.columnRadiusPerFrame.get(); }
+    private static double columnHeightPerFrame() { return SimplyBowsConfig.INSTANCE.bubbleveil.columnHeightPerFrame.get(); }
+    private static int bountyDamageIntervalTicks() { return SimplyBowsConfig.INSTANCE.bubbleveil.bountyDamageIntervalTicks.get(); }
+    private static float bountyBaseDamage() { return SimplyBowsConfig.INSTANCE.bubbleveil.bountyBaseDamage.get(); }
+    private static int gracePulseIntervalTicks() { return SimplyBowsConfig.INSTANCE.bubbleveil.gracePulseIntervalTicks.get(); }
+    private static int graceResistanceDurationTicks() { return SimplyBowsConfig.INSTANCE.bubbleveil.graceResistanceDuration.get(); }
+    private static int graceSlownessDurationTicks() { return SimplyBowsConfig.INSTANCE.bubbleveil.graceSlownessDuration.get(); }
     private static final int GRACE_RESISTANCE_AMPLIFIER = 0;
     private static final int GRACE_SLOWNESS_AMPLIFIER = 0;
     private static final String BUBBLE_BOUNTY_VISUAL_TAG = "simplybows_bubble_bounty_visual";

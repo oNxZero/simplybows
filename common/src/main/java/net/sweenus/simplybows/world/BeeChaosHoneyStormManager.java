@@ -32,6 +32,7 @@ public final class BeeChaosHoneyStormManager {
     private static final Map<MinecraftServer, Map<UUID, Long>> STORM_COOLDOWNS_BY_SERVER = CooldownStorage.newServerScopedStore();
     private static final double STORM_HEIGHT_OFFSET = 6.0;
     private static final long TARGET_HIT_COOLDOWN_TICKS = 10L;
+    private static final int HONEY_FADE_TICKS = 12;
 
     private BeeChaosHoneyStormManager() {
     }
@@ -63,16 +64,16 @@ public final class BeeChaosHoneyStormManager {
         }
 
         int durationTicks = Math.max(20,
-                SimplyBowsConfig.INSTANCE.beeBow.chaosBaseDurationTicks.get()
-                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.beeBow.chaosDurationPerStringTicks.get());
-        int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.beeBow.chaosCooldownTicks.get());
+                SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDurationTicks.get()
+                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.buzzkill.chaosDurationPerStringTicks.get());
+        int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.buzzkill.chaosCooldownTicks.get());
         double radius = Math.max(1.5,
-                SimplyBowsConfig.INSTANCE.beeBow.chaosBaseRadius.get()
-                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.beeBow.chaosRadiusPerString.get());
+                SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseRadius.get()
+                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.buzzkill.chaosRadiusPerString.get());
         int diveInterval = Math.max(
-                SimplyBowsConfig.INSTANCE.beeBow.chaosMinDiveIntervalTicks.get(),
-                SimplyBowsConfig.INSTANCE.beeBow.chaosBaseDiveIntervalTicks.get()
-                        - Math.max(0, frameLevel) * SimplyBowsConfig.INSTANCE.beeBow.chaosDiveIntervalReductionPerFrameTicks.get()
+                SimplyBowsConfig.INSTANCE.buzzkill.chaosMinDiveIntervalTicks.get(),
+                SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDiveIntervalTicks.get()
+                        - Math.max(0, frameLevel) * SimplyBowsConfig.INSTANCE.buzzkill.chaosDiveIntervalReductionPerFrameTicks.get()
         );
 
         long now = world.getTime();
@@ -112,10 +113,19 @@ public final class BeeChaosHoneyStormManager {
         Iterator<ActiveHoneyStorm> iterator = storms.iterator();
         while (iterator.hasNext()) {
             ActiveHoneyStorm storm = iterator.next();
+            if (storm.fadeStartTick > 0L) {
+                long age = world.getTime() - storm.fadeStartTick;
+                if (age >= HONEY_FADE_TICKS) {
+                    iterator.remove();
+                    continue;
+                }
+                spawnAmbientParticles(world, storm, 1.0F - (float) age / (float) HONEY_FADE_TICKS);
+                continue;
+            }
             if (world.getTime() >= storm.expiryTick) {
+                storm.fadeStartTick = world.getTime();
                 world.playSound(null, storm.center.x, storm.center.y, storm.center.z, SoundEvents.BLOCK_BEEHIVE_DRIP, SoundCategory.PLAYERS, 0.65F, 0.9F);
                 world.spawnParticles(ParticleTypes.WAX_OFF, storm.center.x, storm.center.y, storm.center.z, 10, storm.radius * 0.2, 0.12, storm.radius * 0.2, 0.01);
-                iterator.remove();
                 continue;
             }
             tickStorm(world, storm);
@@ -127,12 +137,12 @@ public final class BeeChaosHoneyStormManager {
     }
 
     private static void tickStorm(ServerWorld world, ActiveHoneyStorm storm) {
-        spawnAmbientParticles(world, storm);
+        spawnAmbientParticles(world, storm, 1.0F);
 
         long now = world.getTime();
         if (now >= storm.nextAuraTick) {
             applyAura(world, storm);
-            storm.nextAuraTick = now + Math.max(1, SimplyBowsConfig.INSTANCE.beeBow.chaosAuraIntervalTicks.get());
+            storm.nextAuraTick = now + Math.max(1, SimplyBowsConfig.INSTANCE.buzzkill.chaosAuraIntervalTicks.get());
         }
 
         if (now >= storm.nextDiveTick) {
@@ -147,10 +157,10 @@ public final class BeeChaosHoneyStormManager {
             return;
         }
 
-        int regenDuration = Math.max(1, SimplyBowsConfig.INSTANCE.beeBow.chaosRegenDurationTicks.get());
-        int regenAmplifier = Math.max(0, SimplyBowsConfig.INSTANCE.beeBow.chaosRegenAmplifier.get());
-        int slownessDuration = Math.max(1, SimplyBowsConfig.INSTANCE.beeBow.chaosSlownessDurationTicks.get());
-        int slownessAmplifier = Math.max(0, SimplyBowsConfig.INSTANCE.beeBow.chaosSlownessAmplifier.get());
+        int regenDuration = Math.max(1, SimplyBowsConfig.INSTANCE.buzzkill.chaosRegenDurationTicks.get());
+        int regenAmplifier = Math.max(0, SimplyBowsConfig.INSTANCE.buzzkill.chaosRegenAmplifier.get());
+        int slownessDuration = Math.max(1, SimplyBowsConfig.INSTANCE.buzzkill.chaosSlownessDurationTicks.get());
+        int slownessAmplifier = Math.max(0, SimplyBowsConfig.INSTANCE.buzzkill.chaosSlownessAmplifier.get());
 
         Box box = new Box(
                 storm.center.x - storm.radius,
@@ -219,8 +229,8 @@ public final class BeeChaosHoneyStormManager {
         diveBee.setVelocity(velocity.x, velocity.y, velocity.z);
         diveBee.setCritical(false);
         diveBee.setChaosDiveBomb(
-                SimplyBowsConfig.INSTANCE.beeBow.chaosDiveDamage.get(),
-                SimplyBowsConfig.INSTANCE.beeBow.chaosDiveImpactRadius.get()
+                SimplyBowsConfig.INSTANCE.buzzkill.chaosDiveDamage.get(),
+                SimplyBowsConfig.INSTANCE.buzzkill.chaosDiveImpactRadius.get()
         );
         world.spawnEntity(diveBee);
 
@@ -228,9 +238,14 @@ public final class BeeChaosHoneyStormManager {
         world.playSound(null, start.x, start.y, start.z, SoundEvents.ENTITY_BEE_LOOP, SoundCategory.PLAYERS, 0.4F, 1.25F + world.random.nextFloat() * 0.15F);
     }
 
-    private static void spawnAmbientParticles(ServerWorld world, ActiveHoneyStorm storm) {
-        double radius = storm.radius;
-        for (int i = 0; i < 4; i++) {
+    private static void spawnAmbientParticles(ServerWorld world, ActiveHoneyStorm storm, float presence) {
+        presence = Math.max(0.0F, Math.min(1.0F, presence));
+        if (presence <= 0.02F) {
+            return;
+        }
+        double radius = storm.radius * presence;
+        int honeyCount = Math.max(1, Math.round(4.0F * presence));
+        for (int i = 0; i < honeyCount; i++) {
             double angle = world.random.nextDouble() * Math.PI * 2.0;
             double distance = MathHelper.lerp(world.random.nextDouble(), radius * 0.15, radius);
             double x = storm.center.x + Math.cos(angle) * distance;
@@ -240,13 +255,13 @@ public final class BeeChaosHoneyStormManager {
         }
 
         if (world.getTime() % 2L == 0L) {
-            world.spawnParticles(ParticleTypes.POOF, storm.center.x, storm.center.y, storm.center.z, 6, radius * 0.4, 0.1, radius * 0.4, 0.01);
+            world.spawnParticles(ParticleTypes.POOF, storm.center.x, storm.center.y, storm.center.z, Math.max(1, Math.round(6.0F * presence)), radius * 0.4, 0.1, radius * 0.4, 0.01);
         }
         if (world.getTime() % 3L == 0L) {
-            world.spawnParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, storm.center.x, storm.center.y + 0.15, storm.center.z, 4, radius * 0.3, 0.08, radius * 0.3, 0.01);
+            world.spawnParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, storm.center.x, storm.center.y + 0.15, storm.center.z, Math.max(1, Math.round(4.0F * presence)), radius * 0.3, 0.08, radius * 0.3, 0.01);
         }
         if (world.getTime() % 6L == 0L) {
-            world.spawnParticles(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, storm.center.x, storm.center.y + 0.2, storm.center.z, 2, radius * 0.25, 0.06, radius * 0.25, 0.01);
+            world.spawnParticles(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, storm.center.x, storm.center.y + 0.2, storm.center.z, Math.max(1, Math.round(2.0F * presence)), radius * 0.25, 0.06, radius * 0.25, 0.01);
         }
     }
 
@@ -305,6 +320,7 @@ public final class BeeChaosHoneyStormManager {
         private final Map<UUID, Long> recentTargetHitTicks = new HashMap<>();
         private long nextAuraTick;
         private long nextDiveTick;
+        private long fadeStartTick;
 
         private ActiveHoneyStorm(Vec3d center, double groundY, UUID ownerId, long spawnTick, long expiryTick, double radius, int diveIntervalTicks) {
             this.center = center;

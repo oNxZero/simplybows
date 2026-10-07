@@ -3,6 +3,8 @@ package net.sweenus.simplybows.world;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
@@ -11,6 +13,7 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.entity.BeeGraceVisualEntity;
+import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.util.CombatTargeting;
 
@@ -23,10 +26,11 @@ import java.util.UUID;
 public final class BeeGraceShieldManager {
 
     public static final String GRACE_VISUAL_TAG = "simplybows_bee_grace_visual";
-    private static double graceApplyRadius() { return SimplyBowsConfig.INSTANCE.beeBow.graceApplyRadius.get(); }
-    private static int maxBeesPerTarget() { return SimplyBowsConfig.INSTANCE.beeBow.graceMaxBeesPerTarget.get(); }
-    private static int baseDurationTicks() { return SimplyBowsConfig.INSTANCE.beeBow.graceBaseDuration.get(); }
-    private static int stringDurationBonusTicks() { return SimplyBowsConfig.INSTANCE.beeBow.graceStringDurationBonus.get(); }
+    private static double graceApplyRadius() { return SimplyBowsConfig.INSTANCE.buzzkill.graceApplyRadius.get(); }
+    private static int maxBeesPerTarget() { return SimplyBowsConfig.INSTANCE.buzzkill.graceMaxBeesPerTarget.get(); }
+    private static int baseDurationTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.graceBaseDuration.get(); }
+    private static int stringDurationBonusTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.graceStringDurationBonus.get(); }
+    private static int graceCooldownTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.graceCooldownTicks.get(); }
     private static final double ORBIT_RADIUS = 0.78;
     private static final double ORBIT_HEIGHT = 1.2;
     private static final double ORBIT_BOB_HEIGHT = 0.18;
@@ -38,6 +42,7 @@ public final class BeeGraceShieldManager {
     private static final double MIN_HORIZONTAL_MOTION_SQ_FOR_YAW = 1.0E-4;
 
     private static final Map<ServerWorld, List<ActiveGraceShield>> ACTIVE_SHIELDS = new HashMap<>();
+    private static final Map<MinecraftServer, Map<UUID, Long>> GRACE_COOLDOWNS_BY_SERVER = CooldownStorage.newServerScopedStore();
 
     private BeeGraceShieldManager() {
     }
@@ -48,7 +53,7 @@ public final class BeeGraceShieldManager {
     }
 
     public static void tryApplyFromImpact(ServerWorld world, Vec3d impactPos, LivingEntity owner, BowUpgradeData upgrades) {
-        if (world == null || impactPos == null || owner == null) {
+        if (world == null || impactPos == null || owner == null || !isGraceReady(world, owner.getUuid())) {
             return;
         }
 
@@ -87,6 +92,7 @@ public final class BeeGraceShieldManager {
         }
         if (bestStackCandidate != null) {
             applyShield(world, bestStackCandidate, upgrades);
+            startGraceCooldown(world, owner);
             return;
         }
         if (closest == null) {
@@ -94,6 +100,23 @@ public final class BeeGraceShieldManager {
         }
 
         applyShield(world, closest, upgrades);
+        startGraceCooldown(world, owner);
+    }
+
+    private static boolean isGraceReady(ServerWorld world, UUID ownerId) {
+        long now = CooldownStorage.currentTick(world);
+        Long cooldownEnd = CooldownStorage.forWorld(GRACE_COOLDOWNS_BY_SERVER, world).get(ownerId);
+        return cooldownEnd == null || cooldownEnd <= now;
+    }
+
+    private static void startGraceCooldown(ServerWorld world, LivingEntity owner) {
+        int cooldownTicks = Math.max(20, graceCooldownTicks());
+        CooldownStorage.forWorld(GRACE_COOLDOWNS_BY_SERVER, world)
+                .put(owner.getUuid(), CooldownStorage.currentTick(world) + cooldownTicks);
+        if (owner instanceof ServerPlayerEntity player) {
+            SimplyBowItem.simplybows$sendCooldownPacket(player, "bee",
+                    System.currentTimeMillis() + (long) cooldownTicks * 50L, cooldownTicks);
+        }
     }
 
     public static boolean consumeShield(ServerWorld world, LivingEntity target) {

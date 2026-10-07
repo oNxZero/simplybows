@@ -3,7 +3,12 @@ package net.sweenus.simplybows.entity;
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.passive.AnimalEntity;
+import net.minecraft.entity.passive.IronGolemEntity;
+import net.minecraft.nbt.NbtCompound;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
+import net.minecraft.entity.ProjectileDeflection;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
 import net.minecraft.particle.BlockStateParticleEffect;
@@ -11,6 +16,7 @@ import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.EntityHitResult;
+import net.minecraft.util.hit.HitResult;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
@@ -20,11 +26,12 @@ import net.sweenus.simplybows.world.VineFlowerFieldManager;
 
 public class VineArrowEntity extends ArrowEntity {
 
-    private static double extraDragXZ() { return SimplyBowsConfig.INSTANCE.vineBow.extraDragXZ.get(); }
-    private static double extraDragY() { return SimplyBowsConfig.INSTANCE.vineBow.extraDragY.get(); }
+    private static double extraDragXZ() { return SimplyBowsConfig.INSTANCE.everbloom.extraDragXZ.get(); }
+    private static double extraDragY() { return SimplyBowsConfig.INSTANCE.everbloom.extraDragY.get(); }
     private static final String FIELD_VISUAL_TAG = "simplybows_vine_field_visual";
     private final BowUpgradeData upgrades;
     private boolean spawnedFlowerField;
+    private boolean plantsFlowerField;
 
     public VineArrowEntity(EntityType<? extends VineArrowEntity> type, World world) {
         super(type, world);
@@ -66,8 +73,24 @@ public class VineArrowEntity extends ArrowEntity {
     }
 
     @Override
+    protected ProjectileDeflection hitOrDeflect(HitResult hitResult) {
+        if (hitResult.getType() == HitResult.Type.ENTITY) {
+            Entity hit = ((EntityHitResult) hitResult).getEntity();
+            if (hit instanceof PlayerEntity || hit instanceof IronGolemEntity || hit instanceof AnimalEntity) {
+                this.setDamage(0.0);
+                this.setCritical(false);
+            }
+        }
+        return super.hitOrDeflect(hitResult);
+    }
+
+    @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
-        if (entityHitResult.getEntity() instanceof LivingEntity living) {
+        Entity hit = entityHitResult.getEntity();
+        boolean playerHit = hit instanceof PlayerEntity;
+        boolean golemHit = hit instanceof IronGolemEntity;
+        boolean animalHit = hit instanceof AnimalEntity;
+        if (!playerHit && !golemHit && !animalHit && hit instanceof LivingEntity living) {
             living.hurtTime = 0;
             living.timeUntilRegen = 0;
         }
@@ -75,8 +98,20 @@ public class VineArrowEntity extends ArrowEntity {
             spawnImpactParticles(serverWorld, entityHitResult.getPos());
         }
         trySpawnFlowerField(entityHitResult.getPos());
+        if (playerHit && hit instanceof PlayerEntity player && !player.isSpectator()) {
+            healDirectHit(player);
+            return;
+        }
+        if (golemHit && hit instanceof IronGolemEntity golem) {
+            healDirectHit(golem);
+            return;
+        }
+        if (animalHit && hit instanceof AnimalEntity animal) {
+            healDirectHit(animal);
+            return;
+        }
         super.onEntityHit(entityHitResult);
-        if (entityHitResult.getEntity() instanceof LivingEntity living) {
+        if (hit instanceof LivingEntity living) {
             living.hurtTime = 0;
             living.timeUntilRegen = 0;
         }
@@ -90,8 +125,23 @@ public class VineArrowEntity extends ArrowEntity {
         return super.canHit(entity);
     }
 
+    public void setPlantsFlowerField(boolean plantsFlowerField) {
+        this.plantsFlowerField = plantsFlowerField;
+    }
+
+    private void healDirectHit(LivingEntity living) {
+        this.setDamage(0.0);
+        this.setCritical(false);
+        float before = living.getHealth();
+        living.heal(2.0F + this.upgrades.frameLevel());
+        if (living.getHealth() > before && this.getWorld() instanceof ServerWorld healedWorld) {
+            VineFlowerFieldManager.spawnHealIntakeParticles(healedWorld, living);
+        }
+        this.discard();
+    }
+
     private void trySpawnFlowerField(Vec3d hitPos) {
-        if (this.spawnedFlowerField) {
+        if (!this.plantsFlowerField || this.spawnedFlowerField) {
             return;
         }
 
@@ -112,6 +162,18 @@ public class VineArrowEntity extends ArrowEntity {
         world.spawnParticles(ParticleTypes.FALLING_SPORE_BLOSSOM, pos.x, pos.y + 0.2, pos.z, 12, 0.35, 0.15, 0.35, 0.0);
         world.spawnParticles(ParticleTypes.COMPOSTER, pos.x, pos.y + 0.12, pos.z, 10, 0.3, 0.12, 0.3, 0.0);
         world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.SHORT_GRASS.getDefaultState()), pos.x, pos.y + 0.1, pos.z, 8, 0.28, 0.08, 0.28, 0.01);
+    }
+
+    @Override
+    public void writeCustomDataToNbt(NbtCompound nbt) {
+        super.writeCustomDataToNbt(nbt);
+        nbt.putBoolean("PlantsFlowerField", this.plantsFlowerField);
+    }
+
+    @Override
+    public void readCustomDataFromNbt(NbtCompound nbt) {
+        super.readCustomDataFromNbt(nbt);
+        this.plantsFlowerField = nbt.getBoolean("PlantsFlowerField");
     }
 
     @Override

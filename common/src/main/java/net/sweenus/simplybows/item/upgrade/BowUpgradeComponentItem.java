@@ -14,6 +14,7 @@ import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.BowTooltipHelper;
+import net.sweenus.simplybows.util.BowUpgradeTooltip;
 
 import java.util.List;
 
@@ -68,9 +69,7 @@ public class BowUpgradeComponentItem extends Item {
     @Override
     public void appendTooltip(ItemStack stack, Item.TooltipContext context, List<Text> tooltip, TooltipType type) {
         super.appendTooltip(stack, context, tooltip, type);
-        tooltip.add(Text.literal(" "));
-        //tooltip.add(Text.translatable("tooltip.simplybows.section.component").setStyle(BowTooltipHelper.STYLE_SECTION));
-        tooltip.add(Text.translatable(getComponentTooltipKey()).setStyle(BowTooltipHelper.STYLE_BODY));
+        BowUpgradeTooltip.appendComponentTooltip(tooltip, this.upgradeKind, this.runeEtching);
     }
 
     public BowUpgradeData applyTo(BowUpgradeData current) {

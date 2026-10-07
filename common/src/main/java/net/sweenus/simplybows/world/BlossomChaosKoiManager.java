@@ -76,7 +76,7 @@ public final class BlossomChaosKoiManager {
         int stringLevel = upgrades != null ? Math.max(0, upgrades.stringLevel()) : 0;
         int frameLevel  = upgrades != null ? Math.max(0, upgrades.frameLevel())  : 0;
 
-        var cfg = SimplyBowsConfig.INSTANCE.blossomBow;
+        var cfg = SimplyBowsConfig.INSTANCE.petalwind;
 
         int durationTicks = Math.max(40, cfg.chaosDurationTicks.get() + frameLevel * cfg.chaosDurationPerFrameTicks.get());
         double radius = Math.max(1.5, cfg.chaosRadius.get() + stringLevel * cfg.chaosRadiusPerString.get());

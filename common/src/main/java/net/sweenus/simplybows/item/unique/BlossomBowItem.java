@@ -37,7 +37,7 @@ public class BlossomBowItem extends SimplyBowItem {
                 0.8F,
                 1.05F + serverWorld.getRandom().nextFloat() * 0.15F
         );
-        this.shootAll(serverWorld, shooter, hand, stack, projectiles, f * SimplyBowsConfig.INSTANCE.blossomBow.arrowSpeedMultiplier.get(), SimplyBowsConfig.INSTANCE.blossomBow.arrowDivergence.get(), critical, target);
+        this.shootAll(serverWorld, shooter, hand, stack, projectiles, f * SimplyBowsConfig.INSTANCE.petalwind.arrowSpeedMultiplier.get(), SimplyBowsConfig.INSTANCE.petalwind.arrowDivergence.get(), critical, target);
     }
 
     @Override
@@ -52,7 +52,7 @@ public class BlossomBowItem extends SimplyBowItem {
         }
 
         BlossomArrowEntity arrowEntity = new BlossomArrowEntity(world, shooter, firedArrowStack, weaponStack);
-        arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.blossomBow.baseDamage.get());
+        arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.petalwind.baseDamage.get());
         arrowEntity.setCritical(critical);
         return arrowEntity;
     }

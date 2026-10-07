@@ -53,19 +53,13 @@ public final class SimplyBowsChestLootRules {
                 ItemRegistry.BUBBLE_BOW.get(),
                 ItemRegistry.BEE_BOW.get(),
                 ItemRegistry.BLOSSOM_BOW.get(),
-                ItemRegistry.EARTH_BOW.get(),
-                ItemRegistry.ECHO_BOW.get()
-                // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-                //, ItemRegistry.COSMIC_BOW.get()
+                ItemRegistry.EARTH_BOW.get()
         ));
     }
 
     private static void addBiomeSpecificBoosts(String path, List<LootPool.Builder> pools) {
         if (matchesAny(path, "chests/ocean_monument", "chests/underwater_ruin_big", "chests/underwater_ruin_small", "chests/ocean_ruin_cold", "chests/ocean_ruin_warm", "chests/shipwreck_supply", "chests/shipwreck_map", "chests/shipwreck_treasure")) {
             pools.add(singleItemChancePool(ItemRegistry.BUBBLE_BOW.get(), boostedBowChance()));
-        }
-        if (matchesAny(path, "chests/swamp_hut", "chests/woodland_mansion")) {
-            pools.add(singleItemChancePool(ItemRegistry.ECHO_BOW.get(), boostedBowChance()));
         }
         if (matchesAny(path, "chests/jungle_temple")) {
             pools.add(singleItemChancePool(ItemRegistry.VINE_BOW.get(), boostedBowChance()));
@@ -91,10 +85,6 @@ public final class SimplyBowsChestLootRules {
                     ItemRegistry.RUNE_ETCHING_CHAOS.get()
             ));
         }
-        // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-        //if (matchesAny(path, "chests/end_city_treasure")) {
-        //    pools.add(singleItemChancePool(ItemRegistry.COSMIC_BOW.get(), boostedBowChance()));
-        //}
     }
 
     private static LootPool.Builder singleItemChancePool(Item item, float chance) {

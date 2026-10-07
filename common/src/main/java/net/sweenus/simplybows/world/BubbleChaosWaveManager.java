@@ -266,7 +266,7 @@ public final class BubbleChaosWaveManager {
     }
 
     private static double waveWidthBlocks() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosWaveWidthBlocks.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveWidthBlocks.get();
     }
 
     private static double visualLaneSpacing() {
@@ -279,47 +279,47 @@ public final class BubbleChaosWaveManager {
     }
 
     private static double waveSegmentThickness() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosWaveSegmentThickness.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveSegmentThickness.get();
     }
 
     private static double waveStepDistance() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosWaveStepDistance.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveStepDistance.get();
     }
 
     private static int waveStepIntervalTicks() {
-        return Math.max(1, SimplyBowsConfig.INSTANCE.bubbleBow.chaosWaveStepIntervalTicks.get());
+        return Math.max(1, SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveStepIntervalTicks.get());
     }
 
     private static double waveForwardStartOffset() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosWaveForwardStartOffset.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveForwardStartOffset.get();
     }
 
     private static int baseLengthSteps() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosBaseLengthSteps.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosBaseLengthSteps.get();
     }
 
     private static int lengthStepsPerString() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosLengthStepsPerString.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosLengthStepsPerString.get();
     }
 
     private static float chaosBaseDamage() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosBaseDamage.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosBaseDamage.get();
     }
 
     private static float chaosDamagePerFrame() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosDamagePerFrame.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosDamagePerFrame.get();
     }
 
     private static double chaosBaseKnockback() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosBaseKnockback.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosBaseKnockback.get();
     }
 
     private static double chaosKnockbackPerFrame() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosKnockbackPerFrame.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosKnockbackPerFrame.get();
     }
 
     private static double chaosKnockUp() {
-        return SimplyBowsConfig.INSTANCE.bubbleBow.chaosKnockUp.get();
+        return SimplyBowsConfig.INSTANCE.bubbleveil.chaosKnockUp.get();
     }
 
     private static int visualLifetimeTicks() {

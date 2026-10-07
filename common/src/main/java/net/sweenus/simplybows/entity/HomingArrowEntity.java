@@ -26,14 +26,14 @@ import java.util.UUID;
 
 public class HomingArrowEntity extends ArrowEntity {
 
-    private static double homingRadius() { return SimplyBowsConfig.INSTANCE.iceBow.homingRadius.get(); }
-    private static double homingAccel() { return SimplyBowsConfig.INSTANCE.iceBow.homingAccel.get(); }
-    private static int homingStartTicks() { return SimplyBowsConfig.INSTANCE.iceBow.homingStartTicks.get(); }
-    private static float initialSpreadYawRadians() { return SimplyBowsConfig.INSTANCE.iceBow.initialSpreadYaw.get(); }
-    private static float initialSpreadPitchRadians() { return SimplyBowsConfig.INSTANCE.iceBow.initialSpreadPitch.get(); }
-    private static double startSpeed() { return SimplyBowsConfig.INSTANCE.iceBow.startSpeed.get(); }
-    private static double maxSpeed() { return SimplyBowsConfig.INSTANCE.iceBow.maxSpeed.get(); }
-    private static int speedRampTicks() { return SimplyBowsConfig.INSTANCE.iceBow.speedRampTicks.get(); }
+    private static double homingRadius() { return SimplyBowsConfig.INSTANCE.winterfang.homingRadius.get(); }
+    private static double homingAccel() { return SimplyBowsConfig.INSTANCE.winterfang.homingAccel.get(); }
+    private static int homingStartTicks() { return SimplyBowsConfig.INSTANCE.winterfang.homingStartTicks.get(); }
+    private static float initialSpreadYawRadians() { return SimplyBowsConfig.INSTANCE.winterfang.initialSpreadYaw.get(); }
+    private static float initialSpreadPitchRadians() { return SimplyBowsConfig.INSTANCE.winterfang.initialSpreadPitch.get(); }
+    private static double startSpeed() { return SimplyBowsConfig.INSTANCE.winterfang.startSpeed.get(); }
+    private static double maxSpeed() { return SimplyBowsConfig.INSTANCE.winterfang.maxSpeed.get(); }
+    private static int speedRampTicks() { return SimplyBowsConfig.INSTANCE.winterfang.speedRampTicks.get(); }
     private LivingEntity target;
     private boolean initialSpreadApplied;
     private boolean lockSingleTarget;
@@ -350,9 +350,9 @@ public class HomingArrowEntity extends ArrowEntity {
         int amplifier = 0;
         StatusEffectInstance existing = target.getStatusEffect(StatusEffects.SLOWNESS);
         if (existing != null) {
-            amplifier = Math.min(SimplyBowsConfig.INSTANCE.iceBow.graceMaxSlownessStacks.get(), existing.getAmplifier() + 1);
+            amplifier = Math.min(SimplyBowsConfig.INSTANCE.winterfang.graceMaxSlownessStacks.get(), existing.getAmplifier() + 1);
         }
-        target.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, SimplyBowsConfig.INSTANCE.iceBow.graceSlownessDuration.get(), amplifier), this.getOwner());
+        target.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, SimplyBowsConfig.INSTANCE.winterfang.graceSlownessDuration.get(), amplifier), this.getOwner());
     }
 
     @Override

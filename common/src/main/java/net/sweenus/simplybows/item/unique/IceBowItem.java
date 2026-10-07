@@ -31,9 +31,9 @@ import java.util.Map;
 import java.util.UUID;
 
 public class IceBowItem extends SimplyBowItem {
-    private static int baseQuantity() { return SimplyBowsConfig.INSTANCE.iceBow.baseQuantity.get(); }
-    private static double painTargetHorizontalRange() { return SimplyBowsConfig.INSTANCE.iceBow.painTargetHorizontalRange.get(); }
-    private static double painTargetVerticalRange() { return SimplyBowsConfig.INSTANCE.iceBow.painTargetVerticalRange.get(); }
+    private static int baseQuantity() { return SimplyBowsConfig.INSTANCE.winterfang.baseQuantity.get(); }
+    private static double painTargetHorizontalRange() { return SimplyBowsConfig.INSTANCE.winterfang.painTargetHorizontalRange.get(); }
+    private static double painTargetVerticalRange() { return SimplyBowsConfig.INSTANCE.winterfang.painTargetVerticalRange.get(); }
     private static final String NBT_DAMAGE_MULTIPLIER = "simplybows_ice_damage_multiplier";
     private static final String NBT_LOCK_TARGET = "simplybows_ice_lock_target";
     private static final String NBT_SLOW_STACK = "simplybows_ice_stacking_slow";
@@ -68,18 +68,18 @@ public class IceBowItem extends SimplyBowItem {
 
         if (chaosWallReady) {
             int durationTicks = Math.max(20,
-                    SimplyBowsConfig.INSTANCE.iceBow.chaosWallDurationTicks.get()
-                            + Math.max(0, upgrades.frameLevel()) * SimplyBowsConfig.INSTANCE.iceBow.chaosWallDurationPerFrameTicks.get());
-            int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.iceBow.chaosWallCooldownTicks.get());
+                    SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationTicks.get()
+                            + Math.max(0, upgrades.frameLevel()) * SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationPerFrameTicks.get());
+            int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.winterfang.chaosWallCooldownTicks.get());
             simplybows$startAbilityItemCooldown(shooter, durationTicks + cooldownTicks);
         }
 
         int quantity = getArrowQuantity(upgrades);
         double damageMultiplier = upgrades.damageMultiplier();
         if (rune == RuneEtching.PAIN) {
-            damageMultiplier *= SimplyBowsConfig.INSTANCE.iceBow.painDamageMultiplier.get();
+            damageMultiplier *= SimplyBowsConfig.INSTANCE.winterfang.painDamageMultiplier.get();
         } else if (rune == RuneEtching.BOUNTY) {
-            damageMultiplier *= SimplyBowsConfig.INSTANCE.iceBow.bountyDamageMultiplier.get();
+            damageMultiplier *= SimplyBowsConfig.INSTANCE.winterfang.bountyDamageMultiplier.get();
         }
 
         LivingEntity painTarget = null;
@@ -111,9 +111,9 @@ public class IceBowItem extends SimplyBowItem {
         stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
 
         if (chaosWallReady) {
-            this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.iceBow.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.iceBow.chaosWallArrowDivergence.get() * 0.01F, f == 1.0F, livingEntity);
+            this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.chaosWallArrowDivergence.get() * 0.01F, f == 1.0F, livingEntity);
         } else {
-            this.shootFan(this, serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.iceBow.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.iceBow.arrowDivergence.get(), f == 1.0F, livingEntity, quantity);
+            this.shootFan(this, serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.arrowDivergence.get(), f == 1.0F, livingEntity, quantity);
         }
         HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, shooter, ParticleTypes.SNOWFLAKE, 6);
         HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, shooter, ParticleTypes.WHITE_ASH, 8);
@@ -181,7 +181,7 @@ public class IceBowItem extends SimplyBowItem {
         ProjectileEntity arrowEntity;
         if (arrowStack.isOf(Items.SPECTRAL_ARROW)) {
             HomingSpectralArrowEntity spectralArrow = new HomingSpectralArrowEntity(world, shooter, arrowStack, weaponStack);
-            spectralArrow.setDamage(SimplyBowsConfig.INSTANCE.iceBow.baseDamage.get() * damageMultiplier);
+            spectralArrow.setDamage(SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * damageMultiplier);
             //spectralArrow.setPunch((int) Math.floor((damageMultiplier - 1.0) * 2.0));
             spectralArrow.setLockSingleTarget(lockTarget);
             spectralArrow.setStackingSlowness(stackSlow);
@@ -197,7 +197,7 @@ public class IceBowItem extends SimplyBowItem {
             arrowEntity = spectralArrow;
         } else {
             HomingArrowEntity homingArrow = new HomingArrowEntity(world, shooter, arrowStack, weaponStack);
-            homingArrow.setDamage(SimplyBowsConfig.INSTANCE.iceBow.baseDamage.get() * damageMultiplier);
+            homingArrow.setDamage(SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * damageMultiplier);
             //homingArrow.setPunch((int) Math.floor((damageMultiplier - 1.0) * 2.0));
             homingArrow.setLockSingleTarget(lockTarget);
             homingArrow.setStackingSlowness(stackSlow);
@@ -218,7 +218,7 @@ public class IceBowItem extends SimplyBowItem {
     private int getArrowQuantity(BowUpgradeData upgrades) {
         int quantity = baseQuantity() + upgrades.stringLevel();
         if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
-            quantity *= SimplyBowsConfig.INSTANCE.iceBow.bountyExtraArrowMultiplier.get();
+            quantity *= SimplyBowsConfig.INSTANCE.winterfang.bountyExtraArrowMultiplier.get();
         }
         return quantity;
     }

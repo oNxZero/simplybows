@@ -29,14 +29,15 @@ import java.util.UUID;
 
 public final class BeeHiveSwarmManager {
 
-    private static int baseHiveDurationTicks() { return SimplyBowsConfig.INSTANCE.beeBow.bountyHiveDuration.get(); }
-    private static int stringHiveDurationBonusTicks() { return SimplyBowsConfig.INSTANCE.beeBow.bountyHiveDurationBonusPerString.get(); }
-    private static int fireIntervalTicks() { return SimplyBowsConfig.INSTANCE.beeBow.bountyFireInterval.get(); }
-    private static int baseShots() { return SimplyBowsConfig.INSTANCE.beeBow.bountyBaseShots.get(); }
-    private static int frameBonusShots() { return SimplyBowsConfig.INSTANCE.beeBow.bountyFrameBonusShots.get(); }
-    private static double targetRadius() { return SimplyBowsConfig.INSTANCE.beeBow.bountyTargetRadius.get(); }
+    private static int baseHiveDurationTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDuration.get(); }
+    private static int stringHiveDurationBonusTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDurationBonusPerString.get(); }
+    private static int fireIntervalTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.bountyFireInterval.get(); }
+    private static int baseShots() { return SimplyBowsConfig.INSTANCE.buzzkill.bountyBaseShots.get(); }
+    private static int frameBonusShots() { return SimplyBowsConfig.INSTANCE.buzzkill.bountyFrameBonusShots.get(); }
+    private static double targetRadius() { return SimplyBowsConfig.INSTANCE.buzzkill.bountyTargetRadius.get(); }
 
     private static final int SPRING_ANIM_TICKS = 8;
+    private static final int HIVE_RETRACT_TICKS = 10;
     private static final int FIRE_INTERVAL_RANDOM_EXTRA_TICKS = 6;
     private static final double START_OFFSET_Y = 0.45;
     private static final double TARGET_AIM_EXTRA_Y = 3.65;
@@ -106,9 +107,12 @@ public final class BeeHiveSwarmManager {
         }
 
         hives.removeIf(hive -> {
+            if (hive.retractStartTick > 0L) {
+                return tickHiveRetract(world, hive);
+            }
             if (world.getTime() > hive.expiryTick || hive.shotsRemaining <= 0) {
-                discardVisual(world, hive.visualId);
-                return true;
+                hive.retractStartTick = world.getTime();
+                return false;
             }
             return false;
         });
@@ -120,10 +124,27 @@ public final class BeeHiveSwarmManager {
         }
 
         for (ActiveBeeHive hive : hives) {
+            if (hive.retractStartTick > 0L) {
+                continue;
+            }
             animateHive(world, hive);
             spawnHiveAmbient(world, hive.center);
             tryFireBee(world, hive);
         }
+    }
+
+    private static boolean tickHiveRetract(ServerWorld world, ActiveBeeHive hive) {
+        Entity entity = world.getEntity(hive.visualId);
+        long age = world.getTime() - hive.retractStartTick;
+        if (!(entity instanceof BeeHiveVisualEntity visual) || age >= HIVE_RETRACT_TICKS) {
+            discardVisual(world, hive.visualId);
+            return true;
+        }
+        float ease = (float) age / (float) HIVE_RETRACT_TICKS;
+        ease = ease * ease;
+        visual.setHeightScale(MathHelper.clamp(1.0F - ease, 0.0F, 1.0F));
+        visual.setPos(hive.center.x, hive.center.y - 0.55 * ease, hive.center.z);
+        return false;
     }
 
     private static void animateHive(ServerWorld world, ActiveBeeHive hive) {
@@ -134,8 +155,7 @@ public final class BeeHiveSwarmManager {
 
         long age = world.getTime() - hive.spawnTick;
         float scaleIn = MathHelper.clamp((float) age / SPRING_ANIM_TICKS, 0.0F, 1.0F);
-        float lifeT = MathHelper.clamp((float) (hive.expiryTick - world.getTime()) / 10.0F, 0.0F, 1.0F);
-        visual.setHeightScale(Math.min(scaleIn, lifeT));
+        visual.setHeightScale(scaleIn);
         visual.setPos(hive.center.x, hive.center.y, hive.center.z);
     }
 
@@ -248,6 +268,7 @@ public final class BeeHiveSwarmManager {
         private final BowUpgradeData upgrades;
         private long nextShotTick;
         private int shotsRemaining;
+        private long retractStartTick;
 
         private ActiveBeeHive(Vec3d center, UUID ownerId, UUID visualId, long spawnTick, long expiryTick, long nextShotTick, int shotsRemaining, BowUpgradeData upgrades) {
             this.center = center;

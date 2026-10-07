@@ -18,19 +18,11 @@ import net.sweenus.simplybows.entity.BubbleBountyVisualEntity;
 import net.sweenus.simplybows.entity.BubbleChaosWaveVisualEntity;
 import net.sweenus.simplybows.entity.BubbleGraceVisualEntity;
 import net.sweenus.simplybows.entity.BubblePainArrowEntity;
-import net.sweenus.simplybows.entity.CosmicArrowEntity;
-import net.sweenus.simplybows.entity.CosmicBountyVisualEntity;
-import net.sweenus.simplybows.entity.CosmicOrbitVisualEntity;
-import net.sweenus.simplybows.entity.CosmicStrikeVisualEntity;
-import net.sweenus.simplybows.entity.CosmicTetherVisualEntity;
-import net.sweenus.simplybows.entity.EchoArrowEntity;
-import net.sweenus.simplybows.entity.EchoChaosBlackHoleVisualEntity;
 import net.sweenus.simplybows.entity.EarthArrowEntity;
 import net.sweenus.simplybows.entity.EarthSpikeVisualEntity;
 import net.sweenus.simplybows.entity.HomingArrowEntity;
 import net.sweenus.simplybows.entity.HomingSpectralArrowEntity;
 import net.sweenus.simplybows.entity.IceChaosWallVisualEntity;
-import net.sweenus.simplybows.entity.ShoulderBowEntity;
 import net.sweenus.simplybows.entity.VineArrowEntity;
 import net.sweenus.simplybows.entity.VineFlowerVisualEntity;
 
@@ -79,51 +71,6 @@ public class EntityRegistry {
                     .dimensions(0.5F, 0.5F)
                     .build(SimplyBows.MOD_ID + ":earth_arrow"));
 
-    public static final RegistrySupplier<EntityType<EchoArrowEntity>> ECHO_ARROW = ENTITY_TYPES.register("echo_arrow",
-            () -> EntityType.Builder.<EchoArrowEntity>create(EchoArrowEntity::new, SpawnGroup.MISC)
-                    .dimensions(0.5F, 0.5F)
-                    .build(SimplyBows.MOD_ID + ":echo_arrow"));
-
-    public static final RegistrySupplier<EntityType<CosmicArrowEntity>> COSMIC_ARROW = ENTITY_TYPES.register("cosmic_arrow",
-            () -> EntityType.Builder.<CosmicArrowEntity>create(CosmicArrowEntity::new, SpawnGroup.MISC)
-                    .dimensions(0.5F, 0.5F)
-                    .build(SimplyBows.MOD_ID + ":cosmic_arrow"));
-
-    public static final RegistrySupplier<EntityType<CosmicOrbitVisualEntity>> COSMIC_ORBIT_VISUAL = ENTITY_TYPES.register("cosmic_orbit_visual",
-            () -> EntityType.Builder.<CosmicOrbitVisualEntity>create(CosmicOrbitVisualEntity::new, SpawnGroup.MISC)
-                    .dimensions(4.0F, 4.0F)
-                    .maxTrackingRange(64)
-                    .trackingTickInterval(1)
-                    .build(SimplyBows.MOD_ID + ":cosmic_orbit_visual"));
-
-    public static final RegistrySupplier<EntityType<CosmicStrikeVisualEntity>> COSMIC_STRIKE_VISUAL = ENTITY_TYPES.register("cosmic_strike_visual",
-            () -> EntityType.Builder.<CosmicStrikeVisualEntity>create(CosmicStrikeVisualEntity::new, SpawnGroup.MISC)
-                    .dimensions(12.0F, 12.0F)
-                    .maxTrackingRange(64)
-                    .trackingTickInterval(1)
-                    .build(SimplyBows.MOD_ID + ":cosmic_strike_visual"));
-
-    public static final RegistrySupplier<EntityType<CosmicTetherVisualEntity>> COSMIC_TETHER_VISUAL = ENTITY_TYPES.register("cosmic_tether_visual",
-            () -> EntityType.Builder.<CosmicTetherVisualEntity>create(CosmicTetherVisualEntity::new, SpawnGroup.MISC)
-                    .dimensions(12.0F, 12.0F)
-                    .maxTrackingRange(64)
-                    .trackingTickInterval(1)
-                    .build(SimplyBows.MOD_ID + ":cosmic_tether_visual"));
-
-    public static final RegistrySupplier<EntityType<CosmicBountyVisualEntity>> COSMIC_BOUNTY_VISUAL = ENTITY_TYPES.register("cosmic_bounty_visual",
-            () -> EntityType.Builder.<CosmicBountyVisualEntity>create(CosmicBountyVisualEntity::new, SpawnGroup.MISC)
-                    .dimensions(8.0F, 8.0F)
-                    .maxTrackingRange(64)
-                    .trackingTickInterval(1)
-                    .build(SimplyBows.MOD_ID + ":cosmic_bounty_visual"));
-
-    public static final RegistrySupplier<EntityType<ShoulderBowEntity>> SHOULDER_BOW = ENTITY_TYPES.register("shoulder_bow",
-            () -> EntityType.Builder.<ShoulderBowEntity>create(ShoulderBowEntity::new, SpawnGroup.MISC)
-                    .dimensions(0.8F, 0.8F)
-                    .maxTrackingRange(64)
-                    .trackingTickInterval(1)
-                    .build(SimplyBows.MOD_ID + ":shoulder_bow"));
-
     public static final RegistrySupplier<EntityType<EarthSpikeVisualEntity>> EARTH_SPIKE_VISUAL = ENTITY_TYPES.register("earth_spike_visual",
             () -> EntityType.Builder.<EarthSpikeVisualEntity>create(EarthSpikeVisualEntity::new, SpawnGroup.MISC)
                     .dimensions(0.9F, 2.5F)
@@ -135,13 +82,6 @@ public class EntityRegistry {
                     .maxTrackingRange(64)
                     .trackingTickInterval(1)
                     .build(SimplyBows.MOD_ID + ":ice_chaos_wall_visual"));
-
-    public static final RegistrySupplier<EntityType<EchoChaosBlackHoleVisualEntity>> ECHO_CHAOS_BLACK_HOLE_VISUAL = ENTITY_TYPES.register("echo_chaos_black_hole_visual",
-            () -> EntityType.Builder.<EchoChaosBlackHoleVisualEntity>create(EchoChaosBlackHoleVisualEntity::new, SpawnGroup.MISC)
-                    .dimensions(1.2F, 1.2F)
-                    .maxTrackingRange(64)
-                    .trackingTickInterval(1)
-                    .build(SimplyBows.MOD_ID + ":echo_chaos_black_hole_visual"));
 
     public static final RegistrySupplier<EntityType<VineFlowerVisualEntity>> VINE_FLOWER_VISUAL = ENTITY_TYPES.register("vine_flower_visual",
             () -> EntityType.Builder.<VineFlowerVisualEntity>create(VineFlowerVisualEntity::new, SpawnGroup.MISC)

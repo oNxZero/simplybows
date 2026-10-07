@@ -6,7 +6,6 @@ import net.fabricmc.api.Environment;
 import net.minecraft.item.Item;
 import net.minecraft.util.Identifier;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
-import net.sweenus.simplybows.world.CosmicChaosSunManager;
 
 @Environment(EnvType.CLIENT)
 public class SimplyBowsItemProperties {
@@ -15,15 +14,12 @@ public class SimplyBowsItemProperties {
     }
 
     public static void register() {
-        makeBows(ItemRegistry.VINE_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedVine.get());
-        makeBows(ItemRegistry.ICE_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedIce.get());
-        makeBows(ItemRegistry.BUBBLE_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedBubble.get());
-        makeBows(ItemRegistry.BEE_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedBee.get());
-        makeBows(ItemRegistry.BLOSSOM_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedBlossom.get());
-        makeBows(ItemRegistry.EARTH_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedEarth.get());
-        makeBows(ItemRegistry.ECHO_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedEcho.get());
-        // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-        //makeBows(ItemRegistry.COSMIC_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedCosmic.get());
+        makeBows(ItemRegistry.VINE_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedEverbloom.get());
+        makeBows(ItemRegistry.ICE_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedWinterfang.get());
+        makeBows(ItemRegistry.BUBBLE_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedBubbleveil.get());
+        makeBows(ItemRegistry.BEE_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedBuzzkill.get());
+        makeBows(ItemRegistry.BLOSSOM_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedPetalwind.get());
+        makeBows(ItemRegistry.EARTH_BOW.get(), SimplyBowsConfig.INSTANCE.upgrades.drawSpeedTremorstrike.get());
     }
 
     public static void makeBows(Item item, float drawSpeed) {
@@ -33,12 +29,7 @@ public class SimplyBowsItemProperties {
                 return 0.0F;
             } else {
                 int useTicks = itemStack.getMaxUseTime(livingEntity) - livingEntity.getItemUseTimeLeft();
-                // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-                //float multiplier = itemStack.isOf(ItemRegistry.COSMIC_BOW.get())
-                //        ? CosmicChaosSunManager.getCelestialBowPullMultiplier(livingEntity)
-                //        : 1.0F;
-                float multiplier = 1.0F;
-                return livingEntity.getActiveItem() != itemStack ? 0.0F : (float) useTicks * multiplier / drawSpeed;
+                return livingEntity.getActiveItem() != itemStack ? 0.0F : (float) useTicks / drawSpeed;
             }
         });
 

@@ -64,13 +64,13 @@ public final class IceChaosWallManager {
         Vec3d right = new Vec3d(-horizontal.z, 0.0, horizontal.x).normalize();
 
         int durationTicks = Math.max(20,
-                SimplyBowsConfig.INSTANCE.iceBow.chaosWallDurationTicks.get()
-                        + Math.max(0, frameLevel) * SimplyBowsConfig.INSTANCE.iceBow.chaosWallDurationPerFrameTicks.get());
-        int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.iceBow.chaosWallCooldownTicks.get());
+                SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationTicks.get()
+                        + Math.max(0, frameLevel) * SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationPerFrameTicks.get());
+        int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.winterfang.chaosWallCooldownTicks.get());
         int widthBlocks = Math.max(1,
-                SimplyBowsConfig.INSTANCE.iceBow.chaosWallWidth.get()
-                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.iceBow.chaosWallWidthPerString.get());
-        int heightBlocks = Math.max(1, SimplyBowsConfig.INSTANCE.iceBow.chaosWallHeight.get());
+                SimplyBowsConfig.INSTANCE.winterfang.chaosWallWidth.get()
+                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.winterfang.chaosWallWidthPerString.get());
+        int heightBlocks = Math.max(1, SimplyBowsConfig.INSTANCE.winterfang.chaosWallHeight.get());
         double halfLength = widthBlocks * 0.5;
 
         ActiveWall wall = new ActiveWall(center, right, horizontal, ownerId, world.getTime(), world.getTime() + durationTicks, halfLength, heightBlocks + 0.05);

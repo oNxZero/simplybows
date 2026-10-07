@@ -33,7 +33,7 @@ public class EarthBowItem extends SimplyBowItem {
 
     public void performStoppedUsing(ServerWorld serverWorld, LivingEntity shooter, Hand hand, ItemStack stack, List<ItemStack> projectiles, float f, float g, boolean critical, @Nullable LivingEntity target) {
         BowUpgradeData upgrades = BowUpgradeData.from(stack);
-        float speed = (float) (f * SimplyBowsConfig.INSTANCE.earthBow.arrowSpeedMultiplier.get() * (1.0 + upgrades.stringLevel() * 0.05));
+        float speed = (float) (f * SimplyBowsConfig.INSTANCE.tremorstrike.arrowSpeedMultiplier.get() * (1.0 + upgrades.stringLevel() * 0.05));
         UUID ownerId = shooter != null ? shooter.getUuid() : null;
         boolean chaosSunderReady = upgrades.runeEtching() == RuneEtching.CHAOS
                 && ownerId != null
@@ -41,14 +41,14 @@ public class EarthBowItem extends SimplyBowItem {
 
         if (chaosSunderReady) {
             int durationTicks = Math.max(20,
-                    SimplyBowsConfig.INSTANCE.earthBow.chaosSunderDurationTicks.get()
-                            + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.earthBow.chaosSunderDurationPerStringTicks.get());
+                    SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get()
+                            + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get());
             simplybows$startAbilityItemCooldown(shooter, durationTicks);
         }
 
         CHAOS_SUNDER_ON_IMPACT.set(chaosSunderReady);
         try {
-            this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.earthBow.arrowDivergence.get(), critical, target);
+            this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.tremorstrike.arrowDivergence.get(), critical, target);
         } finally {
             CHAOS_SUNDER_ON_IMPACT.set(false);
         }
@@ -67,7 +67,7 @@ public class EarthBowItem extends SimplyBowItem {
 
         BowUpgradeData upgrades = BowUpgradeData.from(weaponStack);
         EarthArrowEntity arrowEntity = new EarthArrowEntity(world, shooter, firedArrowStack, weaponStack);
-        arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.earthBow.baseDamage.get() * upgrades.damageMultiplier());
+        arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.tremorstrike.baseDamage.get() * upgrades.damageMultiplier());
         arrowEntity.setChaosSunderOnImpact(CHAOS_SUNDER_ON_IMPACT.get());
         //arrowEntity.setPunch(upgrades.bonusKnockback());
         arrowEntity.setCritical(critical);

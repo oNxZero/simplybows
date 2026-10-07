@@ -6,11 +6,6 @@
     "simplybows:bubble_bow/bubble_bow",
     "simplybows:bee_bow/bee_bow",
     "simplybows:blossom_bow/blossom_bow",
-    "simplybows:earth_bow/earth_bow",
-    "simplybows:echo_bow/echo_bow",
-    {
-      "id": "simplybows:cosmic_bow/cosmic_bow",
-      "required": false
-    }
+    "simplybows:earth_bow/earth_bow"
   ]
 }

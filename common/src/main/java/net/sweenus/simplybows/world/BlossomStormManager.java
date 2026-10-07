@@ -12,6 +12,7 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
+import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
@@ -35,22 +36,23 @@ public final class BlossomStormManager {
     private static final int PAIN_VISUAL_RING_MIN_POINTS = 24;
     private static final int PAIN_VISUAL_RING_MAX_POINTS = 72;
     private static final int VORTEX_POINTS = 4;
+    private static final int STORM_FADE_TICKS = 12;
 
-    private static int stormDurationTicks() { return SimplyBowsConfig.INSTANCE.blossomBow.stormDurationTicks.get(); }
-    private static int stormDurationBonusPerString() { return SimplyBowsConfig.INSTANCE.blossomBow.stormDurationBonusPerString.get(); }
-    private static int damageIntervalTicks() { return SimplyBowsConfig.INSTANCE.blossomBow.damageIntervalTicks.get(); }
-    private static float stormDamage() { return SimplyBowsConfig.INSTANCE.blossomBow.stormDamage.get(); }
-    private static double jumpRange() { return SimplyBowsConfig.INSTANCE.blossomBow.jumpRange.get(); }
-    private static double graceAuraDamageRadius() { return SimplyBowsConfig.INSTANCE.blossomBow.graceAuraDamageRadius.get(); }
-    private static double graceAuraRadiusPerString() { return SimplyBowsConfig.INSTANCE.blossomBow.graceAuraRadiusPerString.get(); }
-    private static int graceBuffDurationTicks() { return SimplyBowsConfig.INSTANCE.blossomBow.graceBuffDuration.get(); }
-    private static int bountyBaseMaxTraps() { return SimplyBowsConfig.INSTANCE.blossomBow.bountyBaseMaxTraps.get(); }
-    private static int bountyMaxTrapsPerString() { return SimplyBowsConfig.INSTANCE.blossomBow.bountyMaxTrapsPerString.get(); }
-    private static float bountyTriggerDamageMultiplier() { return SimplyBowsConfig.INSTANCE.blossomBow.bountyTriggerDamageMultiplier.get(); }
-    private static double bountyTriggerBaseRadius() { return SimplyBowsConfig.INSTANCE.blossomBow.bountyTriggerBaseRadius.get(); }
-    private static double bountyTriggerRadiusPerString() { return SimplyBowsConfig.INSTANCE.blossomBow.bountyTriggerRadiusPerString.get(); }
-    private static double painAreaDamageRadius() { return SimplyBowsConfig.INSTANCE.blossomBow.painAreaRadius.get(); }
-    private static double painAreaRadiusPerString() { return SimplyBowsConfig.INSTANCE.blossomBow.painAreaRadiusPerString.get(); }
+    private static int stormDurationTicks() { return SimplyBowsConfig.INSTANCE.petalwind.stormDurationTicks.get(); }
+    private static int stormDurationBonusPerString() { return SimplyBowsConfig.INSTANCE.petalwind.stormDurationBonusPerString.get(); }
+    private static int damageIntervalTicks() { return SimplyBowsConfig.INSTANCE.petalwind.damageIntervalTicks.get(); }
+    private static float stormDamage() { return SimplyBowsConfig.INSTANCE.petalwind.stormDamage.get(); }
+    private static double jumpRange() { return SimplyBowsConfig.INSTANCE.petalwind.jumpRange.get(); }
+    private static double graceAuraDamageRadius() { return SimplyBowsConfig.INSTANCE.petalwind.graceAuraDamageRadius.get(); }
+    private static double graceAuraRadiusPerString() { return SimplyBowsConfig.INSTANCE.petalwind.graceAuraRadiusPerString.get(); }
+    private static int graceBuffDurationTicks() { return SimplyBowsConfig.INSTANCE.petalwind.graceBuffDuration.get(); }
+    private static int bountyBaseMaxTraps() { return SimplyBowsConfig.INSTANCE.petalwind.bountyBaseMaxTraps.get(); }
+    private static int bountyMaxTrapsPerString() { return SimplyBowsConfig.INSTANCE.petalwind.bountyMaxTrapsPerString.get(); }
+    private static float bountyTriggerDamageMultiplier() { return SimplyBowsConfig.INSTANCE.petalwind.bountyTriggerDamageMultiplier.get(); }
+    private static double bountyTriggerBaseRadius() { return SimplyBowsConfig.INSTANCE.petalwind.bountyTriggerBaseRadius.get(); }
+    private static double bountyTriggerRadiusPerString() { return SimplyBowsConfig.INSTANCE.petalwind.bountyTriggerRadiusPerString.get(); }
+    private static double painAreaDamageRadius() { return SimplyBowsConfig.INSTANCE.petalwind.painAreaRadius.get(); }
+    private static double painAreaRadiusPerString() { return SimplyBowsConfig.INSTANCE.petalwind.painAreaRadiusPerString.get(); }
     private static final Map<ServerWorld, List<ActiveStorm>> ACTIVE_STORMS = new HashMap<>();
 
     private BlossomStormManager() {
@@ -70,7 +72,11 @@ public final class BlossomStormManager {
         UUID ownerId = owner != null ? owner.getUuid() : null;
         StormTuning tuning = buildTuning(upgrades);
         if (ownerId != null && !tuning.bountyTrapMode()) {
-            existing.removeIf(storm -> ownerId.equals(storm.ownerId));
+            for (ActiveStorm storm : existing) {
+                if (ownerId.equals(storm.ownerId)) {
+                    return;
+                }
+            }
         } else if (ownerId != null) {
             int maxTraps = tuning.maxActiveBountyTraps();
             while (countOwnerBountyStorms(existing, ownerId) >= maxTraps) {
@@ -109,6 +115,11 @@ public final class BlossomStormManager {
                 tuning
         );
         existing.add(storm);
+        if (owner instanceof ServerPlayerEntity player) {
+            int durationTicks = Math.max(20, tuning.durationTicks());
+            SimplyBowItem.simplybows$sendCooldownPacket(player, "blossom",
+                    System.currentTimeMillis() + (long) durationTicks * 50L, durationTicks);
+        }
         world.playSound(null, startPos.x, startPos.y, startPos.z, SoundEvents.BLOCK_CHERRY_LEAVES_PLACE, SoundCategory.PLAYERS, 0.8F, 0.95F + world.random.nextFloat() * 0.2F);
     }
 
@@ -126,8 +137,18 @@ public final class BlossomStormManager {
     }
 
     private static boolean tickStorm(ServerWorld world, ActiveStorm storm, long now) {
+        if (storm.fadeStartTick > 0L) {
+            long age = now - storm.fadeStartTick;
+            if (age >= STORM_FADE_TICKS) {
+                return true;
+            }
+            spawnVortexParticles(world, storm, now, 1.0F - (float) age / (float) STORM_FADE_TICKS);
+            return false;
+        }
         if (now >= storm.expiryTick) {
-            return true;
+            storm.fadeStartTick = now;
+            spawnVortexParticles(world, storm, now, 1.0F);
+            return false;
         }
 
         LivingEntity currentTarget = storm.currentTargetId == null ? null : getLivingEntity(world, storm.currentTargetId);
@@ -138,11 +159,11 @@ public final class BlossomStormManager {
         if (storm.tuning.bountyTrapMode()) {
             boolean triggered = processBountyTrapTriggers(world, storm, getLivingEntityNullable(world, storm.ownerId));
             if (triggered) {
-                return true;
+                return false;
             }
         }
 
-        spawnVortexParticles(world, storm, now);
+        spawnVortexParticles(world, storm, now, 1.0F);
 
         if (!storm.tuning.bountyTrapMode() && now >= storm.nextDamageTick) {
             LivingEntity owner = getLivingEntityNullable(world, storm.ownerId);
@@ -194,6 +215,7 @@ public final class BlossomStormManager {
             CombatTargeting.applyDamage(world, owner, candidate, damage, true, false);
             applyBountyTriggerKnockup(candidate, storm.tuning.bountyTriggerKnockup());
             spawnBountyTriggerEffects(world, candidate.getPos().add(0.0, candidate.getHeight() * 0.5, 0.0), radius);
+            storm.fadeStartTick = world.getTime();
             return true;
         }
         return false;
@@ -347,12 +369,16 @@ public final class BlossomStormManager {
         return owner;
     }
 
-    private static void spawnVortexParticles(ServerWorld world, ActiveStorm storm, long now) {
+    private static void spawnVortexParticles(ServerWorld world, ActiveStorm storm, long now, float presence) {
+        presence = Math.max(0.0F, Math.min(1.0F, presence));
+        if (presence <= 0.02F) {
+            return;
+        }
         Vec3d center = storm.center;
         double time = now * 0.25;
         for (int i = 0; i < VORTEX_POINTS; i++) {
             double angle = time + (Math.PI * 2.0 / VORTEX_POINTS) * i;
-            double radius = 0.85 + 0.2 * Math.sin(time + i);
+            double radius = (0.85 + 0.2 * Math.sin(time + i)) * presence;
             if (storm.tuning.painAreaMode()) {
                 radius *= 1.45;
             }
@@ -369,14 +395,15 @@ public final class BlossomStormManager {
             return;
         }
 
-        double ringRadius = storm.tuning.painAreaRadius();
+        double ringRadius = storm.tuning.painAreaRadius() * presence;
         int ringPoints = Math.max(PAIN_VISUAL_RING_MIN_POINTS, Math.min(PAIN_VISUAL_RING_MAX_POINTS, (int) Math.round(ringRadius * 10.0)));
         double spin = now * 0.06;
+        int step = presence < 0.45F ? 4 : 2;
         int offset = (int) (now & 1L);
-        for (int i = offset; i < ringPoints; i += 2) {
+        for (int i = offset; i < ringPoints; i += step) {
             double angle = spin + (Math.PI * 2.0 / ringPoints) * i;
             double wobble = 0.12 * Math.sin((now * 0.12) + i * 0.7);
-            double radius = ringRadius + wobble;
+            double radius = ringRadius + wobble * presence;
             double x = center.x + Math.cos(angle) * radius;
             double z = center.z + Math.sin(angle) * radius;
             double y = center.y - 0.05 + 0.35 * Math.sin((now * 0.08) + i * 0.45);
@@ -466,6 +493,7 @@ public final class BlossomStormManager {
         private final UUID ownerId;
         private final StormTuning tuning;
         private final Set<UUID> triggeredBountyVictims = new HashSet<>();
+        private long fadeStartTick;
 
         private ActiveStorm(long expiryTick, long nextDamageTick, long nextJumpTick, long spawnTick, Vec3d center, UUID currentTargetId, UUID ownerId, StormTuning tuning) {
             this.expiryTick = expiryTick;

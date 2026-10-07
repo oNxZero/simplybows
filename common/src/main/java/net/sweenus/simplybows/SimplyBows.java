@@ -1,6 +1,7 @@
 package net.sweenus.simplybows;
 
 import dev.architectury.event.events.client.ClientPlayerEvent;
+import dev.architectury.event.events.common.PlayerEvent;
 import dev.architectury.networking.NetworkManager;
 import dev.architectury.platform.Platform;
 import dev.architectury.registry.client.level.entity.EntityRendererRegistry;
@@ -14,7 +15,6 @@ import net.sweenus.simplybows.client.particle.LongEndRodParticle;
 import net.sweenus.simplybows.client.particle.LongFireworkParticle;
 import net.sweenus.simplybows.client.particle.WaveParticle;
 import net.sweenus.simplybows.network.AbilityCooldownPayload;
-import net.sweenus.simplybows.network.CelestialSwiftnessPayload;
 import net.sweenus.simplybows.client.renderer.BeeArrowEntityRenderer;
 import net.sweenus.simplybows.client.renderer.KoiFishVisualEntityRenderer;
 import net.sweenus.simplybows.client.renderer.BeeGraceVisualEntityRenderer;
@@ -24,27 +24,21 @@ import net.sweenus.simplybows.client.renderer.BubbleChaosWaveVisualEntityRendere
 import net.sweenus.simplybows.client.renderer.BubbleGraceVisualEntityRenderer;
 import net.sweenus.simplybows.client.renderer.BubblePainArrowEntityRenderer;
 import net.sweenus.simplybows.client.renderer.EarthSpikeVisualEntityRenderer;
-import net.sweenus.simplybows.client.renderer.EchoChaosBlackHoleVisualEntityRenderer;
 import net.sweenus.simplybows.client.renderer.HomingArrowEntityRenderer;
 import net.sweenus.simplybows.client.renderer.HomingSpectralArrowEntityRenderer;
 import net.sweenus.simplybows.client.renderer.IceChaosWallVisualEntityRenderer;
-import net.sweenus.simplybows.client.renderer.ShoulderBowEntityRenderer;
-import net.sweenus.simplybows.client.renderer.CosmicArrowEntityRenderer;
-import net.sweenus.simplybows.client.renderer.CosmicBountyVisualEntityRenderer;
-import net.sweenus.simplybows.client.renderer.CosmicOrbitVisualEntityRenderer;
-import net.sweenus.simplybows.client.renderer.CosmicStrikeVisualEntityRenderer;
-import net.sweenus.simplybows.client.renderer.CosmicTetherVisualEntityRenderer;
 import net.sweenus.simplybows.client.renderer.SimplyBowsArrowEntityRenderer;
 import net.sweenus.simplybows.client.renderer.VineFlowerVisualEntityRenderer;
 import net.sweenus.simplybows.command.SimplyBowsCommands;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.item.unique.SimplyBowItem;
+import net.sweenus.simplybows.upgrade.BowUpgradeData;
+import net.sweenus.simplybows.registry.ComponentRegistry;
 import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.registry.ItemRegistry;
 import net.sweenus.simplybows.registry.ParticleRegistry;
 import net.sweenus.simplybows.registry.SimplyBowsCreativeTabRegistry;
 import net.sweenus.simplybows.registry.SimplyBowsItemProperties;
-import net.sweenus.simplybows.util.CelestialSwiftnessTracker;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -65,14 +59,23 @@ public final class SimplyBows {
     public static void init() {
         LOGGER.info("Simply Bows config loaded: {}", SimplyBowsConfig.INSTANCE.getId());
 
+        ComponentRegistry.register();
         ItemRegistry.ITEM.register();
+        PlayerEvent.PLAYER_JOIN.register(player -> {
+            if (player.getWorld().isClient()) {
+                return;
+            }
+            var inventory = player.getInventory();
+            for (int slot = 0; slot < inventory.size(); slot++) {
+                BowUpgradeData.migrateLegacy(inventory.getStack(slot));
+            }
+        });
         SimplyBowsCreativeTabRegistry.register();
         EntityRegistry.registerEntities();
         ParticleRegistry.registerParticles();
         SimplyBowsCommands.register();
         if (Platform.getEnvironment() != Env.CLIENT) {
             NetworkManager.registerS2CPayloadType(AbilityCooldownPayload.ID, AbilityCooldownPayload.CODEC);
-            NetworkManager.registerS2CPayloadType(CelestialSwiftnessPayload.ID, CelestialSwiftnessPayload.CODEC);
         }
     }
 
@@ -84,8 +87,6 @@ public final class SimplyBows {
             SimplyBowsItemProperties.addSimplyBowsItemProperties();
             ClientPlayerEvent.CLIENT_PLAYER_JOIN.register(player -> {
                 ClientAbilityCooldownCache.clearAll();
-                CelestialSwiftnessTracker.clearAll();
-                CosmicArrowEntityRenderer.clearTrails();
             });
 
             EntityRendererRegistry.register(EntityRegistry.HOMING_ARROW, HomingArrowEntityRenderer::new);
@@ -100,18 +101,8 @@ public final class SimplyBows {
                     new SimplyBowsArrowEntityRenderer<>(context, bowArrowTexture("blossom")));
             EntityRendererRegistry.register(EntityRegistry.EARTH_ARROW, context ->
                     new SimplyBowsArrowEntityRenderer<>(context, bowArrowTexture("earth")));
-            EntityRendererRegistry.register(EntityRegistry.ECHO_ARROW, context ->
-                    new SimplyBowsArrowEntityRenderer<>(context, bowArrowTexture("echo")));
-            EntityRendererRegistry.register(EntityRegistry.COSMIC_ARROW, context ->
-                    new CosmicArrowEntityRenderer<>(context, bowArrowTexture("cosmic")));
-            EntityRendererRegistry.register(EntityRegistry.COSMIC_ORBIT_VISUAL, CosmicOrbitVisualEntityRenderer::new);
-            EntityRendererRegistry.register(EntityRegistry.COSMIC_STRIKE_VISUAL, CosmicStrikeVisualEntityRenderer::new);
-            EntityRendererRegistry.register(EntityRegistry.COSMIC_TETHER_VISUAL, CosmicTetherVisualEntityRenderer::new);
-            EntityRendererRegistry.register(EntityRegistry.COSMIC_BOUNTY_VISUAL, CosmicBountyVisualEntityRenderer::new);
-            EntityRendererRegistry.register(EntityRegistry.SHOULDER_BOW, ShoulderBowEntityRenderer::new);
             EntityRendererRegistry.register(EntityRegistry.EARTH_SPIKE_VISUAL, EarthSpikeVisualEntityRenderer::new);
             EntityRendererRegistry.register(EntityRegistry.ICE_CHAOS_WALL_VISUAL, IceChaosWallVisualEntityRenderer::new);
-            EntityRendererRegistry.register(EntityRegistry.ECHO_CHAOS_BLACK_HOLE_VISUAL, EchoChaosBlackHoleVisualEntityRenderer::new);
             EntityRendererRegistry.register(EntityRegistry.VINE_FLOWER_VISUAL, VineFlowerVisualEntityRenderer::new);
             EntityRendererRegistry.register(EntityRegistry.BEE_HIVE_VISUAL, BeeHiveVisualEntityRenderer::new);
             EntityRendererRegistry.register(EntityRegistry.BEE_GRACE_VISUAL, BeeGraceVisualEntityRenderer::new);
@@ -140,16 +131,6 @@ public final class SimplyBows {
                 }
                 return client.world.getTime();
             };
-
-            NetworkManager.registerReceiver(
-                    NetworkManager.Side.S2C,
-                    CelestialSwiftnessPayload.ID,
-                    CelestialSwiftnessPayload.CODEC,
-                    (payload, context) -> context.queue(() ->
-                            CelestialSwiftnessTracker.set(
-                                    payload.playerId(),
-                                    payload.stacks(),
-                                    clientWorldTickReader.getAsLong() + Math.max(1, payload.durationTicks()))));
 
             ClientAbilityCooldownCache.setGameTickReader(clientWorldTickReader);
 

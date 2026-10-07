@@ -32,17 +32,17 @@ import java.util.List;
 
 public class BeeArrowEntity extends ArrowEntity {
 
-    private static int basePoisonDuration() { return SimplyBowsConfig.INSTANCE.beeBow.basePoisonDuration.get(); }
-    private static int stringPoisonDurationBonus() { return SimplyBowsConfig.INSTANCE.beeBow.stringPoisonDurationBonus.get(); }
+    private static int basePoisonDuration() { return SimplyBowsConfig.INSTANCE.buzzkill.basePoisonDuration.get(); }
+    private static int stringPoisonDurationBonus() { return SimplyBowsConfig.INSTANCE.buzzkill.stringPoisonDurationBonus.get(); }
     private static final int MAX_POISON_LEVELS = 5;
     private static final int MAX_POISON_AMPLIFIER = MAX_POISON_LEVELS - 1;
     private static final int STRING_LEVELS_PER_POISON_STEP = 2;
     private static final double MIN_HORIZONTAL_SPEED_SQ_FOR_YAW = 1.0E-4;
     private static final float ROTATION_SMOOTHING = 0.35F;
-    private static double painHomingRadius() { return SimplyBowsConfig.INSTANCE.beeBow.painHomingRadius.get(); }
-    private static int painHomingStartTicks() { return SimplyBowsConfig.INSTANCE.beeBow.painHomingStartTicks.get(); }
-    private static double painHomingAccel() { return SimplyBowsConfig.INSTANCE.beeBow.painHomingAccel.get(); }
-    private static double painMaxSpeed() { return SimplyBowsConfig.INSTANCE.beeBow.painMaxSpeed.get(); }
+    private static double painHomingRadius() { return SimplyBowsConfig.INSTANCE.buzzkill.painHomingRadius.get(); }
+    private static int painHomingStartTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.painHomingStartTicks.get(); }
+    private static double painHomingAccel() { return SimplyBowsConfig.INSTANCE.buzzkill.painHomingAccel.get(); }
+    private static double painMaxSpeed() { return SimplyBowsConfig.INSTANCE.buzzkill.painMaxSpeed.get(); }
     private static final String HIVE_VISUAL_TAG = "simplybows_bee_hive_visual";
     private final BowUpgradeData upgrades;
     private boolean spawnSoundPlayed;

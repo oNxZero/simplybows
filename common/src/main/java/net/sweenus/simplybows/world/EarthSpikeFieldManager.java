@@ -7,6 +7,7 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.particle.BlockStateParticleEffect;
 import net.minecraft.particle.ParticleTypes;
+import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -18,6 +19,7 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.entity.EarthSpikeVisualEntity;
+import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
@@ -49,22 +51,24 @@ public final class EarthSpikeFieldManager {
     private static final double BOUNTY_CENTER_KNOCKBACK_PROXIMITY_MULTIPLIER = 1.9;
     private static final String SPIKE_VISUAL_TAG = "simplybows_earth_spike_visual";
 
-    private static double fieldRadius() { return SimplyBowsConfig.INSTANCE.earthBow.fieldRadius.get(); }
-    private static float spikeDamage() { return SimplyBowsConfig.INSTANCE.earthBow.spikeDamage.get(); }
-    private static double baseUpwardKnockback() { return SimplyBowsConfig.INSTANCE.earthBow.baseUpwardKnockback.get(); }
-    private static double frameUpwardKnockbackPerLevel() { return SimplyBowsConfig.INSTANCE.earthBow.frameUpwardKnockbackPerLevel.get(); }
-    private static double stringRadiusBonusPerLevel() { return SimplyBowsConfig.INSTANCE.earthBow.stringRadiusBonusPerLevel.get(); }
-    private static double painWaveMaxDistance() { return SimplyBowsConfig.INSTANCE.earthBow.painWaveMaxDistance.get(); }
-    private static double painWaveStepDistance() { return SimplyBowsConfig.INSTANCE.earthBow.painWaveStepDistance.get(); }
-    private static float painWaveDamageMultiplier() { return SimplyBowsConfig.INSTANCE.earthBow.painWaveDamageMultiplier.get(); }
-    private static double stringWaveDistanceBonusPerLevel() { return SimplyBowsConfig.INSTANCE.earthBow.painStringWaveDistanceBonusPerLevel.get(); }
-    private static int graceResistanceDurationTicks() { return SimplyBowsConfig.INSTANCE.earthBow.graceResistanceDuration.get(); }
-    private static int graceSlowFallingDurationTicks() { return SimplyBowsConfig.INSTANCE.earthBow.graceSlowFallingDuration.get(); }
-    private static int bountyCenterBaseHeightSegments() { return SimplyBowsConfig.INSTANCE.earthBow.bountyCenterBaseHeightSegments.get(); }
-    private static int bountyCenterExtraHeightPerFrame() { return SimplyBowsConfig.INSTANCE.earthBow.bountyCenterExtraHeightPerFrame.get(); }
-    private static float bountyCenterDamageBaseMultiplier() { return SimplyBowsConfig.INSTANCE.earthBow.bountyCenterDamageBaseMultiplier.get(); }
-    private static float bountyCenterDamageProximityMultiplier() { return SimplyBowsConfig.INSTANCE.earthBow.bountyCenterDamageProximityMultiplier.get(); }
+    private static double fieldRadius() { return SimplyBowsConfig.INSTANCE.tremorstrike.fieldRadius.get(); }
+    private static float spikeDamage() { return SimplyBowsConfig.INSTANCE.tremorstrike.spikeDamage.get(); }
+    private static double baseUpwardKnockback() { return SimplyBowsConfig.INSTANCE.tremorstrike.baseUpwardKnockback.get(); }
+    private static double frameUpwardKnockbackPerLevel() { return SimplyBowsConfig.INSTANCE.tremorstrike.frameUpwardKnockbackPerLevel.get(); }
+    private static double stringRadiusBonusPerLevel() { return SimplyBowsConfig.INSTANCE.tremorstrike.stringRadiusBonusPerLevel.get(); }
+    private static double painWaveMaxDistance() { return SimplyBowsConfig.INSTANCE.tremorstrike.painWaveMaxDistance.get(); }
+    private static double painWaveStepDistance() { return SimplyBowsConfig.INSTANCE.tremorstrike.painWaveStepDistance.get(); }
+    private static float painWaveDamageMultiplier() { return SimplyBowsConfig.INSTANCE.tremorstrike.painWaveDamageMultiplier.get(); }
+    private static double stringWaveDistanceBonusPerLevel() { return SimplyBowsConfig.INSTANCE.tremorstrike.painStringWaveDistanceBonusPerLevel.get(); }
+    private static int graceResistanceDurationTicks() { return SimplyBowsConfig.INSTANCE.tremorstrike.graceResistanceDuration.get(); }
+    private static int graceSlowFallingDurationTicks() { return SimplyBowsConfig.INSTANCE.tremorstrike.graceSlowFallingDuration.get(); }
+    private static int bountyCenterBaseHeightSegments() { return SimplyBowsConfig.INSTANCE.tremorstrike.bountyCenterBaseHeightSegments.get(); }
+    private static int bountyCenterExtraHeightPerFrame() { return SimplyBowsConfig.INSTANCE.tremorstrike.bountyCenterExtraHeightPerFrame.get(); }
+    private static int fieldLockoutTicks() { return SimplyBowsConfig.INSTANCE.tremorstrike.fieldLockoutTicks.get(); }
+    private static float bountyCenterDamageBaseMultiplier() { return SimplyBowsConfig.INSTANCE.tremorstrike.bountyCenterDamageBaseMultiplier.get(); }
+    private static float bountyCenterDamageProximityMultiplier() { return SimplyBowsConfig.INSTANCE.tremorstrike.bountyCenterDamageProximityMultiplier.get(); }
     private static final Map<ServerWorld, List<ActiveSpikeField>> ACTIVE_FIELDS = new HashMap<>();
+    private static final Map<MinecraftServer, Map<UUID, Long>> FIELD_LOCKOUTS_BY_SERVER = CooldownStorage.newServerScopedStore();
 
     private EarthSpikeFieldManager() {
     }
@@ -81,14 +85,8 @@ public final class EarthSpikeFieldManager {
     public static void createOrReplaceField(ServerWorld world, Vec3d center, Entity owner, BowUpgradeData upgrades) {
         List<ActiveSpikeField> fields = ACTIVE_FIELDS.computeIfAbsent(world, w -> new ArrayList<>());
         UUID ownerId = owner != null ? owner.getUuid() : null;
-        if (ownerId != null) {
-            fields.removeIf(field -> {
-                if (ownerId.equals(field.ownerId())) {
-                    removeField(world, field);
-                    return true;
-                }
-                return false;
-            });
+        if (ownerId != null && !isFieldReady(world, ownerId, fields)) {
+            return;
         }
 
         long now = world.getTime();
@@ -101,6 +99,15 @@ public final class EarthSpikeFieldManager {
             spawnBountyCenterSpikeVisuals(world, field);
         }
         fields.add(field);
+        if (ownerId != null) {
+            int lockoutTicks = Math.max(20, fieldLockoutTicks());
+            CooldownStorage.forWorld(FIELD_LOCKOUTS_BY_SERVER, world)
+                    .put(ownerId, now + lockoutTicks);
+            if (owner instanceof ServerPlayerEntity player) {
+                SimplyBowItem.simplybows$sendCooldownPacket(player, "earth",
+                        System.currentTimeMillis() + (long) lockoutTicks * 50L, lockoutTicks);
+            }
+        }
 
         LivingEntity ownerEntity = getOwnerEntity(world, ownerId);
         applySpikeDamage(world, ownerEntity, center, tuning.radius(), tuning.damage(), tuning.upwardKnockback());
@@ -144,6 +151,20 @@ public final class EarthSpikeFieldManager {
             tickPainWaves(world, field);
             animateField(world, field);
         }
+    }
+
+    private static boolean isFieldReady(ServerWorld world, UUID ownerId, List<ActiveSpikeField> fields) {
+        long now = CooldownStorage.currentTick(world);
+        Long lockoutEnd = CooldownStorage.forWorld(FIELD_LOCKOUTS_BY_SERVER, world).get(ownerId);
+        if (lockoutEnd != null && lockoutEnd > now) {
+            return false;
+        }
+        for (ActiveSpikeField field : fields) {
+            if (ownerId.equals(field.ownerId()) && now <= field.expiryTick()) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static void applySpikeDamage(ServerWorld world, LivingEntity owner, Vec3d center, double radius, float damage, double upwardKnockback) {

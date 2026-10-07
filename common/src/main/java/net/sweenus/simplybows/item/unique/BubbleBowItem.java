@@ -46,22 +46,22 @@ public class BubbleBowItem extends SimplyBowItem {
             return;
         }
 
-        float speed = f * SimplyBowsConfig.INSTANCE.bubbleBow.arrowSpeedMultiplier.get();
+        float speed = f * SimplyBowsConfig.INSTANCE.bubbleveil.arrowSpeedMultiplier.get();
         if (upgrades.runeEtching() == RuneEtching.PAIN && critical) {
-            float painSpeedMultiplier = shooter.isTouchingWater() ? SimplyBowsConfig.INSTANCE.bubbleBow.painSpeedMultiplierWater.get() : SimplyBowsConfig.INSTANCE.bubbleBow.painSpeedMultiplierLand.get();
+            float painSpeedMultiplier = shooter.isTouchingWater() ? SimplyBowsConfig.INSTANCE.bubbleveil.painSpeedMultiplierWater.get() : SimplyBowsConfig.INSTANCE.bubbleveil.painSpeedMultiplierLand.get();
             int quantity = Math.max(1, upgrades.stringLevel() + 1);
             this.shootLine(serverWorld, shooter, hand, stack, projectiles, f * painSpeedMultiplier, critical, target, quantity);
             return;
         } else if (upgrades.runeEtching() == RuneEtching.PAIN) {
             FORCE_DEFAULT_BUBBLE_ARROW.set(true);
             try {
-                this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.bubbleBow.arrowDivergence.get(), critical, target);
+                this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.bubbleveil.arrowDivergence.get(), critical, target);
             } finally {
                 FORCE_DEFAULT_BUBBLE_ARROW.set(false);
             }
             return;
         }
-        this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.bubbleBow.arrowDivergence.get(), critical, target);
+        this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.bubbleveil.arrowDivergence.get(), critical, target);
     }
 
     @Override
@@ -79,7 +79,7 @@ public class BubbleBowItem extends SimplyBowItem {
             arrowEntity = new BubbleArrowEntity(world, shooter, firedArrowStack, weaponStack);
         }
         if (arrowEntity instanceof net.minecraft.entity.projectile.PersistentProjectileEntity persistent) {
-            persistent.setDamage(SimplyBowsConfig.INSTANCE.bubbleBow.baseDamage.get());
+            persistent.setDamage(SimplyBowsConfig.INSTANCE.bubbleveil.baseDamage.get());
             persistent.setCritical(critical);
         }
         return arrowEntity;
@@ -112,7 +112,7 @@ public class BubbleBowItem extends SimplyBowItem {
 
                 ProjectileEntity projectileEntity = this.createArrowEntity(world, shooter, stack, arrowForProjectile, critical);
                 this.simplybows$applyRangedWeaponProjectileBonus(shooter, projectileEntity);
-                this.shoot(shooter, projectileEntity, j, speed, SimplyBowsConfig.INSTANCE.bubbleBow.painDivergence.get(), 0.0F, target);
+                this.shoot(shooter, projectileEntity, j, speed, SimplyBowsConfig.INSTANCE.bubbleveil.painDivergence.get(), 0.0F, target);
                 double centerOffset = (quantity - 1) * 0.5;
                 double lateralOffset = (p - centerOffset) * BUBBLE_PAIN_LINE_SPACING;
                 Vec3d spawnOffset = horizontalForward.multiply(BUBBLE_PAIN_LINE_FORWARD_OFFSET).add(right.multiply(lateralOffset));

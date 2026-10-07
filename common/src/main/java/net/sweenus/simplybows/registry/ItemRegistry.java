@@ -9,9 +9,6 @@ import net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem;
 import net.sweenus.simplybows.item.unique.BeeBowItem;
 import net.sweenus.simplybows.item.unique.BlossomBowItem;
 import net.sweenus.simplybows.item.unique.BubbleBowItem;
-// TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-//import net.sweenus.simplybows.item.unique.CosmicBowItem;
-import net.sweenus.simplybows.item.unique.EchoBowItem;
 import net.sweenus.simplybows.item.unique.EarthBowItem;
 import net.sweenus.simplybows.item.unique.IceBowItem;
 import net.sweenus.simplybows.item.unique.VineBowItem;
@@ -39,21 +36,6 @@ public class ItemRegistry {
     public static final RegistrySupplier<Item> EARTH_BOW = ITEM.register("earth_bow/earth_bow", () -> new EarthBowItem(
             new Item.Settings()
     ));
-    public static final RegistrySupplier<Item> ECHO_BOW = ITEM.register("echo_bow/echo_bow", () -> new EchoBowItem(
-            new Item.Settings()
-    ));
-    // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-    //public static final RegistrySupplier<Item> COSMIC_BOW = ITEM.register("cosmic_bow/cosmic_bow", () -> new CosmicBowItem(
-    //        new Item.Settings()
-    //));
-    // Dummy item — exists only so BakedModelManager loads the small inventory model.
-    public static final RegistrySupplier<Item> ECHO_BOW_INVENTORY = ITEM.register("echo_bow/echo_bow_inventory", () -> new Item(
-            new Item.Settings()
-    ));
-    // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-    //public static final RegistrySupplier<Item> COSMIC_BOW_INVENTORY = ITEM.register("cosmic_bow/cosmic_bow_inventory", () -> new Item(
-    //        new Item.Settings()
-    //));
     // Dummy items — exist only so BakedModelManager loads the small inventory models.
     public static final RegistrySupplier<Item> EARTH_BOW_INVENTORY = ITEM.register("earth_bow/earth_bow_inventory", () -> new Item(
             new Item.Settings()
@@ -68,15 +50,6 @@ public class ItemRegistry {
             new Item.Settings()
     ));
     public static final RegistrySupplier<Item> BEE_BOW_INVENTORY = ITEM.register("bee_bow/bee_bow_inventory", () -> new Item(
-            new Item.Settings()
-    ));
-    public static final RegistrySupplier<Item> ECHO_BOW_VISUAL_PULL_0 = ITEM.register("echo_bow_visual_pull_0", () -> new Item(
-            new Item.Settings()
-    ));
-    public static final RegistrySupplier<Item> ECHO_BOW_VISUAL_PULL_1 = ITEM.register("echo_bow_visual_pull_1", () -> new Item(
-            new Item.Settings()
-    ));
-    public static final RegistrySupplier<Item> ECHO_BOW_VISUAL_PULL_2 = ITEM.register("echo_bow_visual_pull_2", () -> new Item(
             new Item.Settings()
     ));
     public static final RegistrySupplier<Item> VINE_BOW_VISUAL_PULL_0 = ITEM.register("vine_bow_visual_pull_0", () -> new Item(
@@ -133,16 +106,6 @@ public class ItemRegistry {
     public static final RegistrySupplier<Item> EARTH_BOW_VISUAL_PULL_2 = ITEM.register("earth_bow_visual_pull_2", () -> new Item(
             new Item.Settings()
     ));
-    // TEMP-DISABLED-COSMIC: re-enable when the Cosmic bow (Starweave) ships.
-    //public static final RegistrySupplier<Item> COSMIC_BOW_VISUAL_PULL_0 = ITEM.register("cosmic_bow_visual_pull_0", () -> new Item(
-    //        new Item.Settings()
-    //));
-    //public static final RegistrySupplier<Item> COSMIC_BOW_VISUAL_PULL_1 = ITEM.register("cosmic_bow_visual_pull_1", () -> new Item(
-    //        new Item.Settings()
-    //));
-    //public static final RegistrySupplier<Item> COSMIC_BOW_VISUAL_PULL_2 = ITEM.register("cosmic_bow_visual_pull_2", () -> new Item(
-    //        new Item.Settings()
-    //));
     public static final RegistrySupplier<Item> ENCHANTED_BOW_STRING = ITEM.register("upgrades/enchanted_bow_string", () -> new BowUpgradeComponentItem(
             new Item.Settings(),
             BowUpgradeComponentItem.UpgradeKind.ENCHANTED_STRING,

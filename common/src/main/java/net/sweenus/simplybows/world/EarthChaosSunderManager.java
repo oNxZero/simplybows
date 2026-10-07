@@ -81,11 +81,11 @@ public final class EarthChaosSunderManager {
 
         Vec3d direction = resolveInitialDirection(world, initialVelocity);
         int durationTicks = Math.max(20,
-                SimplyBowsConfig.INSTANCE.earthBow.chaosSunderDurationTicks.get()
-                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.earthBow.chaosSunderDurationPerStringTicks.get());
+                SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get()
+                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get());
         double acquisitionRange = Math.max(1.5,
-                SimplyBowsConfig.INSTANCE.earthBow.chaosSunderAcquisitionRange.get()
-                        + Math.max(0, frameLevel) * SimplyBowsConfig.INSTANCE.earthBow.chaosSunderAcquisitionRangePerFrame.get());
+                SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderAcquisitionRange.get()
+                        + Math.max(0, frameLevel) * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderAcquisitionRangePerFrame.get());
 
         if (ownerId != null) {
             List<ActiveSunderField> existing = ACTIVE_FIELDS.get(world);
@@ -200,7 +200,7 @@ public final class EarthChaosSunderManager {
         world.spawnParticles(ParticleTypes.POOF, field.position.x, field.position.y + 0.1, field.position.z, 2, 0.12, 0.05, 0.12, 0.0);
 
         LivingEntity owner = getOwnerEntity(world, field.ownerId);
-        float damage = (float) (SimplyBowsConfig.INSTANCE.earthBow.spikeDamage.get() * (1.0 + field.frameLevel * SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get()));
+        float damage = (float) (SimplyBowsConfig.INSTANCE.tremorstrike.spikeDamage.get() * (1.0 + field.frameLevel * SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get()));
 
         Box damageBox = Box.of(field.position, SUNDER_HIT_RADIUS * 2.0, 2.0, SUNDER_HIT_RADIUS * 2.0)
                 .union(Box.of(previous, SUNDER_HIT_RADIUS * 2.0, 2.0, SUNDER_HIT_RADIUS * 2.0));
