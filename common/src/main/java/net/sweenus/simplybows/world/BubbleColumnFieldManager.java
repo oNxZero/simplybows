@@ -7,7 +7,6 @@ import net.minecraft.entity.mob.HostileEntity;
 import net.minecraft.entity.projectile.ProjectileEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.fluid.Fluids;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
@@ -60,18 +59,20 @@ public final class BubbleColumnFieldManager {
     }
 
     public static boolean createOrReplaceColumn(ServerWorld world, Vec3d center, UUID ownerId, BowUpgradeData upgrades) {
-        if (!isUnderwater(world, center)) {
-            return false;
-        }
-
         if (upgrades == null) {
             upgrades = BowUpgradeData.none();
         }
         ColumnTuning tuning = buildTuning(upgrades);
+        boolean runeColumn = tuning.bountyMode() || tuning.graceMode();
+        if (runeColumn && ownerId != null && !RuneUseCooldown.isReady(world, ownerId, "bubble-column")) {
+            return false;
+        }
 
         double y = findGroundTopY(world, center.x, center.z, center.y) + 0.05;
         Vec3d anchoredCenter = new Vec3d(center.x, y, center.z);
-        if (!isUnderwater(world, anchoredCenter)) {
+
+        ActiveBubbleColumn active = ACTIVE_COLUMNS.get(world);
+        if (active != null && !runeColumn && (active.tuning.bountyMode() || active.tuning.graceMode())) {
             return false;
         }
 
@@ -106,6 +107,9 @@ public final class BubbleColumnFieldManager {
         ACTIVE_COLUMNS.put(world, new ActiveBubbleColumn(anchoredCenter, expiryTick, ownerId, tuning, firstEffectTick, visualId));
         spawnBurstParticles(world, anchoredCenter, tuning);
         playSpawnSound(world, anchoredCenter);
+        if (runeColumn) {
+            RuneUseCooldown.start(world, ownerId, "bubble-column", "bubble");
+        }
         return true;
     }
 
@@ -189,15 +193,6 @@ public final class BubbleColumnFieldManager {
                 0.7F,
                 0.95F + world.getRandom().nextFloat() * 0.15F
         );
-    }
-
-    private static boolean isUnderwater(ServerWorld world, Vec3d center) {
-        BlockPos base = BlockPos.ofFloored(center);
-        if (!world.getFluidState(base).isOf(Fluids.WATER)) {
-            return false;
-        }
-        BlockPos up = base.up();
-        return world.getFluidState(up).isOf(Fluids.WATER);
     }
 
     private static double findGroundTopY(ServerWorld world, double x, double z, double centerY) {

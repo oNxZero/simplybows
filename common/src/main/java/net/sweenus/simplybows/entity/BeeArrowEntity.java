@@ -27,6 +27,7 @@ import net.sweenus.simplybows.util.CombatTargeting;
 import net.sweenus.simplybows.world.BeeChaosHoneyStormManager;
 import net.sweenus.simplybows.world.BeeGraceShieldManager;
 import net.sweenus.simplybows.world.BeeHiveSwarmManager;
+import net.sweenus.simplybows.world.RuneUseCooldown;
 
 import java.util.List;
 
@@ -52,11 +53,18 @@ public class BeeArrowEntity extends ArrowEntity {
     private boolean chaosDiveBomb;
     private float chaosDiveBombDamage;
     private double chaosDiveBombRadius;
+    private static final ThreadLocal<Boolean> ENABLE_PAIN_HOMING = ThreadLocal.withInitial(() -> false);
+    private final boolean painHoming;
     private LivingEntity homingTarget;
+
+    public static void setPainHoming(boolean enabled) {
+        ENABLE_PAIN_HOMING.set(enabled);
+    }
 
     public BeeArrowEntity(EntityType<? extends BeeArrowEntity> type, World world) {
         super(type, world);
         this.upgrades = BowUpgradeData.none();
+        this.painHoming = false;
     }
 
     public BeeArrowEntity(World world, LivingEntity owner, ItemStack arrowStack, ItemStack weaponStack) {
@@ -72,13 +80,14 @@ public class BeeArrowEntity extends ArrowEntity {
         this.prevY = owner.getEyeY() - 0.1;
         this.prevZ = owner.getZ();
         this.upgrades = upgrades == null ? BowUpgradeData.none() : upgrades;
+        this.painHoming = ENABLE_PAIN_HOMING.get();
     }
 
     @Override
     public void tick() {
         super.tick();
 
-        if (!this.getWorld().isClient() && this.upgrades.runeEtching() == RuneEtching.PAIN && !this.inGround) {
+        if (!this.getWorld().isClient() && this.painHoming && !this.inGround) {
             updatePainHoming();
         }
 
@@ -111,7 +120,7 @@ public class BeeArrowEntity extends ArrowEntity {
     }
 
     private void updatePainHoming() {
-        if (this.age < painHomingStartTicks()) {
+        if (this.age < 2) {
             return;
         }
 
@@ -119,20 +128,21 @@ public class BeeArrowEntity extends ArrowEntity {
             this.homingTarget = findNearestPainTarget();
         }
         if (this.homingTarget == null) {
+            this.setNoGravity(false);
             return;
         }
 
-        Vec3d targetPos = this.homingTarget.getPos().add(0.0, this.homingTarget.getStandingEyeHeight(), 0.0);
+        this.setNoGravity(true);
+        Vec3d targetPos = this.homingTarget.getPos().add(0.0, this.homingTarget.getStandingEyeHeight() * 0.65, 0.0);
         Vec3d direction = targetPos.subtract(this.getPos());
         if (direction.lengthSquared() <= 1.0E-6) {
             return;
         }
 
-        Vec3d newVelocity = this.getVelocity().add(direction.normalize().multiply(painHomingAccel()));
-        if (newVelocity.lengthSquared() > painMaxSpeed() * painMaxSpeed()) {
-            newVelocity = newVelocity.normalize().multiply(painMaxSpeed());
-        }
-        this.setVelocity(newVelocity);
+        double speed = MathHelper.clamp(Math.max(this.getVelocity().length(), 1.55), 1.55, Math.max(2.15, painMaxSpeed()));
+        Vec3d desired = direction.normalize().multiply(speed);
+        Vec3d steered = this.getVelocity().lerp(desired, 0.62);
+        this.setVelocity(steered);
         this.velocityDirty = true;
     }
 
@@ -171,7 +181,7 @@ public class BeeArrowEntity extends ArrowEntity {
         }
 
         if (entityHitResult.getEntity() instanceof LivingEntity livingEntity && shouldIgnoreGraceDamage(livingEntity)) {
-            tryApplyGraceShield(entityHitResult.getPos());
+            tryApplyGraceShield(entityHitResult.getPos(), livingEntity);
             if (this.getWorld() instanceof ServerWorld serverWorld) {
                 serverWorld.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), SoundEvents.ENTITY_BEE_HURT, SoundCategory.PLAYERS, 0.8F, 1.0F + this.random.nextFloat() * 0.2F);
                 spawnPoofAndDiscard(serverWorld);
@@ -196,7 +206,7 @@ public class BeeArrowEntity extends ArrowEntity {
             return;
         }
 
-        tryApplyGraceShield(entityHitResult.getPos());
+        tryApplyGraceShield(entityHitResult.getPos(), livingEntity);
 
         if (!isFriendlyToOwner(livingEntity)) {
             applyStackingPoison(livingEntity);
@@ -224,7 +234,7 @@ public class BeeArrowEntity extends ArrowEntity {
         }
 
         super.onBlockHit(blockHitResult);
-        tryApplyGraceShield(blockHitResult.getPos());
+        tryApplyGraceShield(blockHitResult.getPos(), null);
         trySpawnChaosHoneyStorm(blockHitResult.getPos());
         trySpawnBountyHive(blockHitResult.getPos());
     }
@@ -247,7 +257,14 @@ public class BeeArrowEntity extends ArrowEntity {
         if (!(this.getOwner() instanceof LivingEntity ownerLiving)) {
             return;
         }
+        if (!RuneUseCooldown.isReady(serverWorld, ownerLiving.getUuid(), "bee-bounty")) {
+            return;
+        }
         BeeHiveSwarmManager.createHive(serverWorld, hitPos, ownerLiving, this.upgrades);
+        int hiveTicks = Math.max(80,
+                SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDuration.get()
+                        + this.upgrades.stringLevel() * SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDurationBonusPerString.get());
+        RuneUseCooldown.start(serverWorld, ownerLiving.getUuid(), "bee-bounty", "bee", hiveTicks);
         this.spawnedBountyHive = true;
     }
 
@@ -313,7 +330,7 @@ public class BeeArrowEntity extends ArrowEntity {
         target.addStatusEffect(new StatusEffectInstance(StatusEffects.POISON, duration, amplifier), this.getOwner());
     }
 
-    private void tryApplyGraceShield(Vec3d hitPos) {
+    private void tryApplyGraceShield(Vec3d hitPos, LivingEntity struck) {
         if (this.upgrades.runeEtching() != RuneEtching.GRACE) {
             return;
         }
@@ -323,7 +340,7 @@ public class BeeArrowEntity extends ArrowEntity {
         if (!(this.getOwner() instanceof LivingEntity ownerLiving)) {
             return;
         }
-        BeeGraceShieldManager.tryApplyFromImpact(serverWorld, hitPos, ownerLiving, this.upgrades);
+        BeeGraceShieldManager.tryApplyFromImpact(serverWorld, hitPos, ownerLiving, this.upgrades, struck);
     }
 
     private boolean isFriendlyToOwner(LivingEntity entity) {

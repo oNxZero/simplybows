@@ -1,37 +1,51 @@
-# Changes in this fork
+# Simply Bows Reforged
 
-Fork of [Sweenus/simplybows](https://github.com/Sweenus/simplybows). Item ids of the bows that remain are unchanged, so existing items stay valid. Echo and Starweave items do not.
+Fork of [Sweenus/simplybows](https://github.com/Sweenus/simplybows). See [README.md](README.md) for install and overview.
 
-Install `neoforge/build/libs/SimplyBows-neoforge-0.1.4.jar` on the server and on every client. The old Modrinth jar cannot run beside it. Delete `config/simplybows/config.toml` once after updating so renamed sections are written. A live file keeps old numbers: set `[winterfang] painDamageMultiplier` to `1.2` if it still says `1.5`, and leave `[everbloom] friendlyHeal` at `2.0`.
+Item ids of the six remaining bows are unchanged. Echo and Starweave items become invalid.
+
+Install `neoforge/build/libs/SimplyBows-neoforge-0.1.4.jar` on the server and every client. Delete `config/simplybows/config.toml` once after updating so renamed keys appear. Live files keep old values: Winterfang `painDamageMultiplier = 1.2`, Everbloom `friendlyHeal = 2.0`, Bubbleveil `painShotSpeedLand = 0.9` / `painShotSpeedWater = 1.05`.
 
 ## Everbloom
 
-Everbloom (`vine_bow`) is a healing weapon.
+- Full draw plants the flower field. Short draw is still a healing arrow.
+- Players, animals, and iron golems take no arrow damage. Direct hit heals (1 heart Frame 0, 3.5 Frame 5).
+- Field heal only on the visible flower patch. Without Grace: lowest absolute HP. With Grace: all valid targets.
+- One field per player across every Everbloom bow. Shared cooldown. Direct heals still work while locked.
+- Field regen drips across the second; overlapping fields do not stack. Frame 0 ≈ 0.5 heart/s, Frame 5 ≈ 2 hearts/s at `friendlyHeal = 2.0`.
+- Monsters take damage in the larger field radius. String grows the visible patch; tooltip shows that radius.
+- Patch fills center → grows out → sinks outside-in. Grace cherry tree matches.
 
-- A full draw plants the flower field. A short draw is still a healing arrow and does not plant flowers.
-- Players, animals, and iron golems take no arrow damage. A direct hit heals them for 1 heart at Frame 0 and 3.5 hearts at Frame 5.
-- The field heals only on the visible flower patch. Without Grace, only the one with the lowest health is healed. With Grace, players, animals, and iron golems in the patch are healed, on a cooldown equal to the field.
-- Field regen is dripped across the second and overlapping fields do not stack. Frame 0 is half a heart per second, Frame 5 is two hearts per second, when `friendlyHeal` is `2.0`.
-- Only monsters take field damage, in the larger field radius.
-- Enchanted String grows the flower patch and arrow speed. The tooltip shows that patch radius, not the monster radius.
-- The patch fills the center and grows outward, then sinks back in from the outside. Grace's cherry tree does the same.
+## Winterfang
 
-## Other bows
+- Pain default damage multiplier `1.2`, short cooldown. Grace stacks Slowness (short CD). Bounty extra arrows (short CD). Chaos frost wall keeps its longer cooldown.
 
-- Winterfang Pain damage multiplier default is `1.2`. Focus and every-shot behavior are unchanged. The Chaos wall keeps its cooldown.
-- Buzzkill's special, including poison and Grace bees, only fires on a full draw. Grace bees have a short cooldown. Chaos honey already had one.
-- Bubbleveil's special only fires on a full draw.
-- Petalwind keeps one storm at a time. Grace still seeks allies inside it. Pain stays the area storm.
-- Tremorstrike will not replant its spike field until a lockout ends. Grace launches allies once per field.
-- Winterfang, Petalwind, and Tremorstrike already required a full draw.
+## Bubbleveil
+
+- Pain axolotl line uses `painShotSpeedLand` / `painShotSpeedWater` so full-draw land shots have real range.
+- Grace and Bounty columns spawn on land or underwater, with axolotl visuals and effects.
+- Chaos wave on full draw. Pain / Grace / Bounty / Chaos have cooldowns. Normal Pain shots during CD still fire a basic bubble arrow.
+
+## Buzzkill
+
+- Pain bees home strongly; CD ~4s. Grace orbits struck target at ~2 blocks, Resistance I–V from Frame for nearby players; CD matches shield length. Bounty hive CD matches hive life. Chaos honey storm ~13s then quick fade (no leftover campfire smoke); longer post-storm CD.
+
+## Petalwind
+
+- Pain: small ring (~2.8 + little String), ~45% storm damage, CD after. Grace: nearest ally at arrow or hit target. Bounty: ground trap ring, triggers on step-in. Chaos: koi at impact; orbit hit target if any. Cooldowns scale with strength.
+
+## Tremorstrike
+
+- Pain waves knock up once lightly, not every step into the sky. Chaos: wider moving sunder trail (multi-spike visual) with CD after. Spike field lockout unchanged.
+
+## Shared systems
+
+- Short `RuneUseCooldown` (and longer existing locks) for rune specials that used to spam.
+- Hotbar ability overlay is translucent so the bow icon stays visible. Does not use vanilla item cooldown lock.
+- Hold Alt: String / Frame gains plus a short per-bow rune description.
+- Upgrades in `simplybows:upgrades` component; legacy `custom_data` migrates once.
+- Out-animations on zones (flowers, hive, honey, petal storms, etc.).
 
 ## Removed
 
-- Starweave (Cosmic) is removed from items, loot, tooltips, models, and config.
-- Echo is removed the same way. Koi visuals stay; they belong to Petalwind Chaos.
-
-## Upgrades and tooltips
-
-Upgrades are stored in the `simplybows:upgrades` component so they survive mods that replace `minecraft:custom_data` on death. Old upgrade data still on an item is copied into that component. Data already wiped by a previous death cannot be restored.
-
-Ability cooldowns draw the vanilla hotbar overlay and do not lock the bow. Tooltips stay short: the ability line, one rune line, and the Alt row shows the gain per String or Frame level.
+- Starweave (Cosmic) and Echo removed from items, loot, tooltips, models, and config. Koi visuals stay for Petalwind Chaos.

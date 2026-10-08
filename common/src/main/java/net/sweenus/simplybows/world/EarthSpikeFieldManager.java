@@ -110,7 +110,8 @@ public final class EarthSpikeFieldManager {
         }
 
         LivingEntity ownerEntity = getOwnerEntity(world, ownerId);
-        applySpikeDamage(world, ownerEntity, center, tuning.radius(), tuning.damage(), tuning.upwardKnockback());
+        double initialKnock = tuning.outwardPainWaves() ? Math.min(0.22, tuning.upwardKnockback()) : tuning.upwardKnockback();
+        applySpikeDamage(world, ownerEntity, center, tuning.radius(), tuning.damage(), initialKnock);
         if (tuning.bountyCenterSpike()) {
             applyBountyCenterImpact(world, ownerEntity, center, tuning);
         }
@@ -351,7 +352,7 @@ public final class EarthSpikeFieldManager {
             double y = findGroundTopY(world, pos.x, pos.z, field.center().y) + BASE_GROUND_OFFSET;
             int heightSegments = 2 + (wave.nextStep() % 4);
             spawnSpikeVisual(world, field, pos.x, y, pos.z, heightSegments, world.getTime());
-            damageAtWaveStep(world, getOwnerEntity(world, field.ownerId()), pos.x, y, pos.z, field.tuning().damage() * painWaveDamageMultiplier(), field.tuning().upwardKnockback());
+            damageAtWaveStep(world, field, getOwnerEntity(world, field.ownerId()), pos.x, y, pos.z, field.tuning().damage() * painWaveDamageMultiplier());
             world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.POINTED_DRIPSTONE.getDefaultState()), pos.x, y + 0.2, pos.z, 3, 0.1, 0.08, 0.1, 0.005);
             world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.DRIPSTONE_BLOCK.getDefaultState()), pos.x, y + 0.15, pos.z, 5, 0.16, 0.08, 0.16, 0.01);
             world.playSound(null, pos.x, y, pos.z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.45F, 1.05F + world.random.nextFloat() * 0.15F);
@@ -369,7 +370,7 @@ public final class EarthSpikeFieldManager {
         field.visuals.add(new SpikeVisual(visual.getUuid(), x, y, z, spawnTick));
     }
 
-    private static void damageAtWaveStep(ServerWorld world, LivingEntity owner, double x, double y, double z, float damage, double upwardKnockback) {
+    private static void damageAtWaveStep(ServerWorld world, ActiveSpikeField field, LivingEntity owner, double x, double y, double z, float damage) {
         Box hitBox = Box.of(new Vec3d(x, y + 0.3, z), PAIN_WAVE_DAMAGE_RADIUS * 2.0, 2.0, PAIN_WAVE_DAMAGE_RADIUS * 2.0);
         for (LivingEntity candidate : world.getEntitiesByClass(
                 LivingEntity.class,
@@ -377,8 +378,8 @@ public final class EarthSpikeFieldManager {
                 CombatTargeting::isOffensiveTargetCandidate
         )) {
             boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, damage, true, false);
-            if (damaged) {
-                applyUpwardKnockback(candidate, upwardKnockback);
+            if (damaged && field.painLaunched.add(candidate.getUuid())) {
+                applyUpwardKnockback(candidate, 0.22);
             }
         }
     }
@@ -492,6 +493,7 @@ public final class EarthSpikeFieldManager {
         private final FieldTuning tuning;
         private final List<SpikeVisual> visuals = new ArrayList<>();
         private final List<PainWaveState> painWaves = new ArrayList<>();
+        private final java.util.Set<UUID> painLaunched = new java.util.HashSet<>();
 
         private ActiveSpikeField(Vec3d center, long spawnTick, long expiryTick, UUID ownerId, FieldTuning tuning) {
             this.center = center;

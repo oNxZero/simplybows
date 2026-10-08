@@ -218,11 +218,11 @@ public class SimplyBowsConfig extends Config {
         public ConfigGroup painGroup = new ConfigGroup("pain");
         @Comment("Spread used for Bubble Pain axolotl shots.")
         public ValidatedFloat painDivergence = new ValidatedFloat(0.12F, 5.0F, 0.0F);
-        @Comment("Pain projectile speed multiplier when fired on land.")
-        public ValidatedFloat painSpeedMultiplierLand = new ValidatedFloat(0.22F, 3.0F, 0.01F);
+        @Comment("Pain axolotl shot speed on land. Full draw multiplies this by 3.")
+        public ValidatedFloat painShotSpeedLand = new ValidatedFloat(0.9F, 3.0F, 0.01F);
         @ConfigGroup.Pop
-        @Comment("Pain projectile speed multiplier when fired underwater.")
-        public ValidatedFloat painSpeedMultiplierWater = new ValidatedFloat(0.62F, 3.0F, 0.01F);
+        @Comment("Pain axolotl shot speed underwater. Full draw multiplies this by 3.")
+        public ValidatedFloat painShotSpeedWater = new ValidatedFloat(1.05F, 3.0F, 0.01F);
 
         // Bubble Column
         public ConfigGroup columnGroup = new ConfigGroup("bubbleColumn");

@@ -30,8 +30,10 @@ public final class EarthChaosSunderManager {
 
     private static final Map<ServerWorld, List<ActiveSunderField>> ACTIVE_FIELDS = new HashMap<>();
     private static final Map<ServerWorld, Long> NEXT_ORPHAN_VISUAL_CLEANUP_TICK = new HashMap<>();
-    private static final double SUNDER_STEP_DISTANCE = 0.25;
-    private static final double SUNDER_HIT_RADIUS = 0.9;
+    private static final double SUNDER_STEP_DISTANCE = 0.34;
+    private static final double SUNDER_HIT_RADIUS = 2.6;
+    private static final int SUNDER_COOLDOWN_AFTER_TICKS = 160;
+    private static final java.util.Map<net.minecraft.server.MinecraftServer, java.util.Map<UUID, Long>> SUNDER_COOLDOWNS = CooldownStorage.newServerScopedStore();
     private static final long TARGET_DAMAGE_COOLDOWN_TICKS = 20L;
     private static final long TARGET_REACQUIRE_COOLDOWN_TICKS = 60L;
     private static final long IDLE_TARGET_CHECK_INTERVAL_TICKS = 15L;
@@ -59,6 +61,10 @@ public final class EarthChaosSunderManager {
 
     public static boolean isSunderReady(ServerWorld world, UUID ownerId) {
         if (world == null || ownerId == null) {
+            return false;
+        }
+        Long cooldownEnd = CooldownStorage.forWorld(SUNDER_COOLDOWNS, world).get(ownerId);
+        if (cooldownEnd != null && world.getTime() < cooldownEnd) {
             return false;
         }
         List<ActiveSunderField> fields = ACTIVE_FIELDS.get(world);
@@ -109,6 +115,9 @@ public final class EarthChaosSunderManager {
                 frameLevel
         );
         ACTIVE_FIELDS.computeIfAbsent(world, w -> new ArrayList<>()).add(field);
+        if (ownerId != null) {
+            CooldownStorage.forWorld(SUNDER_COOLDOWNS, world).put(ownerId, world.getTime() + durationTicks + SUNDER_COOLDOWN_AFTER_TICKS);
+        }
 
         world.playSound(null, startPos.x, startPos.y, startPos.z, SoundEvents.BLOCK_STONE_BREAK, SoundCategory.PLAYERS, 1.0F, 0.85F);
     }
@@ -196,8 +205,8 @@ public final class EarthChaosSunderManager {
         }
         animateSunderVisuals(world, field);
 
-        world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), field.position.x, field.position.y + 0.08, field.position.z, 5, 0.22, 0.08, 0.22, 0.01);
-        world.spawnParticles(ParticleTypes.POOF, field.position.x, field.position.y + 0.1, field.position.z, 2, 0.12, 0.05, 0.12, 0.0);
+        world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), field.position.x, field.position.y + 0.08, field.position.z, 10, 1.15, 0.08, 1.15, 0.01);
+        world.spawnParticles(ParticleTypes.POOF, field.position.x, field.position.y + 0.1, field.position.z, 4, 0.9, 0.05, 0.9, 0.0);
 
         LivingEntity owner = getOwnerEntity(world, field.ownerId);
         float damage = (float) (SimplyBowsConfig.INSTANCE.tremorstrike.spikeDamage.get() * (1.0 + field.frameLevel * SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get()));
@@ -379,10 +388,20 @@ public final class EarthChaosSunderManager {
     }
 
     private static void spawnSunderSpikeVisual(ServerWorld world, ActiveSunderField field, long now) {
-        Vec3d position = field.position;
+        Vec3d side = new Vec3d(-field.direction.z, 0.0, field.direction.x);
+        if (side.lengthSquared() < 1.0E-4) {
+            side = new Vec3d(1.0, 0.0, 0.0);
+        } else {
+            side = side.normalize();
+        }
+        spawnSunderSpikeAt(world, field, field.position, now, 1.7F);
+        spawnSunderSpikeAt(world, field, field.position.add(side.multiply(1.6)), now, 1.15F);
+        spawnSunderSpikeAt(world, field, field.position.add(side.multiply(-1.6)), now, 1.15F);
+    }
+
+    private static void spawnSunderSpikeAt(ServerWorld world, ActiveSunderField field, Vec3d position, long now, float height) {
         double groundY = findGroundTopY(world, position.x, position.z, position.y) + VISUAL_BASE_GROUND_OFFSET;
-        float targetHeight = 1.6F + world.random.nextFloat() * 0.9F;
-        EarthSpikeVisualEntity visual = new EarthSpikeVisualEntity(world, position.x, groundY - VISUAL_START_DEPTH, position.z, targetHeight);
+        EarthSpikeVisualEntity visual = new EarthSpikeVisualEntity(world, position.x, groundY - VISUAL_START_DEPTH, position.z, height);
         visual.addCommandTag(SUNDER_VISUAL_TAG);
         if (!world.spawnEntity(visual)) {
             return;

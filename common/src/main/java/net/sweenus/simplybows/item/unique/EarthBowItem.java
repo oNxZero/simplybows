@@ -43,7 +43,7 @@ public class EarthBowItem extends SimplyBowItem {
             int durationTicks = Math.max(20,
                     SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get()
                             + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get());
-            simplybows$startAbilityItemCooldown(shooter, durationTicks);
+            simplybows$startAbilityItemCooldown(shooter, durationTicks + 160);
         }
 
         CHAOS_SUNDER_ON_IMPACT.set(chaosSunderReady);

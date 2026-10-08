@@ -24,6 +24,7 @@ import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
 import net.sweenus.simplybows.util.HelperMethods;
 import net.sweenus.simplybows.world.IceChaosWallManager;
+import net.sweenus.simplybows.world.RuneUseCooldown;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -64,7 +65,11 @@ public class IceBowItem extends SimplyBowItem {
     public void performStoppedUsing(ServerWorld serverWorld, LivingEntity shooter, Hand hand, ItemStack stack, List<ItemStack> list, float f, float g, boolean bl, @Nullable LivingEntity livingEntity) {
         BowUpgradeData upgrades = BowUpgradeData.from(stack);
         RuneEtching rune = upgrades.runeEtching();
+        UUID ownerId = shooter != null ? shooter.getUuid() : null;
         boolean chaosWallReady = rune == RuneEtching.CHAOS && IceChaosWallManager.isWallReady(serverWorld, shooter.getUuid());
+        boolean painReady = rune == RuneEtching.PAIN && RuneUseCooldown.isReady(serverWorld, ownerId, "ice-pain");
+        boolean graceReady = rune == RuneEtching.GRACE && RuneUseCooldown.isReady(serverWorld, ownerId, "ice-grace");
+        boolean bountyReady = rune == RuneEtching.BOUNTY && RuneUseCooldown.isReady(serverWorld, ownerId, "ice-bounty");
 
         if (chaosWallReady) {
             int durationTicks = Math.max(20,
@@ -74,16 +79,19 @@ public class IceBowItem extends SimplyBowItem {
             simplybows$startAbilityItemCooldown(shooter, durationTicks + cooldownTicks);
         }
 
-        int quantity = getArrowQuantity(upgrades);
+        int quantity = baseQuantity() + upgrades.stringLevel();
+        if (bountyReady) {
+            quantity *= SimplyBowsConfig.INSTANCE.winterfang.bountyExtraArrowMultiplier.get();
+        }
         double damageMultiplier = upgrades.damageMultiplier();
-        if (rune == RuneEtching.PAIN) {
+        if (painReady) {
             damageMultiplier *= SimplyBowsConfig.INSTANCE.winterfang.painDamageMultiplier.get();
-        } else if (rune == RuneEtching.BOUNTY) {
+        } else if (bountyReady) {
             damageMultiplier *= SimplyBowsConfig.INSTANCE.winterfang.bountyDamageMultiplier.get();
         }
 
         LivingEntity painTarget = null;
-        if (rune == RuneEtching.PAIN) {
+        if (painReady) {
             painTarget = livingEntity != null && CombatTargeting.isOffensiveTargetCandidate(livingEntity, shooter)
                     ? livingEntity
                     : findNearestHostile(serverWorld, shooter);
@@ -93,8 +101,8 @@ public class IceBowItem extends SimplyBowItem {
         customData.putDouble(NBT_DAMAGE_MULTIPLIER, damageMultiplier);
         // Only hard-lock when pain mode found a concrete target.
         // If no target is found, keep normal homing fallback behavior.
-        customData.putBoolean(NBT_LOCK_TARGET, rune == RuneEtching.PAIN && painTarget != null);
-        customData.putBoolean(NBT_SLOW_STACK, rune == RuneEtching.GRACE);
+        customData.putBoolean(NBT_LOCK_TARGET, painReady && painTarget != null);
+        customData.putBoolean(NBT_SLOW_STACK, graceReady);
         customData.putBoolean(NBT_CHAOS_WALL_ON_IMPACT, chaosWallReady);
         if (chaosWallReady) {
             customData.putInt(NBT_CHAOS_WALL_STRING_LEVEL, upgrades.stringLevel());
@@ -109,6 +117,14 @@ public class IceBowItem extends SimplyBowItem {
             customData.remove(NBT_TARGET_UUID);
         }
         stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
+
+        if (painReady) {
+            RuneUseCooldown.start(serverWorld, ownerId, "ice-pain", "ice");
+        } else if (graceReady) {
+            RuneUseCooldown.start(serverWorld, ownerId, "ice-grace", "ice");
+        } else if (bountyReady) {
+            RuneUseCooldown.start(serverWorld, ownerId, "ice-bounty", "ice");
+        }
 
         if (chaosWallReady) {
             this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.chaosWallArrowDivergence.get() * 0.01F, f == 1.0F, livingEntity);

@@ -6,7 +6,7 @@ license = "Timefall Development License 1.2"
 [[mods]]
 modId = "simplybows"
 version = "${version}"
-displayName = "Simply Bows"
+displayName = "Simply Bows Reforged"
 authors = "Sweenus, Hootea"
 description = '''
 

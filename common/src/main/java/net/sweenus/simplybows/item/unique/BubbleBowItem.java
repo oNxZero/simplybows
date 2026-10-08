@@ -17,10 +17,12 @@ import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.util.BowUser;
 import net.sweenus.simplybows.util.HelperMethods;
 import net.sweenus.simplybows.world.BubbleChaosWaveManager;
+import net.sweenus.simplybows.world.RuneUseCooldown;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class BubbleBowItem extends SimplyBowItem {
 
@@ -39,18 +41,25 @@ public class BubbleBowItem extends SimplyBowItem {
 
     public void performStoppedUsing(ServerWorld serverWorld, LivingEntity shooter, Hand hand, ItemStack stack, List<ItemStack> projectiles, float f, float g, boolean critical, @Nullable LivingEntity target) {
         BowUpgradeData upgrades = BowUpgradeData.from(stack);
-        if (upgrades.runeEtching() == RuneEtching.CHAOS && critical) {
+        UUID ownerId = shooter != null ? shooter.getUuid() : null;
+        if (upgrades.runeEtching() == RuneEtching.CHAOS && critical
+                && RuneUseCooldown.isReady(serverWorld, ownerId, "bubble-chaos")) {
             BubbleChaosWaveManager.cast(serverWorld, shooter, upgrades);
+            RuneUseCooldown.start(serverWorld, ownerId, "bubble-chaos", "bubble");
             ItemStack ammoReference = projectiles.isEmpty() ? ItemStack.EMPTY : projectiles.getFirst();
             stack.damage(this.getWeaponStackDamage(ammoReference), shooter, LivingEntity.getSlotForHand(hand));
             return;
         }
 
         float speed = f * SimplyBowsConfig.INSTANCE.bubbleveil.arrowSpeedMultiplier.get();
-        if (upgrades.runeEtching() == RuneEtching.PAIN && critical) {
-            float painSpeedMultiplier = shooter.isTouchingWater() ? SimplyBowsConfig.INSTANCE.bubbleveil.painSpeedMultiplierWater.get() : SimplyBowsConfig.INSTANCE.bubbleveil.painSpeedMultiplierLand.get();
+        if (upgrades.runeEtching() == RuneEtching.PAIN && critical
+                && RuneUseCooldown.isReady(serverWorld, ownerId, "bubble-pain")) {
+            float painShotSpeed = shooter.isTouchingWater()
+                    ? SimplyBowsConfig.INSTANCE.bubbleveil.painShotSpeedWater.get()
+                    : SimplyBowsConfig.INSTANCE.bubbleveil.painShotSpeedLand.get();
             int quantity = Math.max(1, upgrades.stringLevel() + 1);
-            this.shootLine(serverWorld, shooter, hand, stack, projectiles, f * painSpeedMultiplier, critical, target, quantity);
+            this.shootLine(serverWorld, shooter, hand, stack, projectiles, f * painShotSpeed, critical, target, quantity);
+            RuneUseCooldown.start(serverWorld, ownerId, "bubble-pain", "bubble");
             return;
         } else if (upgrades.runeEtching() == RuneEtching.PAIN) {
             FORCE_DEFAULT_BUBBLE_ARROW.set(true);

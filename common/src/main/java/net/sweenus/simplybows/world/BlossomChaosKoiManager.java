@@ -69,7 +69,7 @@ public final class BlossomChaosKoiManager {
         }
 
         UUID ownerId = owner != null ? owner.getUuid() : null;
-        if (ownerId != null && hasExistingFishForOwner(world, ownerId)) {
+        if (ownerId != null && (!RuneUseCooldown.isReady(world, ownerId, "blossom-chaos") || hasExistingFishForOwner(world, ownerId))) {
             return;
         }
 
@@ -87,7 +87,10 @@ public final class BlossomChaosKoiManager {
                 cfg.chaosBaseOrbitPeriodTicks.get() - stringLevel * cfg.chaosOrbitPeriodReductionPerStringTicks.get()
         );
 
-        Vec3d effectCenter = resolveCenter(owner, impactPos);
+        UUID anchorId = directTarget != null && directTarget.isAlive() ? directTarget.getUuid() : null;
+        Vec3d effectCenter = anchorId != null
+                ? directTarget.getPos().add(0.0, directTarget.getHeight() * 0.5, 0.0)
+                : new Vec3d(impactPos.x, impactPos.y + 0.4, impactPos.z);
 
         List<FishRef> fishRefs = new ArrayList<>();
         for (int i = 0; i < fishCount; i++) {
@@ -110,6 +113,7 @@ public final class BlossomChaosKoiManager {
         ActiveKoiEffect effect = new ActiveKoiEffect(
                 effectCenter,
                 ownerId,
+                anchorId,
                 now,
                 now + durationTicks,
                 radius,
@@ -126,6 +130,7 @@ public final class BlossomChaosKoiManager {
         );
 
         ACTIVE_EFFECTS.computeIfAbsent(world, ignored -> new ArrayList<>()).add(effect);
+        RuneUseCooldown.start(world, ownerId, "blossom-chaos", "blossom", durationTicks + 120);
 
         world.spawnParticles(ParticleTypes.CHERRY_LEAVES,
                 impactPos.x, impactPos.y + 0.5, impactPos.z, 30, radius * 0.3, 0.5, radius * 0.3, 0.02);
@@ -184,9 +189,11 @@ public final class BlossomChaosKoiManager {
     }
 
     private static void tickEffect(ServerWorld world, ActiveKoiEffect effect, long now) {
-        LivingEntity owner = getOwnerEntity(world, effect.ownerId);
-        if (owner != null && owner.isAlive()) {
-            effect.center = resolveCenter(owner, effect.center);
+        if (effect.anchorId != null) {
+            Entity anchor = world.getEntity(effect.anchorId);
+            if (anchor instanceof LivingEntity living && living.isAlive()) {
+                effect.center = living.getPos().add(0.0, living.getHeight() * 0.5, 0.0);
+            }
         }
 
         long age = now - effect.spawnTick;
@@ -481,6 +488,7 @@ public final class BlossomChaosKoiManager {
     private static final class ActiveKoiEffect {
         private Vec3d center;
         private final UUID ownerId;
+        private final UUID anchorId;
         private final long spawnTick;
         private final long expiryTick;
         private final double radius;
@@ -498,13 +506,14 @@ public final class BlossomChaosKoiManager {
         private final Map<UUID, Long> nextReflectTickByProjectile;
         private float orbitAngle;
 
-        private ActiveKoiEffect(Vec3d center, UUID ownerId, long spawnTick, long expiryTick,
+        private ActiveKoiEffect(Vec3d center, UUID ownerId, UUID anchorId, long spawnTick, long expiryTick,
                                 double radius, float swimRadius, float orbitPeriodTicks, List<FishRef> fishes,
                                 float contactDamage, double contactKnockbackHorizontal, double contactKnockbackVertical,
                                 int contactCooldownTicks, double touchRadius,
                                 double reflectSpeedMultiplier, int reflectCooldownTicks) {
             this.center = center;
             this.ownerId = ownerId;
+            this.anchorId = anchorId;
             this.spawnTick = spawnTick;
             this.expiryTick = expiryTick;
             this.radius = radius;

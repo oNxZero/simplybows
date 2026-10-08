@@ -71,7 +71,10 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
         RuneEtching rune = upgrades.runeEtching();
         boolean isNone = rune == RuneEtching.NONE;
         String runeName = Text.translatable("tooltip.simplybows.rune." + rune.id()).getString();
-        List<String> runeEffectLines = BowUpgradeTooltip.runeLines(bowKey, upgrades);
+        List<String> runeEffectLines = new ArrayList<>(BowUpgradeTooltip.runeLines(bowKey, upgrades));
+        if (altDown && !isNone) {
+            appendRuneDescription(runeEffectLines, bowKey, rune);
+        }
 
         UpgradeRune upgradeRune = new UpgradeRune(runeName, isNone, defaults.runeColor(), runeEffectLines);
 
@@ -277,6 +280,24 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
             case "blossom" -> "tooltip.simplybows.bow.blossom.frame_effect";
             default        -> "tooltip.simplybows.bow.generic.frame_effect";
         };
+    }
+
+    private static void appendRuneDescription(List<String> lines, String bowKey, RuneEtching rune) {
+        String key = getRuneEffectKey(bowKey, rune);
+        String translated = Text.translatable(key).getString();
+        if (translated == null || translated.isBlank() || key.equals(translated)) {
+            return;
+        }
+        String trimmed = translated.replace('\u00A0', ' ').trim();
+        if (trimmed.isEmpty()) {
+            return;
+        }
+        for (String part : trimmed.split("\\R")) {
+            String line = part.trim();
+            if (!line.isEmpty()) {
+                lines.add(line);
+            }
+        }
     }
 
     private static String getRuneEffectKey(String bowKey, RuneEtching rune) {

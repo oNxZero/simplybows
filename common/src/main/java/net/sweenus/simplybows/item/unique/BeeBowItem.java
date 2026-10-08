@@ -13,6 +13,7 @@ import net.sweenus.simplybows.entity.BeeArrowEntity;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.world.BeeChaosHoneyStormManager;
+import net.sweenus.simplybows.world.RuneUseCooldown;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -49,9 +50,16 @@ public class BeeBowItem extends SimplyBowItem {
 
         CHAOS_HONEY_STORM_ON_IMPACT.set(chaosStormReady);
         try {
-            if (upgrades.runeEtching() == RuneEtching.PAIN) {
+            if (upgrades.runeEtching() == RuneEtching.PAIN
+                    && RuneUseCooldown.isReady(serverWorld, ownerId, "bee-pain")) {
                 int quantity = Math.max(1, upgrades.stringLevel() + 1);
-                this.shootFan(this, serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), critical, target, quantity);
+                net.sweenus.simplybows.entity.BeeArrowEntity.setPainHoming(true);
+                try {
+                    this.shootFan(this, serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), critical, target, quantity);
+                } finally {
+                    net.sweenus.simplybows.entity.BeeArrowEntity.setPainHoming(false);
+                }
+                RuneUseCooldown.start(serverWorld, ownerId, "bee-pain", "bee", 80);
                 return;
             }
             this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), critical, target);

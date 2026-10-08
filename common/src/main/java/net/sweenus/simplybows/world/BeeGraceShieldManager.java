@@ -2,6 +2,9 @@ package net.sweenus.simplybows.world;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.effect.StatusEffectInstance;
+import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.network.ServerPlayerEntity;
@@ -31,7 +34,7 @@ public final class BeeGraceShieldManager {
     private static int baseDurationTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.graceBaseDuration.get(); }
     private static int stringDurationBonusTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.graceStringDurationBonus.get(); }
     private static int graceCooldownTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.graceCooldownTicks.get(); }
-    private static final double ORBIT_RADIUS = 0.78;
+    private static final double ORBIT_RADIUS = 2.0;
     private static final double ORBIT_HEIGHT = 1.2;
     private static final double ORBIT_BOB_HEIGHT = 0.18;
     private static final double BASE_ORBIT_ANGULAR_SPEED = 0.15;
@@ -52,55 +55,32 @@ public final class BeeGraceShieldManager {
         return (shields != null && !shields.isEmpty()) || (world.getTime() % 20L == 0L);
     }
 
-    public static void tryApplyFromImpact(ServerWorld world, Vec3d impactPos, LivingEntity owner, BowUpgradeData upgrades) {
+    public static void tryApplyFromImpact(ServerWorld world, Vec3d impactPos, LivingEntity owner, BowUpgradeData upgrades, LivingEntity struck) {
         if (world == null || impactPos == null || owner == null || !isGraceReady(world, owner.getUuid())) {
             return;
         }
 
-        double radius = graceApplyRadius();
-        Box box = Box.of(impactPos, radius * 2.0, radius * 2.0, radius * 2.0);
-        List<LivingEntity> candidates = world.getEntitiesByClass(LivingEntity.class, box, entity ->
-                entity.isAlive() && entity != owner && CombatTargeting.isFriendlyTo(entity, owner));
-        if (candidates.isEmpty()) {
+        LivingEntity orbitTarget = struck != null && struck.isAlive() ? struck : nearestPlayer(world, impactPos, 4.0);
+        if (orbitTarget == null) {
             return;
         }
 
-        int maxStacks = getMaxBeesForStringLevel(upgrades.stringLevel());
-        LivingEntity bestStackCandidate = null;
-        int bestStackCount = -1;
-        double bestStackDist = Double.MAX_VALUE;
-        LivingEntity closest = null;
-        double bestDist = Double.MAX_VALUE;
-        double maxDistSq = radius * radius;
-        for (LivingEntity candidate : candidates) {
-            double distSq = candidate.squaredDistanceTo(impactPos);
-            if (distSq > maxDistSq) {
-                continue;
-            }
-            int existingStacks = getCurrentStacksForTarget(world, candidate.getUuid());
-            if (existingStacks > 0 && existingStacks < maxStacks) {
-                if (existingStacks > bestStackCount || (existingStacks == bestStackCount && distSq < bestStackDist)) {
-                    bestStackCount = existingStacks;
-                    bestStackDist = distSq;
-                    bestStackCandidate = candidate;
-                }
-            }
-            if (distSq < bestDist) {
-                bestDist = distSq;
-                closest = candidate;
-            }
-        }
-        if (bestStackCandidate != null) {
-            applyShield(world, bestStackCandidate, upgrades);
-            startGraceCooldown(world, owner);
-            return;
-        }
-        if (closest == null) {
-            return;
-        }
+        applyShield(world, orbitTarget, upgrades);
+        int duration = baseDurationTicks() + Math.max(0, upgrades.stringLevel()) * stringDurationBonusTicks();
+        startGraceCooldown(world, owner, Math.max(20, duration));
+    }
 
-        applyShield(world, closest, upgrades);
-        startGraceCooldown(world, owner);
+    private static PlayerEntity nearestPlayer(ServerWorld world, Vec3d pos, double radius) {
+        PlayerEntity best = null;
+        double bestDist = radius * radius;
+        for (PlayerEntity player : world.getEntitiesByClass(PlayerEntity.class, Box.of(pos, radius * 2.0, radius * 2.0, radius * 2.0), PlayerEntity::isAlive)) {
+            double dist = player.squaredDistanceTo(pos);
+            if (dist <= bestDist) {
+                bestDist = dist;
+                best = player;
+            }
+        }
+        return best;
     }
 
     private static boolean isGraceReady(ServerWorld world, UUID ownerId) {
@@ -109,8 +89,8 @@ public final class BeeGraceShieldManager {
         return cooldownEnd == null || cooldownEnd <= now;
     }
 
-    private static void startGraceCooldown(ServerWorld world, LivingEntity owner) {
-        int cooldownTicks = Math.max(20, graceCooldownTicks());
+    private static void startGraceCooldown(ServerWorld world, LivingEntity owner, int durationTicks) {
+        int cooldownTicks = Math.max(Math.max(20, graceCooldownTicks()), durationTicks);
         CooldownStorage.forWorld(GRACE_COOLDOWNS_BY_SERVER, world)
                 .put(owner.getUuid(), CooldownStorage.currentTick(world) + cooldownTicks);
         if (owner instanceof ServerPlayerEntity player) {
@@ -198,6 +178,9 @@ public final class BeeGraceShieldManager {
 
             List<ActiveGraceShield> targetShields = entry.getValue();
             targetShields.sort((a, b) -> Long.compare(a.spawnTick, b.spawnTick));
+            if (world.getTime() % 10L == 0L) {
+                pulseResistance(world, target, targetShields.getFirst().resistanceAmplifier);
+            }
             int count = targetShields.size();
             for (int i = 0; i < count; i++) {
                 ActiveGraceShield shield = targetShields.get(i);
@@ -241,13 +224,15 @@ public final class BeeGraceShieldManager {
 
         int duration = baseDurationTicks() + upgrades.stringLevel() * stringDurationBonusTicks();
         long now = world.getTime();
+        int resistanceAmplifier = MathHelper.clamp(upgrades.frameLevel(), 0, 4);
         ActiveGraceShield shield = new ActiveGraceShield(
                 targetId,
                 visual.getUuid(),
                 now,
                 now + Math.max(20, duration),
                 world.random.nextDouble() * Math.PI * 2.0,
-                BASE_ORBIT_ANGULAR_SPEED + (world.random.nextDouble() * 2.0 - 1.0) * ORBIT_ANGULAR_SPEED_RANDOM_RANGE
+                BASE_ORBIT_ANGULAR_SPEED + (world.random.nextDouble() * 2.0 - 1.0) * ORBIT_ANGULAR_SPEED_RANDOM_RANGE,
+                resistanceAmplifier
         );
         shields.add(shield);
 
@@ -280,6 +265,16 @@ public final class BeeGraceShieldManager {
         }
 
         visual.setPos(smoothedPos.x, smoothedPos.y, smoothedPos.z);
+    }
+
+    private static void pulseResistance(ServerWorld world, LivingEntity center, int amplifier) {
+        Box box = center.getBoundingBox().expand(ORBIT_RADIUS, 1.25, ORBIT_RADIUS);
+        for (PlayerEntity player : world.getEntitiesByClass(PlayerEntity.class, box, PlayerEntity::isAlive)) {
+            if (player.squaredDistanceTo(center) > ORBIT_RADIUS * ORBIT_RADIUS) {
+                continue;
+            }
+            player.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, 40, amplifier), center);
+        }
     }
 
     private static int getMaxBeesForStringLevel(int stringLevel) {
@@ -327,14 +322,16 @@ public final class BeeGraceShieldManager {
         private final long expiryTick;
         private final double angleOffset;
         private final double angularSpeed;
+        private final int resistanceAmplifier;
 
-        private ActiveGraceShield(UUID targetId, UUID visualId, long spawnTick, long expiryTick, double angleOffset, double angularSpeed) {
+        private ActiveGraceShield(UUID targetId, UUID visualId, long spawnTick, long expiryTick, double angleOffset, double angularSpeed, int resistanceAmplifier) {
             this.targetId = targetId;
             this.visualId = visualId;
             this.spawnTick = spawnTick;
             this.expiryTick = expiryTick;
             this.angleOffset = angleOffset;
             this.angularSpeed = angularSpeed;
+            this.resistanceAmplifier = resistanceAmplifier;
         }
     }
 }

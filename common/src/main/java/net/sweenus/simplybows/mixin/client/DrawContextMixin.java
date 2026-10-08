@@ -34,6 +34,6 @@ public abstract class DrawContextMixin {
         int top = y + MathHelper.floor(16.0F * (1.0F - progress));
         int bottom = top + MathHelper.ceil(16.0F * progress);
         DrawContext context = (DrawContext) (Object) this;
-        context.fill(RenderLayer.getGuiOverlay(), x, top, x + 16, bottom, Integer.MAX_VALUE);
+        context.fill(RenderLayer.getGuiOverlay(), x, top, x + 16, bottom, 0x59FFFFFF);
     }
 }

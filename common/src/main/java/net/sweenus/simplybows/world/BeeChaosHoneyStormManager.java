@@ -244,24 +244,17 @@ public final class BeeChaosHoneyStormManager {
             return;
         }
         double radius = storm.radius * presence;
-        int honeyCount = Math.max(1, Math.round(4.0F * presence));
+        int honeyCount = Math.max(1, Math.round(3.0F * presence));
         for (int i = 0; i < honeyCount; i++) {
             double angle = world.random.nextDouble() * Math.PI * 2.0;
-            double distance = MathHelper.lerp(world.random.nextDouble(), radius * 0.15, radius);
+            double distance = MathHelper.lerp(world.random.nextDouble(), radius * 0.1, radius);
             double x = storm.center.x + Math.cos(angle) * distance;
             double z = storm.center.z + Math.sin(angle) * distance;
-            double y = storm.center.y - 0.25 + world.random.nextDouble() * 0.5;
-            world.spawnParticles(ParticleTypes.FALLING_HONEY, x, y, z, 1, 0.03, 0.05, 0.03, 0.0);
-        }
-
-        if (world.getTime() % 2L == 0L) {
-            world.spawnParticles(ParticleTypes.POOF, storm.center.x, storm.center.y, storm.center.z, Math.max(1, Math.round(6.0F * presence)), radius * 0.4, 0.1, radius * 0.4, 0.01);
+            double y = storm.groundY + 0.12 + world.random.nextDouble() * 0.35 * presence;
+            world.spawnParticles(ParticleTypes.WAX_ON, x, y, z, 1, 0.02, 0.02, 0.02, 0.0);
         }
         if (world.getTime() % 3L == 0L) {
-            world.spawnParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, storm.center.x, storm.center.y + 0.15, storm.center.z, Math.max(1, Math.round(4.0F * presence)), radius * 0.3, 0.08, radius * 0.3, 0.01);
-        }
-        if (world.getTime() % 6L == 0L) {
-            world.spawnParticles(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE, storm.center.x, storm.center.y + 0.2, storm.center.z, Math.max(1, Math.round(2.0F * presence)), radius * 0.25, 0.06, radius * 0.25, 0.01);
+            world.spawnParticles(ParticleTypes.POOF, storm.center.x, storm.groundY + 0.2, storm.center.z, Math.max(1, Math.round(3.0F * presence)), radius * 0.35, 0.05, radius * 0.35, 0.0);
         }
     }
 

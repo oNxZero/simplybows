@@ -127,10 +127,7 @@ public final class VineFlowerFieldManager {
         UUID ownerId = owner != null ? owner.getUuid() : null;
         FieldTuning tuning = buildTuning(upgrades);
 
-        if (tuning.chaosMode() && ownerId != null && !isChaosFieldReady(world, ownerId, fields)) {
-            return;
-        }
-        if (tuning.cherryTreeVisual() && ownerId != null && !isGraceFieldReady(world, ownerId)) {
+        if (ownerId != null && !isFlowerFieldReady(world, ownerId, fields)) {
             return;
         }
 
@@ -169,7 +166,7 @@ public final class VineFlowerFieldManager {
         fields.add(field);
         playFieldCreationSound(world, center);
         spawnBurstParticles(world, center, tuning);
-        if (tuning.cherryTreeVisual() && owner instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
+        if (owner instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
             int durationTicks = (int) baseDuration;
             startGraceCooldown(world, ownerId, durationTicks);
             SimplyBowItem.simplybows$sendCooldownPacket(serverPlayer, "vine",
@@ -1355,19 +1352,26 @@ public final class VineFlowerFieldManager {
         return false;
     }
 
-    private static boolean isChaosFieldReady(ServerWorld world, UUID ownerId, List<ActiveFlowerField> fields) {
+    private static boolean isFlowerFieldReady(ServerWorld world, UUID ownerId, List<ActiveFlowerField> fields) {
         long now = CooldownStorage.currentTick(world);
-        Long cooldownEnd = getCooldowns(world).get(ownerId);
-        if (cooldownEnd != null && cooldownEnd > now) {
+        Long graceEnd = graceCooldowns(world).get(ownerId);
+        if (graceEnd != null && graceEnd > now) {
             return false;
         }
-
+        Long chaosEnd = getCooldowns(world).get(ownerId);
+        if (chaosEnd != null && chaosEnd > now) {
+            return false;
+        }
         for (ActiveFlowerField field : fields) {
-            if (ownerId.equals(field.ownerId()) && field.tuning().chaosMode() && now < field.effectiveExpiryTick()) {
+            if (ownerId.equals(field.ownerId()) && !field.retracting) {
                 return false;
             }
         }
         return true;
+    }
+
+    private static boolean isChaosFieldReady(ServerWorld world, UUID ownerId, List<ActiveFlowerField> fields) {
+        return isFlowerFieldReady(world, ownerId, fields);
     }
 
     public static boolean isChaosFieldReady(ServerWorld world, UUID ownerId) {
@@ -1376,12 +1380,6 @@ public final class VineFlowerFieldManager {
         }
         List<ActiveFlowerField> fields = ACTIVE_FIELDS.computeIfAbsent(world, w -> new ArrayList<>());
         return isChaosFieldReady(world, ownerId, fields);
-    }
-
-    private static boolean isGraceFieldReady(ServerWorld world, UUID ownerId) {
-        long now = CooldownStorage.currentTick(world);
-        Long cooldownEnd = graceCooldowns(world).get(ownerId);
-        return cooldownEnd == null || cooldownEnd <= now;
     }
 
     private static void startGraceCooldown(ServerWorld world, UUID ownerId, int durationTicks) {
