@@ -16,7 +16,6 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.entity.BeeGraceVisualEntity;
-import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.util.CombatTargeting;
 
@@ -84,19 +83,19 @@ public final class BeeGraceShieldManager {
     }
 
     private static boolean isGraceReady(ServerWorld world, UUID ownerId) {
+        if (!RuneUseCooldown.isPlayerReady(world, ownerId)) {
+            return false;
+        }
         long now = CooldownStorage.currentTick(world);
         Long cooldownEnd = CooldownStorage.forWorld(GRACE_COOLDOWNS_BY_SERVER, world).get(ownerId);
         return cooldownEnd == null || cooldownEnd <= now;
     }
 
     private static void startGraceCooldown(ServerWorld world, LivingEntity owner, int durationTicks) {
-        int cooldownTicks = Math.max(Math.max(20, graceCooldownTicks()), durationTicks);
+        int cooldownTicks = RuneUseCooldown.fromEffectDuration(durationTicks);
         CooldownStorage.forWorld(GRACE_COOLDOWNS_BY_SERVER, world)
                 .put(owner.getUuid(), CooldownStorage.currentTick(world) + cooldownTicks);
-        if (owner instanceof ServerPlayerEntity player) {
-            SimplyBowItem.simplybows$sendCooldownPacket(player, "bee",
-                    System.currentTimeMillis() + (long) cooldownTicks * 50L, cooldownTicks);
-        }
+        RuneUseCooldown.start(world, owner.getUuid(), "bee-grace", "bee", cooldownTicks);
     }
 
     public static boolean consumeShield(ServerWorld world, LivingEntity target) {

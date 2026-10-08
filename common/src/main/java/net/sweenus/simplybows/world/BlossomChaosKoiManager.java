@@ -69,8 +69,12 @@ public final class BlossomChaosKoiManager {
         }
 
         UUID ownerId = owner != null ? owner.getUuid() : null;
-        if (ownerId != null && (!RuneUseCooldown.isReady(world, ownerId, "blossom-chaos") || hasExistingFishForOwner(world, ownerId))) {
+        if (ownerId != null && !RuneUseCooldown.isReady(world, ownerId, "blossom-chaos")) {
             return;
+        }
+        // Replace any previous school for this owner so ground casts aren't blocked.
+        if (ownerId != null) {
+            removeOwnerEffects(world, ownerId);
         }
 
         int stringLevel = upgrades != null ? Math.max(0, upgrades.stringLevel()) : 0;
@@ -88,9 +92,11 @@ public final class BlossomChaosKoiManager {
         );
 
         UUID anchorId = directTarget != null && directTarget.isAlive() ? directTarget.getUuid() : null;
+        // Visual koi render ~1 block below entity Y (trail/model offset). Ground casts need extra height
+        // or the school clips into the floor and looks like "nothing spawned".
         Vec3d effectCenter = anchorId != null
-                ? directTarget.getPos().add(0.0, directTarget.getHeight() * 0.5, 0.0)
-                : new Vec3d(impactPos.x, impactPos.y + 0.4, impactPos.z);
+                ? directTarget.getPos().add(0.0, Math.max(1.0, directTarget.getHeight() * 0.55), 0.0)
+                : new Vec3d(impactPos.x, impactPos.y + 1.55, impactPos.z);
 
         List<FishRef> fishRefs = new ArrayList<>();
         for (int i = 0; i < fishCount; i++) {
@@ -130,7 +136,7 @@ public final class BlossomChaosKoiManager {
         );
 
         ACTIVE_EFFECTS.computeIfAbsent(world, ignored -> new ArrayList<>()).add(effect);
-        RuneUseCooldown.start(world, ownerId, "blossom-chaos", "blossom", durationTicks + 120);
+        RuneUseCooldown.startForEffect(world, ownerId, "blossom-chaos", "blossom", durationTicks);
 
         world.spawnParticles(ParticleTypes.CHERRY_LEAVES,
                 impactPos.x, impactPos.y + 0.5, impactPos.z, 30, radius * 0.3, 0.5, radius * 0.3, 0.02);
@@ -400,26 +406,21 @@ public final class BlossomChaosKoiManager {
         return CombatTargeting.checkFriendlyFire(owner, livingOwner);
     }
 
-    private static boolean hasExistingFishForOwner(ServerWorld world, UUID ownerId) {
+    private static void removeOwnerEffects(ServerWorld world, UUID ownerId) {
         List<ActiveKoiEffect> effects = ACTIVE_EFFECTS.get(world);
         if (effects == null || effects.isEmpty()) {
-            return false;
+            return;
         }
-
-        long now = world.getTime();
-        for (ActiveKoiEffect effect : effects) {
-            if (!ownerId.equals(effect.ownerId) || now >= effect.expiryTick) {
-                continue;
+        effects.removeIf(effect -> {
+            if (!ownerId.equals(effect.ownerId)) {
+                return false;
             }
-
-            for (FishRef fishRef : effect.fishes) {
-                KoiFishVisualEntity koi = getKoiEntity(world, fishRef.entityId);
-                if (koi != null && koi.isAlive() && !koi.isRemoved()) {
-                    return true;
-                }
-            }
+            expireEffect(world, effect);
+            return true;
+        });
+        if (effects.isEmpty()) {
+            ACTIVE_EFFECTS.remove(world);
         }
-        return false;
     }
 
     private static void expireEffect(ServerWorld world, ActiveKoiEffect effect) {

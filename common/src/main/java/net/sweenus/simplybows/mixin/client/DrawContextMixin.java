@@ -4,36 +4,61 @@ import net.minecraft.client.MinecraftClient;
 import net.minecraft.client.font.TextRenderer;
 import net.minecraft.client.gui.DrawContext;
 import net.minecraft.client.render.RenderLayer;
+import net.minecraft.entity.LivingEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.util.math.MathHelper;
+import net.minecraft.world.World;
 import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import org.spongepowered.asm.mixin.Mixin;
+import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /**
- * Stripped DrawContextMixin — only the inventory cooldown bar overlay remains.
- * All tooltip rendering has been moved to Simply Tooltips' DrawContextMixin,
- * delegated via {@link net.sweenus.simplybows.client.tooltip.SimplyBowsTooltipProvider}.
+ * Ability cooldown sweep for unique bows.
+ * Drawn immediately before the item icon so the bow sits on top of the wash
+ * (Legendary Weapons-style), instead of a flat white slab covering the sprite.
  */
 @Mixin(DrawContext.class)
 public abstract class DrawContextMixin {
 
-    @Inject(method = "drawItemInSlot(Lnet/minecraft/client/font/TextRenderer;Lnet/minecraft/item/ItemStack;IILjava/lang/String;)V",
-            at = @At(value = "INVOKE", target = "Lnet/minecraft/client/util/math/MatrixStack;pop()V"))
-    private void simplybows$drawAbilityCooldownOverlay(
-            TextRenderer textRenderer, ItemStack stack, int x, int y,
-            String countOverride, CallbackInfo ci) {
-        if (stack == null || stack.isEmpty() || !(stack.getItem() instanceof SimplyBowItem bowItem)) return;
-        if (!bowItem.simplybows$hasAbilityCooldown()) return;
+    @Inject(
+            method = "drawItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/world/World;Lnet/minecraft/item/ItemStack;III)V",
+            at = @At("HEAD")
+    )
+    private void simplybows$drawAbilityCooldownBehindItem(
+            LivingEntity entity, World world, ItemStack stack, int x, int y, int seed, CallbackInfo ci) {
+        simplybows$tryDrawAbilityCooldown(stack, x, y);
+    }
+
+    @Inject(
+            method = "drawItem(Lnet/minecraft/entity/LivingEntity;Lnet/minecraft/world/World;Lnet/minecraft/item/ItemStack;IIII)V",
+            at = @At("HEAD")
+    )
+    private void simplybows$drawAbilityCooldownBehindItemZ(
+            LivingEntity entity, World world, ItemStack stack, int x, int y, int seed, int z, CallbackInfo ci) {
+        simplybows$tryDrawAbilityCooldown(stack, x, y);
+    }
+
+    @Unique
+    private void simplybows$tryDrawAbilityCooldown(ItemStack stack, int x, int y) {
+        if (stack == null || stack.isEmpty() || !(stack.getItem() instanceof SimplyBowItem bowItem)) {
+            return;
+        }
+        if (!bowItem.simplybows$hasAbilityCooldown()) {
+            return;
+        }
         MinecraftClient client = MinecraftClient.getInstance();
         float tickDelta = client == null ? 0.0F : client.getRenderTickCounter().getTickDelta(true);
         float progress = bowItem.simplybows$getAbilityCooldownProgress(tickDelta);
-        if (progress <= 0.0F) return;
+        if (progress <= 0.0F) {
+            return;
+        }
         int top = y + MathHelper.floor(16.0F * (1.0F - progress));
         int bottom = top + MathHelper.ceil(16.0F * progress);
         DrawContext context = (DrawContext) (Object) this;
-        context.fill(RenderLayer.getGuiOverlay(), x, top, x + 16, bottom, 0x59FFFFFF);
+        // Soft dark-gray wash behind the icon — readable without burying the sprite.
+        context.fill(RenderLayer.getGui(), x, top, x + 16, bottom, 0x6A686868);
     }
 }

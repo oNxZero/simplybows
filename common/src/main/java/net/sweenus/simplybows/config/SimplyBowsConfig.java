@@ -27,7 +27,7 @@ public class SimplyBowsConfig extends Config {
     public BubbleBowSection bubbleveil = new BubbleBowSection();
     @Comment("In-game name: Buzzkill. Enchanted String lengthens poison, Grace bees, the Bounty hive, and the Chaos honey storm, and widens the storm. Reinforced Frame makes Chaos dives happen more often. Bee damage also scales with the global Frame damage multiplier. 20 ticks = 1 second.")
     public BeeBowSection buzzkill = new BeeBowSection();
-    @Comment("In-game name: Petalwind. Enchanted String lengthens the storm, widens Pain and Grace areas, allows more Bounty traps, widens the Chaos area, and makes koi orbit faster. Reinforced Frame lengthens Chaos, enlarges koi orbits, and summons more koi. Storm damage also scales with the global Frame damage multiplier. 20 ticks = 1 second.")
+    @Comment("In-game name: Petalwind. Enchanted String lengthens the storm, widens Pain and Grace areas, widens the Chaos area, and makes koi orbit faster. Bounty always splits into 3 locked storms. Reinforced Frame lengthens Chaos, enlarges koi orbits, and summons more koi. Storm damage also scales with the global Frame damage multiplier. 20 ticks = 1 second.")
     public BlossomBowSection petalwind = new BlossomBowSection();
     @Comment("In-game name: Tremorstrike. Enchanted String increases spike radius, Pain wave distance, and Chaos sunder duration. Reinforced Frame increases knock-up, Bounty spike height, and Chaos acquisition range. Spike damage also scales with the global Frame damage multiplier. 20 ticks = 1 second.")
     public EarthBowSection tremorstrike = new EarthBowSection();
@@ -148,9 +148,11 @@ public class SimplyBowsConfig extends Config {
 
         // Rune: Bounty
         public ConfigGroup bountyGroup = new ConfigGroup("bounty");
+        @Comment("Aura pulse interval while Bounty DPS field is active.")
+        public ValidatedInt bountyAuraInterval = new ValidatedInt(12, 100, 1);
         @ConfigGroup.Pop
-        @Comment("Chance to spawn bonus loot when Bounty conditions are met.")
-        public ValidatedDouble bountyLootChance = new ValidatedDouble(0.25, 1.0, 0.0);
+        @Comment("Hostile damage multiplier for the Bounty DPS field (no healing).")
+        public ValidatedFloat bountyDamageMultiplier = new ValidatedFloat(1.35F, 5.0F, 0.1F);
 
         // Rune: Chaos
         public ConfigGroup chaosGroup = new ConfigGroup("chaos");
@@ -312,7 +314,7 @@ public class SimplyBowsConfig extends Config {
         public ValidatedDouble painHomingAccel = new ValidatedDouble(0.18, 2.0, 0.01);
         @ConfigGroup.Pop
         @Comment("Maximum flight speed for Pain bees.")
-        public ValidatedDouble painMaxSpeed = new ValidatedDouble(1.05, 5.0, 0.1);
+        public ValidatedDouble painMaxSpeed = new ValidatedDouble(0.85, 5.0, 0.1);
 
         // Rune: Grace (shield)
         public ConfigGroup graceGroup = new ConfigGroup("grace");
@@ -347,20 +349,20 @@ public class SimplyBowsConfig extends Config {
         // Rune: Chaos (honey storm)
         public ConfigGroup chaosGroup = new ConfigGroup("chaos");
         @Comment("How long the Bee Chaos honey storm remains active before subsiding.")
-        public ValidatedInt chaosBaseDurationTicks = new ValidatedInt(260, 2400, 20);
-        @Comment("Additional honey storm duration gained per Enchanted String level.")
-        public ValidatedInt chaosDurationPerStringTicks = new ValidatedInt(80, 800, 0);
+        public ValidatedInt chaosBaseDurationTicks = new ValidatedInt(260, 280, 20);
+        @Comment("Additional honey storm duration gained per Enchanted String level. Capped in code.")
+        public ValidatedInt chaosDurationPerStringTicks = new ValidatedInt(10, 40, 0);
         @Comment("Cooldown applied after the honey storm ends before another can be created.")
         public ValidatedInt chaosCooldownTicks = new ValidatedInt(320, 2400, 20);
         @Comment("Base area radius of the Bee Chaos honey storm.")
         public ValidatedDouble chaosBaseRadius = new ValidatedDouble(4.5, 24.0, 0.5);
         @Comment("Additional storm radius gained per Enchanted String level.")
-        public ValidatedDouble chaosRadiusPerString = new ValidatedDouble(1.0, 8.0, 0.0);
-        @Comment("Ticks between honey storm ally/enemy aura pulses.")
+        public ValidatedDouble chaosRadiusPerString = new ValidatedDouble(0.35, 1.0, 0.0);
+        @Comment("Ticks between honey storm aura pulses (slowness on hostiles).")
         public ValidatedInt chaosAuraIntervalTicks = new ValidatedInt(20, 200, 1);
-        @Comment("Regeneration effect duration applied to allies each aura pulse.")
-        public ValidatedInt chaosRegenDurationTicks = new ValidatedInt(60, 400, 1);
-        @Comment("Regeneration amplifier applied to allies in the honey storm.")
+        @Comment("Unused legacy key (Chaos no longer grants Regeneration).")
+        public ValidatedInt chaosRegenDurationTicks = new ValidatedInt(0, 400, 0);
+        @Comment("Unused legacy key (Chaos no longer grants Regeneration).")
         public ValidatedInt chaosRegenAmplifier = new ValidatedInt(0, 4, 0);
         @Comment("Slowness effect duration applied to hostiles each aura pulse.")
         public ValidatedInt chaosSlownessDurationTicks = new ValidatedInt(60, 400, 1);
@@ -376,7 +378,7 @@ public class SimplyBowsConfig extends Config {
         public ValidatedDouble chaosDiveImpactRadius = new ValidatedDouble(2.25, 10.0, 0.25);
         @ConfigGroup.Pop
         @Comment("Damage dealt by each dive-bomb bee impact.")
-        public ValidatedFloat chaosDiveDamage = new ValidatedFloat(16.0F, 50.0F, 0.1F);
+        public ValidatedFloat chaosDiveDamage = new ValidatedFloat(6.0F, 50.0F, 0.1F);
     }
 
     public static class BlossomBowSection extends ConfigSection {
@@ -424,11 +426,9 @@ public class SimplyBowsConfig extends Config {
 
         // Rune: Bounty
         public ConfigGroup bountyGroup = new ConfigGroup("bounty");
-        @Comment("Maximum active Bounty traps before String bonuses.")
-        public ValidatedInt bountyBaseMaxTraps = new ValidatedInt(3, 20, 1);
-        @Comment("Additional active Bounty traps per Enchanted String level.")
-        public ValidatedInt bountyMaxTrapsPerString = new ValidatedInt(1, 10, 0);
-        @Comment("Damage multiplier applied when a Bounty trap triggers.")
+        @Comment("Max simultaneous Bounty petal storms. Default/max 3 — keep at 3 for balance (Fzzy needs min < max).")
+        public ValidatedInt bountyMaxStorms = new ValidatedInt(3, 3, 1);
+        @Comment("Legacy trap-trigger damage multiplier (unused by locked storms).")
         public ValidatedFloat bountyTriggerDamageMultiplier = new ValidatedFloat(3.2F, 20.0F, 0.1F);
         @Comment("Base trigger radius for Bounty traps.")
         public ValidatedDouble bountyTriggerBaseRadius = new ValidatedDouble(1.75, 10.0, 0.5);
@@ -439,9 +439,9 @@ public class SimplyBowsConfig extends Config {
         // Rune: Chaos (Koi)
         public ConfigGroup chaosGroup = new ConfigGroup("chaos");
         @Comment("Base lifetime of the Petalwind Chaos koi swarm.")
-        public ValidatedInt chaosDurationTicks = new ValidatedInt(300, 1200, 60);
+        public ValidatedInt chaosDurationTicks = new ValidatedInt(160, 1200, 40);
         @Comment("Additional Chaos swarm duration per Reinforced Frame level.")
-        public ValidatedInt chaosDurationPerFrameTicks = new ValidatedInt(60, 400, 0);
+        public ValidatedInt chaosDurationPerFrameTicks = new ValidatedInt(30, 400, 0);
         @Comment("Outer area radius used for Chaos ambient waves and petals.")
         public ValidatedDouble chaosRadius = new ValidatedDouble(5.0, 20.0, 1.0);
         @Comment("Additional Chaos area radius per Enchanted String level.")
@@ -511,7 +511,7 @@ public class SimplyBowsConfig extends Config {
         @Comment("Distance between consecutive Pain wave spike steps.")
         public ValidatedDouble painWaveStepDistance = new ValidatedDouble(0.8, 5.0, 0.1);
         @Comment("Damage multiplier applied to Pain wave spikes.")
-        public ValidatedFloat painWaveDamageMultiplier = new ValidatedFloat(1.0F, 10.0F, 0.1F);
+        public ValidatedFloat painWaveDamageMultiplier = new ValidatedFloat(0.55F, 10.0F, 0.1F);
         @ConfigGroup.Pop
         @Comment("Extra Pain wave travel distance per Enchanted String level.")
         public ValidatedDouble painStringWaveDistanceBonusPerLevel = new ValidatedDouble(1.2, 5.0, 0.0);
@@ -527,9 +527,9 @@ public class SimplyBowsConfig extends Config {
         // Rune: Bounty
         public ConfigGroup bountyGroup = new ConfigGroup("bounty");
         @Comment("Base damage multiplier for Bounty center spike impacts.")
-        public ValidatedFloat bountyCenterDamageBaseMultiplier = new ValidatedFloat(1.15F, 10.0F, 0.1F);
+        public ValidatedFloat bountyCenterDamageBaseMultiplier = new ValidatedFloat(0.7F, 10.0F, 0.1F);
         @Comment("Extra center spike damage scaling based on proximity.")
-        public ValidatedFloat bountyCenterDamageProximityMultiplier = new ValidatedFloat(2.0F, 10.0F, 0.1F);
+        public ValidatedFloat bountyCenterDamageProximityMultiplier = new ValidatedFloat(1.0F, 10.0F, 0.1F);
         @Comment("Base visual height segments for the Bounty center spike.")
         public ValidatedInt bountyCenterBaseHeightSegments = new ValidatedInt(14, 50, 1);
         @ConfigGroup.Pop
@@ -539,9 +539,9 @@ public class SimplyBowsConfig extends Config {
         // Rune: Chaos
         public ConfigGroup chaosGroup = new ConfigGroup("chaos");
         @Comment("Base active duration of the Earth Chaos sunder field.")
-        public ValidatedInt chaosSunderDurationTicks = new ValidatedInt(220, 1200, 20);
-        @Comment("Additional sunder duration gained per Enchanted String level.")
-        public ValidatedInt chaosSunderDurationPerStringTicks = new ValidatedInt(32, 400, 0);
+        public ValidatedInt chaosSunderDurationTicks = new ValidatedInt(200, 360, 200);
+        @Comment("Additional sunder duration gained per Enchanted String level. Hard-capped in code.")
+        public ValidatedInt chaosSunderDurationPerStringTicks = new ValidatedInt(24, 60, 0);
         @Comment("Base range used to acquire the next hostile after a sunder hit.")
         public ValidatedDouble chaosSunderAcquisitionRange = new ValidatedDouble(12.0, 24.0, 0.5);
         @ConfigGroup.Pop

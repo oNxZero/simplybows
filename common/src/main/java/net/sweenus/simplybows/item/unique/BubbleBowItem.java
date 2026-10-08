@@ -44,8 +44,11 @@ public class BubbleBowItem extends SimplyBowItem {
         UUID ownerId = shooter != null ? shooter.getUuid() : null;
         if (upgrades.runeEtching() == RuneEtching.CHAOS && critical
                 && RuneUseCooldown.isReady(serverWorld, ownerId, "bubble-chaos")) {
+            int steps = SimplyBowsConfig.INSTANCE.bubbleveil.chaosBaseLengthSteps.get()
+                    + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.bubbleveil.chaosLengthStepsPerString.get();
+            int stepInterval = Math.max(1, SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveStepIntervalTicks.get());
             BubbleChaosWaveManager.cast(serverWorld, shooter, upgrades);
-            RuneUseCooldown.start(serverWorld, ownerId, "bubble-chaos", "bubble");
+            RuneUseCooldown.startForEffect(serverWorld, ownerId, "bubble-chaos", "bubble", Math.max(1, steps) * stepInterval);
             ItemStack ammoReference = projectiles.isEmpty() ? ItemStack.EMPTY : projectiles.getFirst();
             stack.damage(this.getWeaponStackDamage(ammoReference), shooter, LivingEntity.getSlotForHand(hand));
             return;
@@ -59,7 +62,7 @@ public class BubbleBowItem extends SimplyBowItem {
                     : SimplyBowsConfig.INSTANCE.bubbleveil.painShotSpeedLand.get();
             int quantity = Math.max(1, upgrades.stringLevel() + 1);
             this.shootLine(serverWorld, shooter, hand, stack, projectiles, f * painShotSpeed, critical, target, quantity);
-            RuneUseCooldown.start(serverWorld, ownerId, "bubble-pain", "bubble");
+            RuneUseCooldown.startForEffect(serverWorld, ownerId, "bubble-pain", "bubble", RuneUseCooldown.BURST_EFFECT_TICKS);
             return;
         } else if (upgrades.runeEtching() == RuneEtching.PAIN) {
             FORCE_DEFAULT_BUBBLE_ARROW.set(true);

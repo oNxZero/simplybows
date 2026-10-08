@@ -16,7 +16,6 @@ import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
-import net.sweenus.simplybows.util.NetworkCompat;
 import net.sweenus.simplybows.world.RuneUseCooldown;
 
 import java.util.ArrayList;
@@ -30,10 +29,15 @@ import java.util.UUID;
 public final class BlossomStormManager {
 
     private static final int JUMP_INTERVAL_TICKS = 25;
-    private static final int GRACE_SWIFTNESS_AMPLIFIER = 0;
-    private static final int GRACE_HASTE_AMPLIFIER = 0;
-    private static final double BOUNTY_TRIGGER_BASE_KNOCKUP = 0.22;
-    private static final double BOUNTY_TRIGGER_KNOCKUP_PER_FRAME = 0.06;
+    private static final int GRACE_STRENGTH_AMPLIFIER = 1; // Strength II
+    private static final int GRACE_FIELD_BASE_TICKS = 60; // 3s puddle
+    private static final int GRACE_BUFF_BASE_TICKS = 100; // 5s Strength
+    private static final int GRACE_FIELD_PER_STRING_TICKS = 10;
+    private static final int GRACE_BUFF_PER_FRAME_TICKS = 20;
+    private static final double GRACE_BASE_RADIUS = 3.0;
+    private static final double GRACE_RADIUS_PER_STRING = 0.45;
+    private static final double BOUNTY_TRIGGER_BASE_KNOCKUP = 0.18;
+    private static final double BOUNTY_TRIGGER_KNOCKUP_PER_FRAME = 0.04;
     private static final int PAIN_VISUAL_RING_MIN_POINTS = 24;
     private static final int PAIN_VISUAL_RING_MAX_POINTS = 72;
     private static final int VORTEX_POINTS = 4;
@@ -47,9 +51,10 @@ public final class BlossomStormManager {
     private static double graceAuraDamageRadius() { return SimplyBowsConfig.INSTANCE.petalwind.graceAuraDamageRadius.get(); }
     private static double graceAuraRadiusPerString() { return SimplyBowsConfig.INSTANCE.petalwind.graceAuraRadiusPerString.get(); }
     private static int graceBuffDurationTicks() { return SimplyBowsConfig.INSTANCE.petalwind.graceBuffDuration.get(); }
-    private static int bountyBaseMaxTraps() { return SimplyBowsConfig.INSTANCE.petalwind.bountyBaseMaxTraps.get(); }
-    private static int bountyMaxTrapsPerString() { return SimplyBowsConfig.INSTANCE.petalwind.bountyMaxTrapsPerString.get(); }
-    private static float bountyTriggerDamageMultiplier() { return SimplyBowsConfig.INSTANCE.petalwind.bountyTriggerDamageMultiplier.get(); }
+    private static int bountyMaxStorms() {
+        // Hard-cap at 3 even if someone edits config past the intended max.
+        return Math.min(3, Math.max(1, SimplyBowsConfig.INSTANCE.petalwind.bountyMaxStorms.get()));
+    }
     private static double bountyTriggerBaseRadius() { return SimplyBowsConfig.INSTANCE.petalwind.bountyTriggerBaseRadius.get(); }
     private static double bountyTriggerRadiusPerString() { return SimplyBowsConfig.INSTANCE.petalwind.bountyTriggerRadiusPerString.get(); }
     private static double painAreaDamageRadius() { return SimplyBowsConfig.INSTANCE.petalwind.painAreaRadius.get(); }
@@ -81,37 +86,72 @@ public final class BlossomStormManager {
         if (tuning.graceSupportMode() && ownerId != null && !RuneUseCooldown.isReady(world, ownerId, "blossom-grace")) {
             return;
         }
+        boolean baseStorm = !tuning.bountyTrapMode() && !tuning.painAreaMode() && !tuning.graceSupportMode();
+        if (baseStorm && ownerId != null && !RuneUseCooldown.isReady(world, ownerId, "blossom-base")) {
+            return;
+        }
         if (ownerId != null && !tuning.bountyTrapMode()) {
             for (ActiveStorm storm : existing) {
                 if (ownerId.equals(storm.ownerId)) {
                     return;
                 }
             }
-        } else if (ownerId != null) {
-            int maxTraps = tuning.maxActiveBountyTraps();
-            while (countOwnerBountyStorms(existing, ownerId) >= maxTraps) {
+        }
+
+        long now = world.getTime();
+        LivingEntity ownerLiving = owner instanceof LivingEntity living ? living : null;
+
+        if (tuning.bountyTrapMode()) {
+            // Up to 3 petal storms locked onto separate targets (no free hopping).
+            while (ownerId != null && countOwnerBountyStorms(existing, ownerId) > 0) {
                 int oldestIndex = findOldestOwnerBountyStormIndex(existing, ownerId);
                 if (oldestIndex < 0) {
                     break;
                 }
                 existing.remove(oldestIndex);
             }
+            List<LivingEntity> targets = findBountyInitialTargets(world, startPos, directTarget, ownerLiving, tuning.maxActiveBountyTraps());
+            if (targets.isEmpty()) {
+                // No hostiles nearby — one hunter storm at impact, same as base bow.
+                existing.add(new ActiveStorm(
+                        now + tuning.durationTicks(),
+                        now + damageIntervalTicks(),
+                        now + JUMP_INTERVAL_TICKS,
+                        now,
+                        startPos,
+                        null,
+                        ownerId,
+                        tuning
+                ));
+            } else {
+                for (LivingEntity target : targets) {
+                    Vec3d center = target.getPos().add(0.0, target.getHeight() * 0.5, 0.0);
+                    existing.add(new ActiveStorm(
+                            now + tuning.durationTicks(),
+                            now + damageIntervalTicks(),
+                            now + JUMP_INTERVAL_TICKS,
+                            now,
+                            center,
+                            target.getUuid(),
+                            ownerId,
+                            tuning
+                    ));
+                }
+            }
+            RuneUseCooldown.startForEffect(world, ownerId, "blossom-bounty", "blossom", tuning.durationTicks());
+            world.playSound(null, startPos.x, startPos.y, startPos.z, SoundEvents.BLOCK_CHERRY_LEAVES_PLACE, SoundCategory.PLAYERS, 0.8F, 0.95F + world.random.nextFloat() * 0.2F);
+            return;
         }
 
-        long now = world.getTime();
-        LivingEntity ownerLiving = owner instanceof LivingEntity living ? living : null;
         UUID initialTargetId = null;
         Vec3d initialCenter = startPos;
-        if (tuning.bountyTrapMode()) {
-            initialTargetId = null;
+        if (tuning.graceSupportMode()) {
+            // Fixed ground puddle — under struck feet, or at impact. Never follows.
             double groundY = directTarget != null ? directTarget.getY() : startPos.y;
-            initialCenter = new Vec3d(startPos.x, groundY, startPos.z);
-        } else if (tuning.graceSupportMode()) {
-            LivingEntity anchor = resolveGraceInitialAnchor(world, startPos, ownerLiving, directTarget);
-            if (anchor != null) {
-                initialTargetId = anchor.getUuid();
-                initialCenter = anchor.getPos().add(0.0, anchor.getHeight() * 0.5, 0.0);
-            }
+            double x = directTarget != null ? directTarget.getX() : startPos.x;
+            double z = directTarget != null ? directTarget.getZ() : startPos.z;
+            initialCenter = new Vec3d(x, groundY, z);
+            initialTargetId = null;
         } else if (directTarget != null && ownerLiving != null && CombatTargeting.checkFriendlyFire(directTarget, ownerLiving)) {
             initialTargetId = directTarget.getUuid();
         }
@@ -127,16 +167,12 @@ public final class BlossomStormManager {
                 tuning
         );
         existing.add(storm);
-        if (tuning.bountyTrapMode()) {
-            RuneUseCooldown.start(world, ownerId, "blossom-bounty", "blossom", 80);
-        } else if (tuning.painAreaMode()) {
-            RuneUseCooldown.start(world, ownerId, "blossom-pain", "blossom", Math.max(20, tuning.durationTicks()) + 100);
+        if (tuning.painAreaMode()) {
+            RuneUseCooldown.startForEffect(world, ownerId, "blossom-pain", "blossom", tuning.durationTicks());
         } else if (tuning.graceSupportMode()) {
-            RuneUseCooldown.start(world, ownerId, "blossom-grace", "blossom", Math.max(20, tuning.durationTicks()) + 60);
-        } else if (owner instanceof ServerPlayerEntity player) {
-            int durationTicks = Math.max(20, tuning.durationTicks());
-            SimplyBowItem.simplybows$sendCooldownPacket(player, "blossom",
-                    System.currentTimeMillis() + (long) durationTicks * 50L, durationTicks);
+            RuneUseCooldown.startForEffect(world, ownerId, "blossom-grace", "blossom", tuning.durationTicks());
+        } else {
+            RuneUseCooldown.startForEffect(world, ownerId, "blossom-base", "blossom", tuning.durationTicks());
         }
         world.playSound(null, startPos.x, startPos.y, startPos.z, SoundEvents.BLOCK_CHERRY_LEAVES_PLACE, SoundCategory.PLAYERS, 0.8F, 0.95F + world.random.nextFloat() * 0.2F);
     }
@@ -170,94 +206,48 @@ public final class BlossomStormManager {
         }
 
         LivingEntity currentTarget = storm.currentTargetId == null ? null : getLivingEntity(world, storm.currentTargetId);
-        if (currentTarget != null && currentTarget.isAlive()) {
+        // Pain / Grace stay planted; base + Bounty leaping storms follow their target.
+        if (!storm.tuning.painAreaMode() && !storm.tuning.graceSupportMode()
+                && currentTarget != null && currentTarget.isAlive()) {
             storm.center = currentTarget.getPos().add(0.0, currentTarget.getHeight() * 0.5, 0.0);
-        }
-
-        if (storm.tuning.bountyTrapMode()) {
-            boolean triggered = processBountyTrapTriggers(world, storm, getLivingEntityNullable(world, storm.ownerId));
-            if (triggered) {
-                return false;
-            }
         }
 
         spawnVortexParticles(world, storm, now, 1.0F);
 
-        if (!storm.tuning.bountyTrapMode() && now >= storm.nextDamageTick) {
+        if (now >= storm.nextDamageTick) {
             LivingEntity owner = getLivingEntityNullable(world, storm.ownerId);
             if (storm.tuning.painAreaMode()) {
                 applyPainAreaDamage(world, storm, owner);
             } else if (storm.tuning.graceSupportMode()) {
-                applyGraceSupportPulse(world, storm, owner, currentTarget);
+                applyGraceSupportPulse(world, storm, owner);
             } else if (currentTarget != null && currentTarget.isAlive()) {
                 CombatTargeting.applyDamage(world, owner, currentTarget, storm.tuning.damage(), true, false);
             }
-            int interval = storm.tuning.painAreaMode() ? Math.max(18, damageIntervalTicks()) : damageIntervalTicks();
+            int interval = storm.tuning.painAreaMode()
+                    ? Math.max(8, damageIntervalTicks() - 2)
+                    : damageIntervalTicks();
             storm.nextDamageTick = now + interval;
         }
 
-        if (!storm.tuning.painAreaMode() && !storm.tuning.bountyTrapMode() && !storm.tuning.graceSupportMode() && now >= storm.nextJumpTick) {
-            LivingEntity next = findNextTarget(world, storm, currentTarget);
-            if (next != null && (currentTarget == null || !next.getUuid().equals(currentTarget.getUuid()))) {
-                Vec3d from = storm.center;
-                Vec3d to = next.getPos().add(0.0, next.getHeight() * 0.5, 0.0);
-                spawnJumpTrail(world, from, to);
-                world.playSound(null, to.x, to.y, to.z, SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, SoundCategory.PLAYERS, 0.7F, 1.05F + world.random.nextFloat() * 0.2F);
-                storm.currentTargetId = next.getUuid();
-                storm.center = to;
+        if (!storm.tuning.painAreaMode() && !storm.tuning.graceSupportMode() && now >= storm.nextJumpTick) {
+            // Bounty: lock to the initial 3 targets — only hop when that target dies.
+            boolean bountyLocked = storm.tuning.bountyTrapMode();
+            boolean needsRetarget = currentTarget == null || !currentTarget.isAlive();
+            if (!bountyLocked || needsRetarget) {
+                LivingEntity next = findNextTarget(world, storm, bountyLocked ? null : currentTarget);
+                if (next != null && (currentTarget == null || !next.getUuid().equals(currentTarget.getUuid()))) {
+                    Vec3d from = storm.center;
+                    Vec3d to = next.getPos().add(0.0, next.getHeight() * 0.5, 0.0);
+                    spawnJumpTrail(world, from, to);
+                    world.playSound(null, to.x, to.y, to.z, SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, SoundCategory.PLAYERS, 0.7F, 1.05F + world.random.nextFloat() * 0.2F);
+                    storm.currentTargetId = next.getUuid();
+                    storm.center = to;
+                }
             }
             storm.nextJumpTick = now + JUMP_INTERVAL_TICKS;
         }
 
         return false;
-    }
-
-    private static boolean processBountyTrapTriggers(ServerWorld world, ActiveStorm storm, LivingEntity owner) {
-        double radius = storm.tuning.bountyTriggerRadius();
-        float damage = storm.tuning.damage() * bountyTriggerDamageMultiplier();
-        Box triggerBox = Box.of(storm.center, radius * 2.0, 3.5, radius * 2.0);
-        for (LivingEntity candidate : world.getEntitiesByClass(
-                LivingEntity.class,
-                triggerBox,
-                CombatTargeting::isOffensiveTargetCandidate
-        )) {
-            if (candidate.squaredDistanceTo(storm.center) > radius * radius) {
-                continue;
-            }
-            if (!storm.triggeredBountyVictims.add(candidate.getUuid())) {
-                continue;
-            }
-            if (owner != null && !CombatTargeting.checkFriendlyFire(candidate, owner)) {
-                continue;
-            }
-
-            CombatTargeting.applyDamage(world, owner, candidate, damage, true, false);
-            applyBountyTriggerKnockup(candidate, storm.tuning.bountyTriggerKnockup());
-            spawnBountyTriggerEffects(world, candidate.getPos().add(0.0, candidate.getHeight() * 0.5, 0.0), radius);
-            storm.fadeStartTick = world.getTime();
-            return true;
-        }
-        return false;
-    }
-
-    private static void applyBountyTriggerKnockup(LivingEntity target, double knockup) {
-        if (target == null || knockup <= 0.0) {
-            return;
-        }
-        target.addVelocity(0.0, knockup, 0.0);
-        target.setOnGround(false);
-        target.velocityDirty = true;
-        if (target instanceof ServerPlayerEntity player) {
-            NetworkCompat.sendVelocityUpdate(player);
-        }
-    }
-
-    private static void spawnBountyTriggerEffects(ServerWorld world, Vec3d center, double radius) {
-        world.spawnParticles(ParticleTypes.CHERRY_LEAVES, center.x, center.y, center.z, 22, radius * 0.35, 0.22, radius * 0.35, 0.01);
-        world.spawnParticles(ParticleTypes.SPORE_BLOSSOM_AIR, center.x, center.y + 0.1, center.z, 16, radius * 0.28, 0.18, radius * 0.28, 0.0);
-        world.spawnParticles(ParticleTypes.CRIT, center.x, center.y + 0.12, center.z, 10, radius * 0.2, 0.15, radius * 0.2, 0.02);
-        world.playSound(null, center.x, center.y, center.z, SoundEvents.ENTITY_PLAYER_ATTACK_STRONG, SoundCategory.PLAYERS, 0.8F, 0.9F + world.random.nextFloat() * 0.15F);
-        world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_CHERRY_LEAVES_BREAK, SoundCategory.PLAYERS, 0.7F, 0.95F + world.random.nextFloat() * 0.2F);
     }
 
     private static void applyPainAreaDamage(ServerWorld world, ActiveStorm storm, LivingEntity owner) {
@@ -277,38 +267,27 @@ public final class BlossomStormManager {
             if (owner != null && !CombatTargeting.checkFriendlyFire(candidate, owner)) {
                 continue;
             }
-            CombatTargeting.applyDamage(world, owner, candidate, storm.tuning.damage() * 0.45F, true, false);
+            // Same DPS as the leaping storm, but AOE.
+            CombatTargeting.applyDamage(world, owner, candidate, storm.tuning.damage(), true, false);
         }
     }
 
-    private static void applyGraceSupportPulse(ServerWorld world, ActiveStorm storm, LivingEntity owner, LivingEntity currentTarget) {
-        LivingEntity anchor = currentTarget;
-        if (anchor == null || !anchor.isAlive()) {
-            anchor = resolveGraceInitialAnchor(world, storm.center, owner, null);
-        }
-        if (anchor == null || !anchor.isAlive()) {
-            return;
-        }
-
-        Vec3d anchorCenter = anchor.getPos().add(0.0, anchor.getHeight() * 0.5, 0.0);
-        storm.center = anchorCenter;
-        anchor.addStatusEffect(new StatusEffectInstance(StatusEffects.SPEED, graceBuffDurationTicks(), GRACE_SWIFTNESS_AMPLIFIER), owner);
-        anchor.addStatusEffect(new StatusEffectInstance(StatusEffects.HASTE, graceBuffDurationTicks(), GRACE_HASTE_AMPLIFIER), owner);
-
+    private static void applyGraceSupportPulse(ServerWorld world, ActiveStorm storm, LivingEntity owner) {
         double radius = storm.tuning.graceAuraRadius();
-        Box hitBox = Box.of(anchorCenter, radius * 2.0, 5.0, radius * 2.0);
+        int buffTicks = storm.tuning.graceBuffTicks();
+        Box hitBox = Box.of(storm.center, radius * 2.0, 3.5, radius * 2.0);
         for (LivingEntity candidate : world.getEntitiesByClass(
                 LivingEntity.class,
                 hitBox,
-                CombatTargeting::isOffensiveTargetCandidate
+                entity -> entity instanceof net.minecraft.entity.player.PlayerEntity && entity.isAlive()
         )) {
-            if (candidate.squaredDistanceTo(anchorCenter) > radius * radius) {
+            if (candidate.squaredDistanceTo(storm.center) > radius * radius) {
                 continue;
             }
-            if (owner != null && !CombatTargeting.checkFriendlyFire(candidate, owner)) {
-                continue;
-            }
-            CombatTargeting.applyDamage(world, owner, candidate, storm.tuning.damage(), true, false);
+            candidate.addStatusEffect(
+                    new StatusEffectInstance(StatusEffects.STRENGTH, buffTicks, GRACE_STRENGTH_AMPLIFIER),
+                    owner
+            );
         }
     }
 
@@ -324,6 +303,9 @@ public final class BlossomStormManager {
                 CombatTargeting::isOffensiveTargetCandidate
         );
         LivingEntity owner = getLivingEntityNullable(world, storm.ownerId);
+        Set<UUID> claimedBySiblings = storm.tuning.bountyTrapMode()
+                ? claimedBountyTargets(world, storm)
+                : Set.of();
 
         LivingEntity best = null;
         double bestDist = Double.MAX_VALUE;
@@ -332,6 +314,9 @@ public final class BlossomStormManager {
                 continue;
             }
             if (currentTarget != null && candidate.getUuid().equals(currentTarget.getUuid())) {
+                continue;
+            }
+            if (claimedBySiblings.contains(candidate.getUuid())) {
                 continue;
             }
             if (owner != null && !CombatTargeting.checkFriendlyFire(candidate, owner)) {
@@ -344,6 +329,52 @@ public final class BlossomStormManager {
             }
         }
         return best;
+    }
+
+    private static List<LivingEntity> findBountyInitialTargets(
+            ServerWorld world, Vec3d impact, LivingEntity directTarget, LivingEntity owner, int maxTargets) {
+        List<LivingEntity> chosen = new ArrayList<>();
+        Set<UUID> seen = new HashSet<>();
+        if (directTarget != null && directTarget.isAlive()
+                && CombatTargeting.isOffensiveTargetCandidate(directTarget, owner)
+                && (owner == null || CombatTargeting.checkFriendlyFire(directTarget, owner))) {
+            chosen.add(directTarget);
+            seen.add(directTarget.getUuid());
+        }
+        Box search = Box.of(impact, jumpRange() * 2.0, 6.0, jumpRange() * 2.0);
+        List<LivingEntity> nearby = new ArrayList<>(world.getEntitiesByClass(
+                LivingEntity.class,
+                search,
+                entity -> CombatTargeting.isOffensiveTargetCandidate(entity, owner)
+                        && (owner == null || CombatTargeting.checkFriendlyFire(entity, owner))
+                        && !seen.contains(entity.getUuid())
+        ));
+        nearby.sort((a, b) -> Double.compare(a.squaredDistanceTo(impact), b.squaredDistanceTo(impact)));
+        for (LivingEntity candidate : nearby) {
+            if (chosen.size() >= maxTargets) {
+                break;
+            }
+            chosen.add(candidate);
+            seen.add(candidate.getUuid());
+        }
+        return chosen;
+    }
+
+    private static Set<UUID> claimedBountyTargets(ServerWorld world, ActiveStorm self) {
+        Set<UUID> claimed = new HashSet<>();
+        List<ActiveStorm> storms = ACTIVE_STORMS.get(world);
+        if (storms == null || self.ownerId == null) {
+            return claimed;
+        }
+        for (ActiveStorm other : storms) {
+            if (other == self || !self.ownerId.equals(other.ownerId) || !other.tuning.bountyTrapMode()) {
+                continue;
+            }
+            if (other.currentTargetId != null) {
+                claimed.add(other.currentTargetId);
+            }
+        }
+        return claimed;
     }
 
     private static LivingEntity findNextGraceTarget(ServerWorld world, ActiveStorm storm, LivingEntity currentTarget) {
@@ -411,18 +442,9 @@ public final class BlossomStormManager {
             return;
         }
         Vec3d center = storm.center;
-        if (storm.tuning.bountyTrapMode()) {
-            double ring = Math.max(0.8, storm.tuning.bountyTriggerRadius()) * presence;
-            int points = 10;
-            for (int i = 0; i < points; i++) {
-                double angle = (Math.PI * 2.0 / points) * i + now * 0.04;
-                double x = center.x + Math.cos(angle) * ring;
-                double z = center.z + Math.sin(angle) * ring;
-                world.spawnParticles(ParticleTypes.CHERRY_LEAVES, x, center.y + 0.15, z, 1, 0.02, 0.01, 0.02, 0.0);
-            }
-            if (now % 4L == 0L) {
-                world.spawnParticles(ParticleTypes.SPORE_BLOSSOM_AIR, center.x, center.y + 0.1, center.z, 2, ring * 0.35, 0.02, ring * 0.35, 0.0);
-            }
+        if (storm.tuning.graceSupportMode()) {
+            double radius = Math.max(0.8, storm.tuning.graceAuraRadius()) * presence;
+            spawnFilledPuddleParticles(world, center, radius, now, true);
             return;
         }
         double time = now * 0.25;
@@ -464,6 +486,37 @@ public final class BlossomStormManager {
             if ((i & 7) == 0) {
                 world.spawnParticles(ParticleTypes.ENCHANT, x, y + 0.18, z, 1, 0.0, 0.02, 0.0, 0.0);
             }
+        }
+    }
+
+    private static void spawnFilledPuddleParticles(ServerWorld world, Vec3d center, double radius, long now, boolean grace) {
+        // Outer ring
+        int ringPoints = Math.max(16, (int) Math.round(radius * 10.0));
+        double spin = now * 0.04;
+        for (int i = 0; i < ringPoints; i++) {
+            double angle = spin + (Math.PI * 2.0 / ringPoints) * i;
+            double x = center.x + Math.cos(angle) * radius;
+            double z = center.z + Math.sin(angle) * radius;
+            world.spawnParticles(ParticleTypes.CHERRY_LEAVES, x, center.y + 0.1, z, 1, 0.02, 0.01, 0.02, 0.0);
+        }
+        // Filled disk — denser toward the center so it reads as a puddle, not a hoop.
+        int fillCount = Math.max(10, (int) Math.round(radius * radius * 3.5));
+        for (int i = 0; i < fillCount; i++) {
+            double angle = world.random.nextDouble() * Math.PI * 2.0;
+            double dist = radius * Math.sqrt(world.random.nextDouble());
+            double x = center.x + Math.cos(angle) * dist;
+            double z = center.z + Math.sin(angle) * dist;
+            world.spawnParticles(ParticleTypes.SPORE_BLOSSOM_AIR, x, center.y + 0.06, z, 1, 0.04, 0.01, 0.04, 0.0);
+            if ((i & 3) == 0) {
+                world.spawnParticles(ParticleTypes.CHERRY_LEAVES, x, center.y + 0.08, z, 1, 0.03, 0.01, 0.03, 0.0);
+            }
+            if (grace && (i & 7) == 0) {
+                world.spawnParticles(ParticleTypes.ENCHANT, x, center.y + 0.15, z, 1, 0.02, 0.02, 0.02, 0.0);
+            }
+        }
+        if (now % 4L == 0L) {
+            world.spawnParticles(ParticleTypes.FALLING_SPORE_BLOSSOM, center.x, center.y + 0.2, center.z,
+                    4, radius * 0.45, 0.05, radius * 0.45, 0.0);
         }
     }
 
@@ -524,13 +577,31 @@ public final class BlossomStormManager {
         boolean painAreaMode = rune == RuneEtching.PAIN;
         boolean graceSupportMode = rune == RuneEtching.GRACE;
         boolean bountyTrapMode = rune == RuneEtching.BOUNTY;
-        double painAreaRadius = Math.min(2.8, painAreaDamageRadius()) + upgrades.stringLevel() * Math.min(0.2, painAreaRadiusPerString());
-        double graceAuraRadius = (graceAuraDamageRadius() * upgrades.sizeMultiplier()) + upgrades.stringLevel() * graceAuraRadiusPerString();
-        double bountyTriggerRadius = (bountyTriggerBaseRadius() * upgrades.sizeMultiplier()) + upgrades.stringLevel() * bountyTriggerRadiusPerString();
-        int maxActiveBountyTraps = bountyBaseMaxTraps() + upgrades.stringLevel() * bountyMaxTrapsPerString();
-        double bountyTriggerKnockup = BOUNTY_TRIGGER_BASE_KNOCKUP + upgrades.frameLevel() * BOUNTY_TRIGGER_KNOCKUP_PER_FRAME;
-        int durationTicks = stormDurationTicks() + upgrades.stringLevel() * stormDurationBonusPerString();
-        return new StormTuning(damage, painAreaMode, graceSupportMode, bountyTrapMode, painAreaRadius, graceAuraRadius, bountyTriggerRadius, maxActiveBountyTraps, bountyTriggerKnockup, durationTicks);
+        if (painAreaMode) {
+            // AOE only — half the leaping-storm pulse damage.
+            damage *= 0.5F;
+        } else if (bountyTrapMode) {
+            // Split across up to 3 locked storms — each hits a bit softer.
+            damage *= 0.7F;
+        }
+        double painAreaRadius = Math.min(4.5, Math.max(3.0, painAreaDamageRadius() * 0.55))
+                + upgrades.stringLevel() * Math.min(0.45, painAreaRadiusPerString());
+        double graceAuraRadius = GRACE_BASE_RADIUS + upgrades.stringLevel() * GRACE_RADIUS_PER_STRING
+                + (graceAuraDamageRadius() > 0 ? Math.min(1.5, graceAuraRadiusPerString() * upgrades.stringLevel() * 0.25) : 0.0);
+        double bountyTriggerRadius = Math.max(1.4, bountyTriggerBaseRadius() + upgrades.stringLevel() * bountyTriggerRadiusPerString());
+        int maxActiveBountyTraps = bountyMaxStorms();
+        double bountyTriggerKnockup = 0.0;
+        int durationTicks;
+        int graceBuffTicks = GRACE_BUFF_BASE_TICKS + upgrades.frameLevel() * GRACE_BUFF_PER_FRAME_TICKS;
+        if (graceSupportMode) {
+            durationTicks = GRACE_FIELD_BASE_TICKS + upgrades.stringLevel() * GRACE_FIELD_PER_STRING_TICKS;
+        } else if (painAreaMode) {
+            durationTicks = stormDurationTicks() + upgrades.stringLevel() * stormDurationBonusPerString() + 20;
+        } else {
+            durationTicks = stormDurationTicks() + upgrades.stringLevel() * stormDurationBonusPerString();
+        }
+        return new StormTuning(damage, painAreaMode, graceSupportMode, bountyTrapMode, painAreaRadius, graceAuraRadius,
+                bountyTriggerRadius, maxActiveBountyTraps, bountyTriggerKnockup, durationTicks, graceBuffTicks);
     }
 
     private static final class ActiveStorm {
@@ -567,7 +638,8 @@ public final class BlossomStormManager {
             double bountyTriggerRadius,
             int maxActiveBountyTraps,
             double bountyTriggerKnockup,
-            int durationTicks
+            int durationTicks,
+            int graceBuffTicks
     ) {
     }
 }

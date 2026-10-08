@@ -13,6 +13,8 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
+import net.sweenus.simplybows.upgrade.RuneEtching;
+import net.sweenus.simplybows.util.GraceProjectile;
 import net.sweenus.simplybows.world.BubbleColumnFieldManager;
 
 import java.util.UUID;
@@ -66,6 +68,16 @@ public class BubbleArrowEntity extends ArrowEntity {
 
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
+        if (entityHitResult.getEntity() instanceof LivingEntity living
+                && isGraceSupportProjectile()
+                && GraceProjectile.isSupportTarget(living)) {
+            if (this.getWorld() instanceof ServerWorld serverWorld) {
+                spawnImpactParticles(serverWorld, living.getPos());
+            }
+            trySpawnBubbleColumn(living.getPos());
+            this.discard();
+            return;
+        }
         if (entityHitResult.getEntity() instanceof LivingEntity living) {
             living.hurtTime = 0;
             living.timeUntilRegen = 0;
@@ -81,8 +93,17 @@ public class BubbleArrowEntity extends ArrowEntity {
         }
     }
 
+    public boolean isGraceSupportProjectile() {
+        return this.columnUpgrades.runeEtching() == RuneEtching.GRACE;
+    }
+
     private void trySpawnBubbleColumn(Vec3d hitPos) {
         if (this.spawnedBubbleColumn) {
+            return;
+        }
+        // Chaos is the wave only — never fall back to a bubble column while Chaos is etched.
+        if (this.columnUpgrades.runeEtching() == RuneEtching.CHAOS) {
+            this.spawnedBubbleColumn = true;
             return;
         }
 

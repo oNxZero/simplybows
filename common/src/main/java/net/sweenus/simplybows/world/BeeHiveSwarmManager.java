@@ -39,10 +39,10 @@ public final class BeeHiveSwarmManager {
     private static final int SPRING_ANIM_TICKS = 8;
     private static final int HIVE_RETRACT_TICKS = 10;
     private static final int FIRE_INTERVAL_RANDOM_EXTRA_TICKS = 6;
-    private static final double START_OFFSET_Y = 0.45;
-    private static final double TARGET_AIM_EXTRA_Y = 3.65;
-    private static final double SHOT_SPEED = 0.55;
-    private static final double SHOT_DIVERGENCE = 0.08;
+    private static final double START_OFFSET_Y = 0.85;
+    private static final double TARGET_AIM_EXTRA_Y = 0.55;
+    private static final double SHOT_SPEED = 1.55;
+    private static final double SHOT_DIVERGENCE = 0.03;
     private static final int RANDOM_TARGET_POOL_SIZE = 4;
     private static final String HIVE_VISUAL_TAG = "simplybows_bee_hive_visual";
 
@@ -191,18 +191,24 @@ public final class BeeHiveSwarmManager {
             return;
         }
 
-        BeeArrowEntity beeArrow = new BeeArrowEntity(world, owner, new ItemStack(Items.ARROW), hive.upgrades);
-        beeArrow.setPosition(start.x, start.y, start.z);
-        Vec3d velocity = direction.normalize().multiply(SHOT_SPEED).add(
-                (world.random.nextDouble() - 0.5) * SHOT_DIVERGENCE,
-                (world.random.nextDouble() - 0.5) * SHOT_DIVERGENCE,
-                (world.random.nextDouble() - 0.5) * SHOT_DIVERGENCE
-        );
-        beeArrow.setVelocity(velocity);
-        beeArrow.setCritical(false);
-        beeArrow.setDamage(2.0 * hive.upgrades.damageMultiplier() + CombatTargeting.getRangedWeaponDamageBonus(owner));
-
-        world.spawnEntity(beeArrow);
+        BeeArrowEntity.setPainHoming(true, 0.35F);
+        BeeArrowEntity beeArrow;
+        try {
+            beeArrow = new BeeArrowEntity(world, owner, new ItemStack(Items.ARROW), hive.upgrades);
+            beeArrow.setPosition(start.x, start.y, start.z);
+            beeArrow.setNoGravity(true);
+            Vec3d velocity = direction.normalize().multiply(SHOT_SPEED).add(
+                    (world.random.nextDouble() - 0.5) * SHOT_DIVERGENCE,
+                    0.08 + world.random.nextDouble() * 0.06,
+                    (world.random.nextDouble() - 0.5) * SHOT_DIVERGENCE
+            );
+            beeArrow.setVelocity(velocity);
+            beeArrow.setCritical(false);
+            beeArrow.setDamage(1.1 * hive.upgrades.damageMultiplier());
+            world.spawnEntity(beeArrow);
+        } finally {
+            BeeArrowEntity.setPainHoming(false);
+        }
         hive.shotsRemaining--;
 
         world.playSound(null, start.x, start.y, start.z, SoundEvents.BLOCK_BEEHIVE_EXIT, SoundCategory.PLAYERS, 0.7F, 1.0F + world.random.nextFloat() * 0.18F);

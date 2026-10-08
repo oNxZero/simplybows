@@ -45,6 +45,9 @@ public final class IceChaosWallManager {
         if (world == null || ownerId == null) {
             return false;
         }
+        if (!RuneUseCooldown.isPlayerReady(world, ownerId)) {
+            return false;
+        }
         long now = CooldownStorage.currentTick(world);
         Long cooldownEnd = getCooldowns(world).get(ownerId);
         return cooldownEnd == null || cooldownEnd <= now;
@@ -66,7 +69,6 @@ public final class IceChaosWallManager {
         int durationTicks = Math.max(20,
                 SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationTicks.get()
                         + Math.max(0, frameLevel) * SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationPerFrameTicks.get());
-        int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.winterfang.chaosWallCooldownTicks.get());
         int widthBlocks = Math.max(1,
                 SimplyBowsConfig.INSTANCE.winterfang.chaosWallWidth.get()
                         + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.winterfang.chaosWallWidthPerString.get());
@@ -77,8 +79,10 @@ public final class IceChaosWallManager {
         ACTIVE_WALLS.computeIfAbsent(world, w -> new ArrayList<>()).add(wall);
 
         if (ownerId != null) {
+            int cooldownTicks = RuneUseCooldown.fromEffectDuration(durationTicks);
             long now = CooldownStorage.currentTick(world);
-            getCooldowns(world).put(ownerId, now + durationTicks + cooldownTicks);
+            getCooldowns(world).put(ownerId, now + cooldownTicks);
+            RuneUseCooldown.start(world, ownerId, "ice-chaos", "ice", cooldownTicks);
         }
 
         spawnVisuals(world, wall);

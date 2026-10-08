@@ -16,6 +16,7 @@ import net.minecraft.world.World;
 import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
+import net.sweenus.simplybows.util.GraceProjectile;
 import net.sweenus.simplybows.world.BlossomChaosKoiManager;
 import net.sweenus.simplybows.world.BlossomStormManager;
 
@@ -50,6 +51,17 @@ public class BlossomArrowEntity extends ArrowEntity {
 
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
+        if (entityHitResult.getEntity() instanceof LivingEntity living
+                && isGraceSupportProjectile()
+                && GraceProjectile.isSupportTarget(living)) {
+            if (this.getWorld() instanceof ServerWorld serverWorld) {
+                serverWorld.playSound(null, living.getX(), living.getY(), living.getZ(),
+                        SoundEvents.BLOCK_SPORE_BLOSSOM_PLACE, SoundCategory.PLAYERS, 0.85F, 1.05F + this.random.nextFloat() * 0.15F);
+            }
+            trySpawnStorm(living.getPos(), living);
+            this.discard();
+            return;
+        }
         if (entityHitResult.getEntity() instanceof LivingEntity living) {
             living.hurtTime = 0;
             living.timeUntilRegen = 0;
@@ -73,7 +85,12 @@ public class BlossomArrowEntity extends ArrowEntity {
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             serverWorld.playSound(null, blockHitResult.getPos().x, blockHitResult.getPos().y, blockHitResult.getPos().z, SoundEvents.BLOCK_SPORE_BLOSSOM_PLACE, SoundCategory.PLAYERS, 0.8F, 0.95F + this.random.nextFloat() * 0.2F);
         }
+        // Prefer exact impact Vec3d; Chaos/Grace snap to ground top themselves.
         trySpawnStorm(blockHitResult.getPos(), null);
+    }
+
+    public boolean isGraceSupportProjectile() {
+        return this.upgrades.runeEtching() == RuneEtching.GRACE;
     }
 
     private void spawnTrailParticles(ServerWorld world) {

@@ -46,6 +46,9 @@ public final class BeeChaosHoneyStormManager {
         if (world == null || ownerId == null) {
             return false;
         }
+        if (!RuneUseCooldown.isPlayerReady(world, ownerId)) {
+            return false;
+        }
         long now = CooldownStorage.currentTick(world);
         Long cooldownEnd = getCooldowns(world).get(ownerId);
         return cooldownEnd == null || cooldownEnd <= now;
@@ -63,13 +66,13 @@ public final class BeeChaosHoneyStormManager {
             storms.removeIf(storm -> ownerId.equals(storm.ownerId));
         }
 
-        int durationTicks = Math.max(20,
+        // Hard-cap near 13s so String/Frame cannot stretch the storm into a half-minute zone.
+        int durationTicks = Math.max(20, Math.min(280,
                 SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDurationTicks.get()
-                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.buzzkill.chaosDurationPerStringTicks.get());
-        int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.buzzkill.chaosCooldownTicks.get());
-        double radius = Math.max(1.5,
+                        + Math.max(0, stringLevel) * Math.min(10, SimplyBowsConfig.INSTANCE.buzzkill.chaosDurationPerStringTicks.get())));
+        double radius = Math.max(1.5, Math.min(7.0,
                 SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseRadius.get()
-                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.buzzkill.chaosRadiusPerString.get());
+                        + Math.max(0, stringLevel) * Math.min(0.35, SimplyBowsConfig.INSTANCE.buzzkill.chaosRadiusPerString.get())));
         int diveInterval = Math.max(
                 SimplyBowsConfig.INSTANCE.buzzkill.chaosMinDiveIntervalTicks.get(),
                 SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDiveIntervalTicks.get()
@@ -89,7 +92,9 @@ public final class BeeChaosHoneyStormManager {
         storms.add(storm);
 
         if (ownerId != null) {
-            getCooldowns(world).put(ownerId, CooldownStorage.currentTick(world) + durationTicks + cooldownTicks);
+            int cooldownTicks = RuneUseCooldown.fromEffectDuration(durationTicks);
+            getCooldowns(world).put(ownerId, CooldownStorage.currentTick(world) + cooldownTicks);
+            RuneUseCooldown.start(world, ownerId, "bee-chaos", "bee", cooldownTicks);
         }
 
         world.playSound(null, cloudCenter.x, cloudCenter.y, cloudCenter.z, SoundEvents.ITEM_HONEY_BOTTLE_DRINK, SoundCategory.PLAYERS, 0.8F, 0.8F + world.random.nextFloat() * 0.1F);
@@ -157,8 +162,6 @@ public final class BeeChaosHoneyStormManager {
             return;
         }
 
-        int regenDuration = Math.max(1, SimplyBowsConfig.INSTANCE.buzzkill.chaosRegenDurationTicks.get());
-        int regenAmplifier = Math.max(0, SimplyBowsConfig.INSTANCE.buzzkill.chaosRegenAmplifier.get());
         int slownessDuration = Math.max(1, SimplyBowsConfig.INSTANCE.buzzkill.chaosSlownessDurationTicks.get());
         int slownessAmplifier = Math.max(0, SimplyBowsConfig.INSTANCE.buzzkill.chaosSlownessAmplifier.get());
 
@@ -178,9 +181,7 @@ public final class BeeChaosHoneyStormManager {
                 continue;
             }
 
-            if (CombatTargeting.isFriendlyTo(candidate, owner)) {
-                candidate.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, regenDuration, regenAmplifier), owner);
-            } else if (CombatTargeting.isOffensiveTargetCandidate(candidate)
+            if (CombatTargeting.isOffensiveTargetCandidate(candidate)
                     && CombatTargeting.checkFriendlyFire(candidate, owner)) {
                 candidate.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, slownessDuration, slownessAmplifier), owner);
             }

@@ -23,6 +23,7 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.sweenus.simplybows.network.AbilityCooldownPayload;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
+import net.sweenus.simplybows.world.RuneUseCooldown;
 import net.sweenus.simplybows.util.BowTooltipHelper;
 import net.sweenus.simplybows.util.BowUser;
 import net.sweenus.simplybows.util.CombatTargeting;
@@ -79,7 +80,8 @@ public class SimplyBowItem extends BowItem {
         if (reader == null || tickReader == null) {
             return false;
         }
-        long[] data = reader.apply(getTooltipBowKey());
+        // Shared CD across every unique bow for this player.
+        long[] data = reader.apply(RuneUseCooldown.GLOBAL_BOW_KEY);
         return data != null && tickReader.getAsLong() < data[0];
     }
 
@@ -89,7 +91,7 @@ public class SimplyBowItem extends BowItem {
         if (reader == null || tickReader == null) {
             return 0.0F;
         }
-        long[] data = reader.apply(getTooltipBowKey());
+        long[] data = reader.apply(RuneUseCooldown.GLOBAL_BOW_KEY);
         if (data == null) {
             return 0.0F;
         }
@@ -308,6 +310,10 @@ public class SimplyBowItem extends BowItem {
         if (player == null || cooldownTicks <= 0) {
             return;
         }
+        if (player.getWorld() instanceof ServerWorld serverWorld) {
+            RuneUseCooldown.start(serverWorld, player.getUuid(), "item-" + getTooltipBowKey(), getTooltipBowKey(), cooldownTicks);
+            return;
+        }
         long endMs = System.currentTimeMillis() + Math.max(1, cooldownTicks) * 50L;
         simplybows$sendCooldownPacket(player, getTooltipBowKey(), endMs, cooldownTicks);
     }
@@ -329,10 +335,11 @@ public class SimplyBowItem extends BowItem {
      * beyond its initial value without going through an ItemStack.
      */
     public static void simplybows$sendCooldownPacket(ServerPlayerEntity player, String bowKey, long endMs, int totalTicks) {
-        if (player == null || bowKey == null || endMs <= 0 || totalTicks <= 0) {
+        if (player == null || endMs <= 0 || totalTicks <= 0) {
             return;
         }
-        NetworkManager.sendToPlayer(player, new AbilityCooldownPayload(endMs, totalTicks, bowKey));
+        // Always sync as the shared player CD so every Simply Bow shows the same overlay.
+        NetworkManager.sendToPlayer(player, new AbilityCooldownPayload(endMs, totalTicks, RuneUseCooldown.GLOBAL_BOW_KEY));
     }
 
     protected boolean simplybows$hasInfiniteAmmo(PlayerEntity player, ItemStack bowStack) {

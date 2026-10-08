@@ -30,9 +30,13 @@ public final class EarthChaosSunderManager {
 
     private static final Map<ServerWorld, List<ActiveSunderField>> ACTIVE_FIELDS = new HashMap<>();
     private static final Map<ServerWorld, Long> NEXT_ORPHAN_VISUAL_CLEANUP_TICK = new HashMap<>();
-    private static final double SUNDER_STEP_DISTANCE = 0.34;
-    private static final double SUNDER_HIT_RADIUS = 2.6;
-    private static final int SUNDER_COOLDOWN_AFTER_TICKS = 160;
+    private static final double SUNDER_ORBIT_RADIUS_BASE = 5.0; // wide rotating disc
+    private static final double SUNDER_ORBIT_RADIUS_PER_STRING = 0.45;
+    private static final double SUNDER_BAND_HALF_WIDTH = 1.55; // dense band — spikes packed tight
+    private static final double SUNDER_HIT_RADIUS = 1.85; // per-front hit along the band
+    private static final int SUNDER_FULL_ROTATIONS = 2;
+    private static final int SUNDER_MIN_DURATION_TICKS = 200; // 10s
+    private static final int SUNDER_MAX_DURATION_TICKS = 360; // 18s
     private static final java.util.Map<net.minecraft.server.MinecraftServer, java.util.Map<UUID, Long>> SUNDER_COOLDOWNS = CooldownStorage.newServerScopedStore();
     private static final long TARGET_DAMAGE_COOLDOWN_TICKS = 20L;
     private static final long TARGET_REACQUIRE_COOLDOWN_TICKS = 60L;
@@ -63,6 +67,9 @@ public final class EarthChaosSunderManager {
         if (world == null || ownerId == null) {
             return false;
         }
+        if (!RuneUseCooldown.isPlayerReady(world, ownerId)) {
+            return false;
+        }
         Long cooldownEnd = CooldownStorage.forWorld(SUNDER_COOLDOWNS, world).get(ownerId);
         if (cooldownEnd != null && world.getTime() < cooldownEnd) {
             return false;
@@ -85,13 +92,11 @@ public final class EarthChaosSunderManager {
             return;
         }
 
-        Vec3d direction = resolveInitialDirection(world, initialVelocity);
-        int durationTicks = Math.max(20,
-                SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get()
-                        + Math.max(0, stringLevel) * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get());
-        double acquisitionRange = Math.max(1.5,
-                SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderAcquisitionRange.get()
-                        + Math.max(0, frameLevel) * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderAcquisitionRangePerFrame.get());
+        int durationTicks = Math.max(SUNDER_MIN_DURATION_TICKS, Math.min(SUNDER_MAX_DURATION_TICKS,
+                Math.max(SUNDER_MIN_DURATION_TICKS, SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get())
+                        + Math.max(0, stringLevel) * Math.max(20, SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get())));
+        double orbitRadius = SUNDER_ORBIT_RADIUS_BASE + Math.max(0, stringLevel) * SUNDER_ORBIT_RADIUS_PER_STRING;
+        double startAngle = resolveInitialAngle(world, initialVelocity);
 
         if (ownerId != null) {
             List<ActiveSunderField> existing = ACTIVE_FIELDS.get(world);
@@ -106,17 +111,25 @@ public final class EarthChaosSunderManager {
             }
         }
 
+        Vec3d orbitCenter = new Vec3d(startPos.x, startPos.y, startPos.z);
+        Vec3d firstPos = orbitCenter.add(Math.cos(startAngle) * orbitRadius, 0.0, Math.sin(startAngle) * orbitRadius);
+        double angularSpeed = (Math.PI * 2.0 * SUNDER_FULL_ROTATIONS) / Math.max(1, durationTicks);
         ActiveSunderField field = new ActiveSunderField(
-                startPos,
-                direction,
+                orbitCenter,
+                firstPos,
+                startAngle,
+                orbitRadius,
+                angularSpeed,
                 ownerId,
                 world.getTime() + durationTicks,
-                acquisitionRange,
                 frameLevel
         );
         ACTIVE_FIELDS.computeIfAbsent(world, w -> new ArrayList<>()).add(field);
         if (ownerId != null) {
-            CooldownStorage.forWorld(SUNDER_COOLDOWNS, world).put(ownerId, world.getTime() + durationTicks + SUNDER_COOLDOWN_AFTER_TICKS);
+            int cooldownTicks = RuneUseCooldown.fromEffectDuration(durationTicks);
+            CooldownStorage.forWorld(SUNDER_COOLDOWNS, world).put(
+                    ownerId, world.getTime() + cooldownTicks);
+            RuneUseCooldown.start(world, ownerId, "earth-chaos", "earth", cooldownTicks);
         }
 
         world.playSound(null, startPos.x, startPos.y, startPos.z, SoundEvents.BLOCK_STONE_BREAK, SoundCategory.PLAYERS, 1.0F, 0.85F);
@@ -188,10 +201,19 @@ public final class EarthChaosSunderManager {
 
     private static void tickField(ServerWorld world, ActiveSunderField field) {
         Vec3d previous = field.position;
-        field.position = field.position.add(field.direction.multiply(SUNDER_STEP_DISTANCE));
-        LivingEntity currentTarget = getValidCurrentTarget(world, field);
-        if (currentTarget != null) {
-            steerTowardTarget(field, currentTarget);
+        field.orbitAngle += field.angularSpeed;
+        if (field.orbitAngle > Math.PI * 2.0) {
+            field.orbitAngle -= Math.PI * 2.0;
+        }
+        // Circle around the impact point — never runs off into the void.
+        field.position = field.orbitCenter.add(
+                Math.cos(field.orbitAngle) * field.orbitRadius,
+                0.0,
+                Math.sin(field.orbitAngle) * field.orbitRadius
+        );
+        field.direction = field.position.subtract(previous);
+        if (field.direction.lengthSquared() > 1.0E-6) {
+            field.direction = field.direction.normalize();
         }
 
         if (world.getTime() >= field.nextMovementSoundTick) {
@@ -205,17 +227,17 @@ public final class EarthChaosSunderManager {
         }
         animateSunderVisuals(world, field);
 
-        world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), field.position.x, field.position.y + 0.08, field.position.z, 10, 1.15, 0.08, 1.15, 0.01);
-        world.spawnParticles(ParticleTypes.POOF, field.position.x, field.position.y + 0.1, field.position.z, 4, 0.9, 0.05, 0.9, 0.0);
+        world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), field.position.x, field.position.y + 0.08, field.position.z, 10, SUNDER_BAND_HALF_WIDTH * 0.55, 0.08, SUNDER_BAND_HALF_WIDTH * 0.55, 0.01);
+        world.spawnParticles(ParticleTypes.POOF, field.position.x, field.position.y + 0.1, field.position.z, 4, SUNDER_BAND_HALF_WIDTH * 0.4, 0.05, SUNDER_BAND_HALF_WIDTH * 0.4, 0.0);
 
         LivingEntity owner = getOwnerEntity(world, field.ownerId);
-        float damage = (float) (SimplyBowsConfig.INSTANCE.tremorstrike.spikeDamage.get() * (1.0 + field.frameLevel * SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get()));
+        // Slightly softer per hit — bigger denser ring covers more ground.
+        float damage = (float) (SimplyBowsConfig.INSTANCE.tremorstrike.spikeDamage.get() * 0.52
+                * (1.0 + field.frameLevel * SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get() * 0.5));
 
-        Box damageBox = Box.of(field.position, SUNDER_HIT_RADIUS * 2.0, 2.0, SUNDER_HIT_RADIUS * 2.0)
-                .union(Box.of(previous, SUNDER_HIT_RADIUS * 2.0, 2.0, SUNDER_HIT_RADIUS * 2.0));
+        double outer = field.orbitRadius + SUNDER_BAND_HALF_WIDTH + SUNDER_HIT_RADIUS;
+        Box damageBox = Box.of(field.orbitCenter, outer * 2.0, 2.4, outer * 2.0);
 
-        LivingEntity redirectSource = null;
-        boolean damagedCurrentTarget = false;
         for (LivingEntity candidate : world.getEntitiesByClass(
                 LivingEntity.class,
                 damageBox,
@@ -226,157 +248,32 @@ public final class EarthChaosSunderManager {
             if (lastDamageTick != null && world.getTime() - lastDamageTick < TARGET_DAMAGE_COOLDOWN_TICKS) {
                 continue;
             }
-            if (candidate.squaredDistanceTo(field.position) > (SUNDER_HIT_RADIUS * SUNDER_HIT_RADIUS)
-                    && candidate.squaredDistanceTo(previous) > (SUNDER_HIT_RADIUS * SUNDER_HIT_RADIUS)) {
+            double dx = candidate.getX() - field.orbitCenter.x;
+            double dz = candidate.getZ() - field.orbitCenter.z;
+            double dist = Math.sqrt(dx * dx + dz * dz);
+            double inner = Math.max(0.4, field.orbitRadius - SUNDER_BAND_HALF_WIDTH);
+            double bandOuter = field.orbitRadius + SUNDER_BAND_HALF_WIDTH;
+            // Thick ring: must be in the radial band, and near the moving front (or previous).
+            if (dist < inner || dist > bandOuter) {
+                continue;
+            }
+            if (candidate.squaredDistanceTo(field.position) > (SUNDER_HIT_RADIUS * SUNDER_HIT_RADIUS * 2.25)
+                    && candidate.squaredDistanceTo(previous) > (SUNDER_HIT_RADIUS * SUNDER_HIT_RADIUS * 2.25)) {
                 continue;
             }
 
-            boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, damage, true, false);
-            if (!damaged) {
-                continue;
+            boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, damage, false, false);
+            if (damaged) {
+                field.recentDamageTicks.put(candidateId, world.getTime());
             }
-
-            field.recentDamageTicks.put(candidateId, world.getTime());
-            if (field.currentTargetId != null && field.currentTargetId.equals(candidateId)) {
-                damagedCurrentTarget = true;
-            }
-
-            if (redirectSource == null) {
-                redirectSource = candidate;
-            }
-        }
-
-        if (redirectSource != null) {
-            if (currentTarget != null && !damagedCurrentTarget) {
-                return;
-            }
-            retargetOrBranch(world, field, redirectSource);
-        } else if (world.getTime() >= field.nextIdleTargetCheckTick) {
-            if (currentTarget != null) {
-                return;
-            }
-            attemptIdleRetarget(world, field);
-            field.nextIdleTargetCheckTick = world.getTime() + IDLE_TARGET_CHECK_INTERVAL_TICKS;
         }
     }
 
-    private static void attemptIdleRetarget(ServerWorld world, ActiveSunderField field) {
-        LivingEntity nextTarget = findNextTargetNear(world, field, field.position, null);
-        if (nextTarget == null) {
-            return;
+    private static double resolveInitialAngle(ServerWorld world, Vec3d initialVelocity) {
+        if (initialVelocity != null && initialVelocity.horizontalLengthSquared() > 1.0E-6) {
+            return Math.atan2(initialVelocity.z, initialVelocity.x);
         }
-
-        Vec3d desired = nextTarget.getPos().add(0.0, nextTarget.getStandingEyeHeight() * 0.35, 0.0).subtract(field.position);
-        if (desired.lengthSquared() <= 1.0E-6) {
-            return;
-        }
-
-        field.direction = desired.normalize();
-        field.currentTargetId = nextTarget.getUuid();
-        field.recentTargetTicks.put(nextTarget.getUuid(), world.getTime());
-        world.playSound(null, field.position.x, field.position.y, field.position.z, SoundEvents.BLOCK_DEEPSLATE_BRICKS_BREAK, SoundCategory.PLAYERS, 0.45F, 1.25F + world.random.nextFloat() * 0.1F);
-    }
-
-    private static void retargetOrBranch(ServerWorld world, ActiveSunderField field, LivingEntity source) {
-        LivingEntity nextTarget = findNextTarget(world, field, source);
-        if (nextTarget != null) {
-            Vec3d desired = nextTarget.getPos().add(0.0, nextTarget.getStandingEyeHeight() * 0.35, 0.0).subtract(field.position);
-            if (desired.lengthSquared() > 1.0E-6) {
-                field.direction = desired.normalize();
-                field.currentTargetId = nextTarget.getUuid();
-                field.recentTargetTicks.put(nextTarget.getUuid(), world.getTime());
-                world.playSound(null, field.position.x, field.position.y, field.position.z, SoundEvents.BLOCK_DEEPSLATE_BRICKS_BREAK, SoundCategory.PLAYERS, 0.6F, 1.15F + world.random.nextFloat() * 0.15F);
-                return;
-            }
-        }
-
-        field.currentTargetId = null;
-        field.direction = randomBranchDirection(world, field.direction);
-        world.playSound(null, field.position.x, field.position.y, field.position.z, SoundEvents.BLOCK_DRIPSTONE_BLOCK_STEP, SoundCategory.PLAYERS, 0.5F, 0.8F + world.random.nextFloat() * 0.2F);
-    }
-
-    private static LivingEntity getValidCurrentTarget(ServerWorld world, ActiveSunderField field) {
-        if (field.currentTargetId == null) {
-            return null;
-        }
-        Entity entity = world.getEntity(field.currentTargetId);
-        if (!(entity instanceof LivingEntity living) || !living.isAlive()) {
-            field.currentTargetId = null;
-            return null;
-        }
-        LivingEntity owner = getOwnerEntity(world, field.ownerId);
-        if (!CombatTargeting.isOffensiveTargetCandidate(living, owner)) {
-            field.currentTargetId = null;
-            return null;
-        }
-        if (living.squaredDistanceTo(field.position) > field.acquisitionRange * field.acquisitionRange) {
-            field.currentTargetId = null;
-            return null;
-        }
-        return living;
-    }
-
-    private static void steerTowardTarget(ActiveSunderField field, LivingEntity target) {
-        Vec3d desired = target.getPos().add(0.0, target.getStandingEyeHeight() * 0.35, 0.0).subtract(field.position);
-        if (desired.lengthSquared() <= 1.0E-6) {
-            return;
-        }
-        field.direction = desired.normalize();
-    }
-
-    private static LivingEntity findNextTarget(ServerWorld world, ActiveSunderField field, LivingEntity source) {
-        return findNextTargetNear(world, field, source.getPos(), source.getUuid());
-    }
-
-    private static LivingEntity findNextTargetNear(ServerWorld world, ActiveSunderField field, Vec3d centerPos, UUID excludedEntityId) {
-        double range = field.acquisitionRange;
-        Box box = Box.of(centerPos, range * 2.0, 4.0, range * 2.0);
-        long now = world.getTime();
-        LivingEntity owner = getOwnerEntity(world, field.ownerId);
-        field.recentTargetTicks.entrySet().removeIf(entry -> now - entry.getValue() >= TARGET_REACQUIRE_COOLDOWN_TICKS);
-
-        LivingEntity nearest = null;
-        double bestSq = Double.MAX_VALUE;
-
-        for (LivingEntity candidate : world.getEntitiesByClass(
-                LivingEntity.class,
-                box,
-                entity -> CombatTargeting.isOffensiveTargetCandidate(entity, owner)
-        )) {
-            UUID id = candidate.getUuid();
-            if (excludedEntityId != null && id.equals(excludedEntityId)) {
-                continue;
-            }
-            Long lastTargetTick = field.recentTargetTicks.get(id);
-            if (lastTargetTick != null && now - lastTargetTick < TARGET_REACQUIRE_COOLDOWN_TICKS) {
-                continue;
-            }
-            double sq = candidate.getPos().squaredDistanceTo(centerPos);
-            if (sq <= range * range && sq < bestSq) {
-                bestSq = sq;
-                nearest = candidate;
-            }
-        }
-        return nearest;
-    }
-
-    private static Vec3d resolveInitialDirection(ServerWorld world, Vec3d initialVelocity) {
-        if (initialVelocity != null && initialVelocity.lengthSquared() > 1.0E-6) {
-            return initialVelocity.normalize();
-        }
-        float yaw = world.random.nextFloat() * 360.0F;
-        return Vec3d.fromPolar(0.0F, yaw).normalize();
-    }
-
-    private static Vec3d randomBranchDirection(ServerWorld world, Vec3d current) {
-        Vec3d base = (current == null || current.lengthSquared() <= 1.0E-6) ? new Vec3d(1.0, 0.0, 0.0) : current.normalize();
-        double yaw = Math.atan2(base.z, base.x);
-        double randomTurn = MathHelper.lerp(world.random.nextDouble(), Math.toRadians(35.0), Math.toRadians(120.0));
-        if (world.random.nextBoolean()) {
-            randomTurn = -randomTurn;
-        }
-        double newYaw = yaw + randomTurn;
-        return new Vec3d(Math.cos(newYaw), 0.0, Math.sin(newYaw)).normalize();
+        return world.random.nextDouble() * Math.PI * 2.0;
     }
 
     private static LivingEntity getOwnerEntity(ServerWorld world, UUID ownerId) {
@@ -394,9 +291,19 @@ public final class EarthChaosSunderManager {
         } else {
             side = side.normalize();
         }
-        spawnSunderSpikeAt(world, field, field.position, now, 1.7F);
-        spawnSunderSpikeAt(world, field, field.position.add(side.multiply(1.6)), now, 1.15F);
-        spawnSunderSpikeAt(world, field, field.position.add(side.multiply(-1.6)), now, 1.15F);
+        // Dense packed front — reads as a rotating disc segment, not sparse poles.
+        Vec3d inward = field.orbitCenter.subtract(field.position);
+        Vec3d radial = inward.horizontalLengthSquared() > 1.0E-4
+                ? new Vec3d(inward.x, 0.0, inward.z).normalize()
+                : new Vec3d(1.0, 0.0, 0.0);
+        double[] sideOffsets = {-0.95, -0.45, 0.0, 0.45, 0.95};
+        double[] radialOffsets = {-SUNDER_BAND_HALF_WIDTH * 0.75, 0.0, SUNDER_BAND_HALF_WIDTH * 0.75};
+        for (double sideOff : sideOffsets) {
+            for (double radialOff : radialOffsets) {
+                float height = (Math.abs(sideOff) < 0.1 && Math.abs(radialOff) < 0.2) ? 1.55F : 1.25F;
+                spawnSunderSpikeAt(world, field, field.position.add(side.multiply(sideOff)).add(radial.multiply(radialOff)), now, height);
+            }
+        }
     }
 
     private static void spawnSunderSpikeAt(ServerWorld world, ActiveSunderField field, Vec3d position, long now, float height) {
@@ -494,29 +401,31 @@ public final class EarthChaosSunderManager {
     }
 
     private static final class ActiveSunderField {
+        private final Vec3d orbitCenter;
         private Vec3d position;
         private Vec3d direction;
+        private double orbitAngle;
+        private final double orbitRadius;
+        private final double angularSpeed;
         private final UUID ownerId;
         private final long expiryTick;
-        private final double acquisitionRange;
         private final int frameLevel;
         private final Map<UUID, Long> recentDamageTicks = new HashMap<>();
-        private final Map<UUID, Long> recentTargetTicks = new HashMap<>();
         private final List<SunderVisual> visuals = new ArrayList<>();
-        private UUID currentTargetId;
-        private long nextIdleTargetCheckTick;
         private long nextMovementSoundTick;
         private long nextVisualSpawnTick;
 
-        private ActiveSunderField(Vec3d position, Vec3d direction, UUID ownerId, long expiryTick, double acquisitionRange, int frameLevel) {
+        private ActiveSunderField(Vec3d orbitCenter, Vec3d position, double orbitAngle, double orbitRadius,
+                                  double angularSpeed, UUID ownerId, long expiryTick, int frameLevel) {
+            this.orbitCenter = orbitCenter;
             this.position = position;
-            this.direction = direction;
+            this.orbitAngle = orbitAngle;
+            this.orbitRadius = orbitRadius;
+            this.angularSpeed = angularSpeed;
+            this.direction = new Vec3d(-Math.sin(orbitAngle), 0.0, Math.cos(orbitAngle));
             this.ownerId = ownerId;
             this.expiryTick = expiryTick;
-            this.acquisitionRange = acquisitionRange;
             this.frameLevel = frameLevel;
-            this.currentTargetId = null;
-            this.nextIdleTargetCheckTick = 0L;
             this.nextMovementSoundTick = 0L;
             this.nextVisualSpawnTick = 0L;
         }

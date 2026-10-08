@@ -19,7 +19,6 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.entity.EarthSpikeVisualEntity;
-import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
@@ -47,8 +46,10 @@ public final class EarthSpikeFieldManager {
     private static final int PAIN_STAR_RAYS = 8;
     private static final int PAIN_WAVE_STEP_TICKS = 1;
     private static final double PAIN_WAVE_DAMAGE_RADIUS = 0.8;
-    private static final double BOUNTY_CENTER_KNOCKBACK_BASE_MULTIPLIER = 1.15;
-    private static final double BOUNTY_CENTER_KNOCKBACK_PROXIMITY_MULTIPLIER = 1.9;
+    private static final double BOUNTY_CENTER_KNOCKBACK_BASE_MULTIPLIER = 0.55;
+    private static final double BOUNTY_CENTER_KNOCKBACK_PROXIMITY_MULTIPLIER = 0.35;
+    private static final double BOUNTY_MAX_KNOCKUP = 0.55;
+    private static final float PAIN_WAVE_DAMAGE_SCALE = 0.28F;
     private static final String SPIKE_VISUAL_TAG = "simplybows_earth_spike_visual";
 
     private static double fieldRadius() { return SimplyBowsConfig.INSTANCE.tremorstrike.fieldRadius.get(); }
@@ -100,26 +101,26 @@ public final class EarthSpikeFieldManager {
         }
         fields.add(field);
         if (ownerId != null) {
-            int lockoutTicks = Math.max(20, fieldLockoutTicks());
+            int effectTicks = FIELD_DURATION_TICKS + painTravelTicks;
+            int lockoutTicks = RuneUseCooldown.fromEffectDuration(effectTicks);
             CooldownStorage.forWorld(FIELD_LOCKOUTS_BY_SERVER, world)
                     .put(ownerId, now + lockoutTicks);
-            if (owner instanceof ServerPlayerEntity player) {
-                SimplyBowItem.simplybows$sendCooldownPacket(player, "earth",
-                        System.currentTimeMillis() + (long) lockoutTicks * 50L, lockoutTicks);
-            }
+            RuneUseCooldown.start(world, ownerId, "earth-field", "earth", lockoutTicks);
         }
 
         LivingEntity ownerEntity = getOwnerEntity(world, ownerId);
-        double initialKnock = tuning.outwardPainWaves() ? Math.min(0.22, tuning.upwardKnockback()) : tuning.upwardKnockback();
-        applySpikeDamage(world, ownerEntity, center, tuning.radius(), tuning.damage(), initialKnock);
-        if (tuning.bountyCenterSpike()) {
-            applyBountyCenterImpact(world, ownerEntity, center, tuning);
-        }
         if (tuning.graceSupport()) {
+            // Support-only: no hostile spike damage / knockback on Grace.
             applyGraceAllySupport(world, ownerEntity, center, tuning);
-        }
-        if (tuning.outwardPainWaves()) {
+        } else if (tuning.bountyCenterSpike()) {
+            // Bounty: center impact only (no double knockup from the base field).
+            applyBountyCenterImpact(world, ownerEntity, center, tuning);
+        } else if (tuning.outwardPainWaves()) {
+            // Pain: light initial tap, then waves carry most of the damage.
+            applySpikeDamage(world, ownerEntity, center, tuning.radius(), tuning.damage() * 0.45F, Math.min(0.18, tuning.upwardKnockback()));
             initializePainWaves(field, now);
+        } else {
+            applySpikeDamage(world, ownerEntity, center, tuning.radius(), tuning.damage(), tuning.upwardKnockback());
         }
         world.playSound(null, center.x, center.y, center.z, SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.PLAYERS, 1.35F, 0.65F + world.random.nextFloat() * 0.1F);
         world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_POINTED_DRIPSTONE_DRIP_LAVA_INTO_CAULDRON, SoundCategory.PLAYERS, 1.0F, 0.75F + world.random.nextFloat() * 0.1F);
@@ -155,6 +156,9 @@ public final class EarthSpikeFieldManager {
     }
 
     private static boolean isFieldReady(ServerWorld world, UUID ownerId, List<ActiveSpikeField> fields) {
+        if (!RuneUseCooldown.isPlayerReady(world, ownerId)) {
+            return false;
+        }
         long now = CooldownStorage.currentTick(world);
         Long lockoutEnd = CooldownStorage.forWorld(FIELD_LOCKOUTS_BY_SERVER, world).get(ownerId);
         if (lockoutEnd != null && lockoutEnd > now) {
@@ -200,10 +204,14 @@ public final class EarthSpikeFieldManager {
             }
 
             double proximity = 1.0 - MathHelper.clamp(dist / centerRadius, 0.0, 1.0);
-            float scaledDamage = tuning.damage() * (bountyCenterDamageBaseMultiplier() + (float) (proximity * bountyCenterDamageProximityMultiplier()));
-            boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, scaledDamage, true, false);
+            // Already halved once; strip another 40% (×0.6 → net ×0.3 of base field damage).
+            float scaledDamage = tuning.damage() * 0.3F
+                    * (bountyCenterDamageBaseMultiplier() + (float) (proximity * bountyCenterDamageProximityMultiplier()));
+            boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, scaledDamage, false, false);
             if (damaged) {
-                double scaledKnockup = tuning.upwardKnockback() * (BOUNTY_CENTER_KNOCKBACK_BASE_MULTIPLIER + (proximity * BOUNTY_CENTER_KNOCKBACK_PROXIMITY_MULTIPLIER));
+                double scaledKnockup = Math.min(BOUNTY_MAX_KNOCKUP,
+                        Math.min(0.42, tuning.upwardKnockback())
+                                * (BOUNTY_CENTER_KNOCKBACK_BASE_MULTIPLIER + (proximity * BOUNTY_CENTER_KNOCKBACK_PROXIMITY_MULTIPLIER)));
                 applyUpwardKnockback(candidate, scaledKnockup);
             }
         }
@@ -259,8 +267,8 @@ public final class EarthSpikeFieldManager {
         boolean bountyCenterSpike = upgrades.runeEtching() == RuneEtching.BOUNTY;
         double radius = fieldRadius() * sizeMultiplier + upgrades.stringLevel() * stringRadiusBonusPerLevel();
         double visualRadius = PATCH_VISUAL_RADIUS * sizeMultiplier + upgrades.stringLevel() * (stringRadiusBonusPerLevel() * 0.45);
-        double painWaveDistance = painWaveMaxDistance() + upgrades.stringLevel() * stringWaveDistanceBonusPerLevel();
-        double upwardKnockback = baseUpwardKnockback() + upgrades.frameLevel() * frameUpwardKnockbackPerLevel();
+        double painWaveDistance = Math.min(10.0, painWaveMaxDistance() * 0.65 + upgrades.stringLevel() * stringWaveDistanceBonusPerLevel() * 0.5);
+        double upwardKnockback = Math.min(0.55, baseUpwardKnockback() * 0.7 + upgrades.frameLevel() * Math.min(0.06, frameUpwardKnockbackPerLevel()));
         int centerSpikeHeightSegments = bountyCenterBaseHeightSegments() + upgrades.frameLevel() * bountyCenterExtraHeightPerFrame();
         return new FieldTuning(
                 radius,
@@ -352,7 +360,8 @@ public final class EarthSpikeFieldManager {
             double y = findGroundTopY(world, pos.x, pos.z, field.center().y) + BASE_GROUND_OFFSET;
             int heightSegments = 2 + (wave.nextStep() % 4);
             spawnSpikeVisual(world, field, pos.x, y, pos.z, heightSegments, world.getTime());
-            damageAtWaveStep(world, field, getOwnerEntity(world, field.ownerId()), pos.x, y, pos.z, field.tuning().damage() * painWaveDamageMultiplier());
+            damageAtWaveStep(world, field, getOwnerEntity(world, field.ownerId()), pos.x, y, pos.z,
+                    field.tuning().damage() * painWaveDamageMultiplier() * PAIN_WAVE_DAMAGE_SCALE);
             world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.POINTED_DRIPSTONE.getDefaultState()), pos.x, y + 0.2, pos.z, 3, 0.1, 0.08, 0.1, 0.005);
             world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.DRIPSTONE_BLOCK.getDefaultState()), pos.x, y + 0.15, pos.z, 5, 0.16, 0.08, 0.16, 0.01);
             world.playSound(null, pos.x, y, pos.z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.45F, 1.05F + world.random.nextFloat() * 0.15F);
@@ -375,11 +384,12 @@ public final class EarthSpikeFieldManager {
         for (LivingEntity candidate : world.getEntitiesByClass(
                 LivingEntity.class,
                 hitBox,
-                CombatTargeting::isOffensiveTargetCandidate
+                entity -> CombatTargeting.isOffensiveTargetCandidate(entity, owner)
         )) {
-            boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, damage, true, false);
+            // Respect iframes so multi-ray waves cannot oneshot.
+            boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, damage, false, false);
             if (damaged && field.painLaunched.add(candidate.getUuid())) {
-                applyUpwardKnockback(candidate, 0.22);
+                applyUpwardKnockback(candidate, 0.14);
             }
         }
     }

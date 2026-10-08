@@ -17,6 +17,7 @@ import net.minecraft.world.World;
 import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.util.CombatTargeting;
+import net.sweenus.simplybows.util.GraceProjectile;
 import net.sweenus.simplybows.world.IceChaosWallManager;
 
 import java.util.HashSet;
@@ -283,6 +284,14 @@ public class HomingArrowEntity extends ArrowEntity {
 
     @Override
     protected void onHit(LivingEntity target) {
+        if (isGraceSupportProjectile() && GraceProjectile.isSupportTarget(target)) {
+            applyStackingSlow(target);
+            if (this.getWorld() instanceof ServerWorld serverWorld) {
+                spawnImpactParticles(serverWorld, target);
+            }
+            this.discard();
+            return;
+        }
         // Allow multiple fan arrows to damage in the same tick by clearing invulnerability frames.
         target.hurtTime = 0;
         target.timeUntilRegen = 0;
@@ -293,7 +302,6 @@ public class HomingArrowEntity extends ArrowEntity {
         super.onHit(target);
         target.hurtTime = 0;
         target.timeUntilRegen = 0;
-        // Handle any additional logic for when the arrow hits its target
     }
 
     @Override
@@ -324,6 +332,10 @@ public class HomingArrowEntity extends ArrowEntity {
 
     public void setLockedTargetUuid(UUID lockedTargetUuid) {
         this.lockedTargetUuid = lockedTargetUuid;
+    }
+
+    public boolean isGraceSupportProjectile() {
+        return this.stackingSlowness;
     }
 
     public void setStackingSlowness(boolean stackingSlowness) {

@@ -72,7 +72,7 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
         boolean isNone = rune == RuneEtching.NONE;
         String runeName = Text.translatable("tooltip.simplybows.rune." + rune.id()).getString();
         List<String> runeEffectLines = new ArrayList<>(BowUpgradeTooltip.runeLines(bowKey, upgrades));
-        if (altDown && !isNone) {
+        if (!isNone) {
             appendRuneDescription(runeEffectLines, bowKey, rune);
         }
 
@@ -87,6 +87,9 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
 
         UpgradeSection upgradeSection = new UpgradeSection(maxSlots, usedSlots, rows, upgradeRune);
 
+        // STATS tab: numeric string/frame/rune breakdown (more detail than LORE).
+        List<String> detailLines = new ArrayList<>(BowUpgradeTooltip.detailLines(bowKey, upgrades));
+
         String animKeyExtra = "|s:" + upgrades.stringLevel()
                 + "|f:" + upgrades.frameLevel()
                 + "|r:" + rune.id();
@@ -98,7 +101,7 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
                 List.of("UNIQUE", "BOW"),
                 TooltipBorderStyle.DEFAULT,
                 abilityLines,
-                List.of(),
+                detailLines,
                 List.of(),
                 TooltipTheme.defaultTheme(),
                 upgradeSection,

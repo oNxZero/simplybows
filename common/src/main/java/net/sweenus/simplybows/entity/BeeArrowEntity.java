@@ -2,7 +2,10 @@ package net.sweenus.simplybows.entity;
 
 import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
+import net.minecraft.entity.passive.AnimalEntity;
+import net.minecraft.entity.passive.IronGolemEntity;
 import net.minecraft.entity.passive.VillagerEntity;
+import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.projectile.ArrowEntity;
@@ -54,11 +57,21 @@ public class BeeArrowEntity extends ArrowEntity {
     private float chaosDiveBombDamage;
     private double chaosDiveBombRadius;
     private static final ThreadLocal<Boolean> ENABLE_PAIN_HOMING = ThreadLocal.withInitial(() -> false);
+    private static final ThreadLocal<Float> PAIN_DAMAGE_SCALE = ThreadLocal.withInitial(() -> 1.0F);
     private final boolean painHoming;
     private LivingEntity homingTarget;
 
     public static void setPainHoming(boolean enabled) {
+        setPainHoming(enabled, 1.0F);
+    }
+
+    public static void setPainHoming(boolean enabled, float damageScale) {
         ENABLE_PAIN_HOMING.set(enabled);
+        PAIN_DAMAGE_SCALE.set(enabled ? Math.max(0.05F, damageScale) : 1.0F);
+    }
+
+    public static float getPainDamageScale() {
+        return PAIN_DAMAGE_SCALE.get();
     }
 
     public BeeArrowEntity(EntityType<? extends BeeArrowEntity> type, World world) {
@@ -139,9 +152,11 @@ public class BeeArrowEntity extends ArrowEntity {
             return;
         }
 
-        double speed = MathHelper.clamp(Math.max(this.getVelocity().length(), 1.55), 1.55, Math.max(2.15, painMaxSpeed()));
+        // Cap preserves Pain's low spawn speed; Bounty hive bees spawn faster and keep ~1.2.
+        double speedCap = 1.2;
+        double speed = MathHelper.clamp(Math.min(this.getVelocity().length(), speedCap), 0.55, speedCap);
         Vec3d desired = direction.normalize().multiply(speed);
-        Vec3d steered = this.getVelocity().lerp(desired, 0.62);
+        Vec3d steered = this.getVelocity().lerp(desired, 0.45);
         this.setVelocity(steered);
         this.velocityDirty = true;
     }
@@ -180,10 +195,16 @@ public class BeeArrowEntity extends ArrowEntity {
             return;
         }
 
-        if (entityHitResult.getEntity() instanceof LivingEntity livingEntity && shouldIgnoreGraceDamage(livingEntity)) {
+        if (!(entityHitResult.getEntity() instanceof LivingEntity livingEntity)) {
+            trySpawnChaosHoneyStorm(entityHitResult.getPos());
+            return;
+        }
+
+        if (isGraceSupportTarget(livingEntity)) {
             tryApplyGraceShield(entityHitResult.getPos(), livingEntity);
             if (this.getWorld() instanceof ServerWorld serverWorld) {
-                serverWorld.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), SoundEvents.ENTITY_BEE_HURT, SoundCategory.PLAYERS, 0.8F, 1.0F + this.random.nextFloat() * 0.2F);
+                serverWorld.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), SoundEvents.ENTITY_BEE_POLLINATE, SoundCategory.PLAYERS, 0.85F, 1.1F + this.random.nextFloat() * 0.15F);
+                serverWorld.spawnParticles(ParticleTypes.WAX_ON, livingEntity.getX(), livingEntity.getBodyY(0.5), livingEntity.getZ(), 10, 0.2, 0.18, 0.2, 0.01);
                 spawnPoofAndDiscard(serverWorld);
             } else {
                 this.discard();
@@ -191,24 +212,17 @@ public class BeeArrowEntity extends ArrowEntity {
             return;
         }
 
-        if (entityHitResult.getEntity() instanceof LivingEntity living) {
-            living.hurtTime = 0;
-            living.timeUntilRegen = 0;
+        if (!this.painHoming) {
+            livingEntity.hurtTime = 0;
+            livingEntity.timeUntilRegen = 0;
         }
         super.onEntityHit(entityHitResult);
-        if (entityHitResult.getEntity() instanceof LivingEntity living) {
-            living.hurtTime = 0;
-            living.timeUntilRegen = 0;
+        if (!this.painHoming) {
+            livingEntity.hurtTime = 0;
+            livingEntity.timeUntilRegen = 0;
         }
 
-        if (!(entityHitResult.getEntity() instanceof LivingEntity livingEntity)) {
-            trySpawnChaosHoneyStorm(entityHitResult.getPos());
-            return;
-        }
-
-        tryApplyGraceShield(entityHitResult.getPos(), livingEntity);
-
-        if (!isFriendlyToOwner(livingEntity)) {
+        if (this.upgrades.runeEtching() != RuneEtching.GRACE && !isFriendlyToOwner(livingEntity)) {
             applyStackingPoison(livingEntity);
         }
         trySpawnChaosHoneyStorm(entityHitResult.getPos());
@@ -264,7 +278,7 @@ public class BeeArrowEntity extends ArrowEntity {
         int hiveTicks = Math.max(80,
                 SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDuration.get()
                         + this.upgrades.stringLevel() * SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDurationBonusPerString.get());
-        RuneUseCooldown.start(serverWorld, ownerLiving.getUuid(), "bee-bounty", "bee", hiveTicks);
+        RuneUseCooldown.startForEffect(serverWorld, ownerLiving.getUuid(), "bee-bounty", "bee", hiveTicks);
         this.spawnedBountyHive = true;
     }
 
@@ -350,8 +364,18 @@ public class BeeArrowEntity extends ArrowEntity {
         return CombatTargeting.isFriendlyTo(entity, ownerLiving);
     }
 
-    private boolean shouldIgnoreGraceDamage(LivingEntity livingEntity) {
-        return this.upgrades.runeEtching() == RuneEtching.GRACE && livingEntity instanceof VillagerEntity;
+    private boolean isGraceSupportTarget(LivingEntity livingEntity) {
+        if (this.upgrades.runeEtching() != RuneEtching.GRACE || livingEntity == null) {
+            return false;
+        }
+        return livingEntity instanceof PlayerEntity
+                || livingEntity instanceof AnimalEntity
+                || livingEntity instanceof IronGolemEntity
+                || livingEntity instanceof VillagerEntity;
+    }
+
+    public boolean isGraceSupportProjectile() {
+        return this.upgrades.runeEtching() == RuneEtching.GRACE;
     }
 
     private void spawnPoofAndDiscard(ServerWorld world) {

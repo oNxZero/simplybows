@@ -5,7 +5,8 @@
   "minVersion": "0.8",
   "client": [
     "client.DrawContextMixin",
-    "client.ItemRendererMixin"
+    "client.ItemRendererMixin",
+    "client.TooltipRendererMixin"
   ],
   "mixins": [
     "AbstractSkeletonEntityMixin",

@@ -35,6 +35,17 @@ public abstract class AnvilScreenHandlerMixin {
             return;
         }
 
+        // Upgrade parts contain "bow" in their item id (enchanted_bow_string, etc.).
+        // Never treat them as upgradeable bows, or Frame+String becomes a fake anvil craft.
+        if (isUpgradeComponent(left) && isUpgradeComponent(right)) {
+            handler.getSlot(2).setStack(ItemStack.EMPTY);
+            this.levelCost.set(0);
+            this.repairItemUsage = 0;
+            ((ScreenHandler) (Object) this).sendContentUpdates();
+            ci.cancel();
+            return;
+        }
+
         ItemStack bowStack;
         ItemStack componentStack;
         boolean componentOnRight;
@@ -74,18 +85,7 @@ public abstract class AnvilScreenHandlerMixin {
     }
 
     private static boolean isUpgradeableBow(ItemStack stack) {
-        if (stack.isEmpty()) {
-            return false;
-        }
-        if (stack.getItem() instanceof SimplyBowItem) {
-            return true;
-        }
-        Identifier id = Registries.ITEM.getId(stack.getItem());
-        if (id == null || !"simplybows".equals(id.getNamespace())) {
-            return false;
-        }
-        String path = id.getPath();
-        return path.contains("bow");
+        return !stack.isEmpty() && stack.getItem() instanceof SimplyBowItem;
     }
 
     private static boolean isUpgradeComponent(ItemStack stack) {
@@ -96,9 +96,6 @@ public abstract class AnvilScreenHandlerMixin {
             return true;
         }
         Identifier id = Registries.ITEM.getId(stack.getItem());
-        if (id == null || !"simplybows".equals(id.getNamespace())) {
-            return false;
-        }
-        return id.getPath().startsWith("upgrades/");
+        return id != null && "simplybows".equals(id.getNamespace()) && id.getPath().startsWith("upgrades/");
     }
 }

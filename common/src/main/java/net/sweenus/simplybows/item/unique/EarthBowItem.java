@@ -13,6 +13,7 @@ import net.sweenus.simplybows.entity.EarthArrowEntity;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.world.EarthChaosSunderManager;
+import net.sweenus.simplybows.world.RuneUseCooldown;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -39,11 +40,13 @@ public class EarthBowItem extends SimplyBowItem {
                 && ownerId != null
                 && EarthChaosSunderManager.isSunderReady(serverWorld, ownerId);
 
-        if (chaosSunderReady) {
-            int durationTicks = Math.max(20,
-                    SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get()
-                            + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get());
-            simplybows$startAbilityItemCooldown(shooter, durationTicks + 160);
+        if (upgrades.runeEtching() == RuneEtching.CHAOS && ownerId != null) {
+            int durationTicks = Math.max(200, Math.min(360,
+                    Math.max(200, SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get())
+                            + Math.max(0, upgrades.stringLevel()) * Math.max(20, SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get())));
+            if (chaosSunderReady) {
+                simplybows$startAbilityItemCooldown(shooter, RuneUseCooldown.fromEffectDuration(durationTicks));
+            }
         }
 
         CHAOS_SUNDER_ON_IMPACT.set(chaosSunderReady);

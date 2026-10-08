@@ -75,8 +75,7 @@ public class IceBowItem extends SimplyBowItem {
             int durationTicks = Math.max(20,
                     SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationTicks.get()
                             + Math.max(0, upgrades.frameLevel()) * SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationPerFrameTicks.get());
-            int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.winterfang.chaosWallCooldownTicks.get());
-            simplybows$startAbilityItemCooldown(shooter, durationTicks + cooldownTicks);
+            simplybows$startAbilityItemCooldown(shooter, RuneUseCooldown.fromEffectDuration(durationTicks));
         }
 
         int quantity = baseQuantity() + upgrades.stringLevel();

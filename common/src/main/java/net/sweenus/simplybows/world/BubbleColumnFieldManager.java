@@ -108,7 +108,7 @@ public final class BubbleColumnFieldManager {
         spawnBurstParticles(world, anchoredCenter, tuning);
         playSpawnSound(world, anchoredCenter);
         if (runeColumn) {
-            RuneUseCooldown.start(world, ownerId, "bubble-column", "bubble");
+            RuneUseCooldown.startForEffect(world, ownerId, "bubble-column", "bubble", tuning.durationTicks());
         }
         return true;
     }

@@ -17,6 +17,8 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
+import net.sweenus.simplybows.upgrade.RuneEtching;
+import net.sweenus.simplybows.util.GraceProjectile;
 import net.sweenus.simplybows.world.EarthChaosSunderManager;
 import net.sweenus.simplybows.world.EarthSpikeFieldManager;
 
@@ -53,6 +55,17 @@ public class EarthArrowEntity extends ArrowEntity {
 
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
+        if (entityHitResult.getEntity() instanceof LivingEntity living
+                && isGraceSupportProjectile()
+                && GraceProjectile.isSupportTarget(living)) {
+            if (this.getWorld() instanceof ServerWorld serverWorld) {
+                Vec3d pos = living.getPos();
+                serverWorld.playSound(null, pos.x, pos.y, pos.z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.85F, 1.1F);
+            }
+            trySpawnField(living.getPos());
+            this.discard();
+            return;
+        }
         if (entityHitResult.getEntity() instanceof LivingEntity living) {
             living.hurtTime = 0;
             living.timeUntilRegen = 0;
@@ -68,6 +81,10 @@ public class EarthArrowEntity extends ArrowEntity {
             serverWorld.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), pos.x, pos.y + 0.1, pos.z, 12, 0.3, 0.1, 0.3, 0.01);
         }
         trySpawnField(entityHitResult.getPos());
+    }
+
+    public boolean isGraceSupportProjectile() {
+        return this.upgrades.runeEtching() == RuneEtching.GRACE;
     }
 
     @Override
@@ -94,15 +111,18 @@ public class EarthArrowEntity extends ArrowEntity {
             return;
         }
         if (this.getWorld() instanceof ServerWorld serverWorld) {
-            if (this.chaosSunderOnImpact) {
-                EarthChaosSunderManager.spawnAtImpact(
-                        serverWorld,
-                        pos,
-                        this.getOwner() != null ? this.getOwner().getUuid() : null,
-                        this.upgrades.stringLevel(),
-                        this.upgrades.frameLevel(),
-                        this.getVelocity()
-                );
+            // Chaos replaces the spike field entirely — never fall back to the normal ability on CD.
+            if (this.upgrades.runeEtching() == RuneEtching.CHAOS) {
+                if (this.chaosSunderOnImpact) {
+                    EarthChaosSunderManager.spawnAtImpact(
+                            serverWorld,
+                            pos,
+                            this.getOwner() != null ? this.getOwner().getUuid() : null,
+                            this.upgrades.stringLevel(),
+                            this.upgrades.frameLevel(),
+                            this.getVelocity()
+                    );
+                }
             } else {
                 EarthSpikeFieldManager.createOrReplaceField(serverWorld, pos, this.getOwner(), this.upgrades);
             }

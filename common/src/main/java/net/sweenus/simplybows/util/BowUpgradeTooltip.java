@@ -233,7 +233,9 @@ public final class BowUpgradeTooltip {
             case "vine" -> switch (rune) {
                 case PAIN -> t("tooltip.simplybows.rune_stat.vine.pain", seconds(SimplyBowsConfig.INSTANCE.everbloom.painAuraInterval.get()));
                 case GRACE -> t("tooltip.simplybows.rune_stat.vine.grace", seconds(SimplyBowsConfig.INSTANCE.everbloom.fieldDurationTicks.get()));
-                case BOUNTY -> t("tooltip.simplybows.rune_stat.vine.bounty", num(SimplyBowsConfig.INSTANCE.everbloom.bountyLootChance.get() * 100.0));
+                case BOUNTY -> t("tooltip.simplybows.rune_stat.vine.bounty",
+                        num(SimplyBowsConfig.INSTANCE.everbloom.bountyDamageMultiplier.get()),
+                        seconds(SimplyBowsConfig.INSTANCE.everbloom.bountyAuraInterval.get()));
                 case CHAOS -> t("tooltip.simplybows.rune_stat.vine.chaos",
                         num(SimplyBowsConfig.INSTANCE.everbloom.chaosBaseRadius.get() + string * SimplyBowsConfig.INSTANCE.everbloom.chaosRadiusPerString.get()),
                         seconds(SimplyBowsConfig.INSTANCE.everbloom.chaosBaseDurationTicks.get() + frame * SimplyBowsConfig.INSTANCE.everbloom.chaosDurationPerFrameTicks.get()));
@@ -273,10 +275,13 @@ public final class BowUpgradeTooltip {
             };
             case "blossom" -> switch (rune) {
                 case PAIN -> t("tooltip.simplybows.rune_stat.blossom.pain", num(SimplyBowsConfig.INSTANCE.petalwind.painAreaRadius.get() * upgrades.sizeMultiplier() + string * SimplyBowsConfig.INSTANCE.petalwind.painAreaRadiusPerString.get()));
-                case GRACE -> t("tooltip.simplybows.rune_stat.blossom.grace", seconds(SimplyBowsConfig.INSTANCE.petalwind.graceBuffDuration.get()), num(SimplyBowsConfig.INSTANCE.petalwind.graceAuraDamageRadius.get() * upgrades.sizeMultiplier() + string * SimplyBowsConfig.INSTANCE.petalwind.graceAuraRadiusPerString.get()));
+                case GRACE -> t("tooltip.simplybows.rune_stat.blossom.grace",
+                        seconds(100 + frame * 20),
+                        num(3.0 + string * 0.45));
                 case BOUNTY -> t("tooltip.simplybows.rune_stat.blossom.bounty",
-                        SimplyBowsConfig.INSTANCE.petalwind.bountyBaseMaxTraps.get() + string * SimplyBowsConfig.INSTANCE.petalwind.bountyMaxTrapsPerString.get(),
-                        num(SimplyBowsConfig.INSTANCE.petalwind.bountyTriggerDamageMultiplier.get()));
+                        SimplyBowsConfig.INSTANCE.petalwind.bountyMaxStorms.get(),
+                        seconds(SimplyBowsConfig.INSTANCE.petalwind.stormDurationTicks.get()
+                                + upgrades.stringLevel() * SimplyBowsConfig.INSTANCE.petalwind.stormDurationBonusPerString.get()));
                 case CHAOS -> t("tooltip.simplybows.rune_stat.blossom.chaos",
                         SimplyBowsConfig.INSTANCE.petalwind.chaosBaseFishCount.get() + frame * SimplyBowsConfig.INSTANCE.petalwind.chaosFishPerFrame.get(),
                         seconds(SimplyBowsConfig.INSTANCE.petalwind.chaosDurationTicks.get() + frame * SimplyBowsConfig.INSTANCE.petalwind.chaosDurationPerFrameTicks.get()),

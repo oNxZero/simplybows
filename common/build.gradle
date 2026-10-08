@@ -21,4 +21,8 @@ dependencies {
 
     // Simply Tooltips - optional soft dependency for modern tooltip rendering
     compileOnly files(rootProject.simplyTooltipsCommonDevJar)
+
+    // MixinExtras (@Local) for Simply Tooltips tooltip tab fixes — provided at runtime by NeoForge/Fabric
+    compileOnly "io.github.llamalad7:mixinextras-common:0.4.1"
+    annotationProcessor "io.github.llamalad7:mixinextras-common:0.4.1"
 }

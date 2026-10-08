@@ -33,6 +33,7 @@ import net.sweenus.simplybows.command.SimplyBowsCommands;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
+import net.sweenus.simplybows.world.RuneUseCooldown;
 import net.sweenus.simplybows.registry.ComponentRegistry;
 import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.registry.ItemRegistry;
@@ -58,6 +59,14 @@ public final class SimplyBows {
 
     public static void init() {
         LOGGER.info("Simply Bows config loaded: {}", SimplyBowsConfig.INSTANCE.getId());
+
+        // Wire global ability CD overlay without a class-init cycle.
+        RuneUseCooldown.CLIENT_SYNC = (player, ticks) ->
+                SimplyBowItem.simplybows$sendCooldownPacket(
+                        player,
+                        RuneUseCooldown.GLOBAL_BOW_KEY,
+                        System.currentTimeMillis() + (long) ticks * 50L,
+                        ticks);
 
         ComponentRegistry.register();
         ItemRegistry.ITEM.register();

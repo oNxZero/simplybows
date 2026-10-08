@@ -4,18 +4,11 @@ import net.minecraft.block.BlockState;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.passive.AnimalEntity;
 import net.minecraft.entity.passive.IronGolemEntity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.item.ItemStack;
-import net.minecraft.loot.LootTable;
-import net.minecraft.loot.context.LootContextParameterSet;
-import net.minecraft.loot.context.LootContextParameters;
-import net.minecraft.loot.context.LootContextTypes;
-import net.minecraft.registry.RegistryKey;
 import net.minecraft.particle.BlockStateParticleEffect;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.registry.tag.EntityTypeTags;
@@ -29,11 +22,9 @@ import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.GameRules;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.config.SimplyBowsConfig.VineBowSection;
 import net.sweenus.simplybows.entity.VineFlowerVisualEntity;
-import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
@@ -147,11 +138,10 @@ public final class VineFlowerFieldManager {
             fields.add(chaosField);
             playChaosFieldCreationSound(world, center);
             spawnChaosCreationParticles(world, center, tuning);
-            if (owner instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
-                int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.everbloom.chaosCooldownTicks.get());
-                int overlayTicks = (int) baseDuration + cooldownTicks;
-                SimplyBowItem.simplybows$sendCooldownPacket(serverPlayer, "vine",
-                        System.currentTimeMillis() + (long) overlayTicks * 50L, overlayTicks);
+            int cooldownTicks = RuneUseCooldown.fromEffectDuration((int) baseDuration);
+            if (ownerId != null) {
+                getCooldowns(world).put(ownerId, CooldownStorage.currentTick(world) + cooldownTicks);
+                RuneUseCooldown.start(world, ownerId, "vine-chaos", "vine", cooldownTicks);
             }
             return;
         }
@@ -166,11 +156,11 @@ public final class VineFlowerFieldManager {
         fields.add(field);
         playFieldCreationSound(world, center);
         spawnBurstParticles(world, center, tuning);
-        if (owner instanceof net.minecraft.server.network.ServerPlayerEntity serverPlayer) {
+        if (ownerId != null) {
             int durationTicks = (int) baseDuration;
+            int cooldownTicks = RuneUseCooldown.fromEffectDuration(durationTicks);
             startGraceCooldown(world, ownerId, durationTicks);
-            SimplyBowItem.simplybows$sendCooldownPacket(serverPlayer, "vine",
-                    System.currentTimeMillis() + (long) durationTicks * 50L, durationTicks);
+            RuneUseCooldown.start(world, ownerId, "vine-field", "vine", cooldownTicks);
         }
     }
 
@@ -490,15 +480,23 @@ public final class VineFlowerFieldManager {
         }
 
         int remainingFieldTicks = (int) Math.max(0L, field.effectiveExpiryTick() - world.getTime());
-        int cooldownTicks = Math.max(20, SimplyBowsConfig.INSTANCE.everbloom.chaosCooldownTicks.get());
-        int remainingOverlayTicks = Math.max(1, remainingFieldTicks + cooldownTicks);
+        Long cdEnd = getCooldowns(world).get(player.getUuid());
+        int remainingOverlayTicks = cdEnd != null && cdEnd > world.getTime()
+                ? (int) (cdEnd - world.getTime())
+                : RuneUseCooldown.fromEffectDuration(Math.max(1, remainingFieldTicks));
+        // Energy can extend the field past the original 3× window — keep CD covering it.
+        if (remainingFieldTicks > remainingOverlayTicks) {
+            remainingOverlayTicks = RuneUseCooldown.fromEffectDuration(remainingFieldTicks);
+            getCooldowns(world).put(player.getUuid(), world.getTime() + remainingOverlayTicks);
+        }
+        remainingOverlayTicks = Math.max(1, remainingOverlayTicks);
 
         long endMs = System.currentTimeMillis() + (long) remainingOverlayTicks * 50L;
         if (endMs <= field.lastSentCooldownEndMs) {
             return;
         }
         field.lastSentCooldownEndMs = endMs;
-        SimplyBowItem.simplybows$sendCooldownPacket(player, "vine", endMs, remainingOverlayTicks);
+        RuneUseCooldown.start(world, player.getUuid(), "vine-chaos", "vine", remainingOverlayTicks);
     }
 
     private static void applyChaosRootMaintenance(ServerWorld world, ActiveFlowerField field, long now) {
@@ -684,10 +682,7 @@ public final class VineFlowerFieldManager {
                     if (entity.getType().isIn(EntityTypeTags.UNDEAD)) {
                         damage += tuning.undeadBonusDamage();
                     }
-                    boolean died = dealAuraDamage(world, owner, entity, damage);
-                    if (died && tuning.bountyLootChance() > 0.0) {
-                        trySpawnBountyLoot(world, entity, owner, tuning.bountyLootChance());
-                    }
+                    dealAuraDamage(world, owner, entity, damage);
                 }
                 continue;
             }
@@ -949,7 +944,6 @@ public final class VineFlowerFieldManager {
         boolean damageHostiles = true;
         boolean cleanseNegative = false;
         boolean cherryTreeVisual = false;
-        double bountyLootChance = 0.0;
         int auraInterval = SimplyBowsConfig.INSTANCE.everbloom.auraIntervalTicks.get();
 
         if (rune == RuneEtching.PAIN) {
@@ -964,7 +958,13 @@ public final class VineFlowerFieldManager {
             cleanseNegative = true;
             cherryTreeVisual = true;
         } else if (rune == RuneEtching.BOUNTY) {
-            bountyLootChance = SimplyBowsConfig.INSTANCE.everbloom.bountyLootChance.get();
+            // Combat AOE: no heal, faster pulses, a bit more damage than base (still under Pain DPS).
+            healFriendlies = false;
+            damageHostiles = true;
+            friendlyHeal = 0.0F;
+            hostileDamage *= SimplyBowsConfig.INSTANCE.everbloom.bountyDamageMultiplier.get();
+            undeadBonusDamage *= SimplyBowsConfig.INSTANCE.everbloom.bountyDamageMultiplier.get();
+            auraInterval = SimplyBowsConfig.INSTANCE.everbloom.bountyAuraInterval.get();
         } else if (rune == RuneEtching.CHAOS) {
             healFriendlies = false;
             damageHostiles = false;
@@ -1040,7 +1040,6 @@ public final class VineFlowerFieldManager {
                 damageHostiles,
                 cleanseNegative,
                 cherryTreeVisual,
-                bountyLootChance,
                 Math.max(5, auraInterval),
                 visualPoints,
                 rune == RuneEtching.CHAOS,
@@ -1122,56 +1121,6 @@ public final class VineFlowerFieldManager {
             entity.removeStatusEffect(instance.getEffectType());
         }
         return true;
-    }
-
-    private static void trySpawnBountyLoot(ServerWorld world, LivingEntity entity, LivingEntity owner, double chance) {
-        if (!world.getGameRules().getBoolean(GameRules.DO_MOB_LOOT)) {
-            return;
-        }
-        if (entity.getRandom().nextDouble() > chance) {
-            return;
-        }
-
-        RegistryKey<LootTable> lootTableKey = entity.getLootTable();
-        LootTable lootTable = world.getServer().getReloadableRegistries().getLootTable(lootTableKey);
-        DamageSource damageSource = createBountyDamageSource(world, owner);
-
-        LootContextParameterSet.Builder builder = new LootContextParameterSet.Builder(world)
-                .add(LootContextParameters.THIS_ENTITY, entity)
-                .add(LootContextParameters.ORIGIN, entity.getPos())
-                .add(LootContextParameters.DAMAGE_SOURCE, damageSource)
-                .addOptional(LootContextParameters.ATTACKING_ENTITY, damageSource.getAttacker())
-                .addOptional(LootContextParameters.DIRECT_ATTACKING_ENTITY, damageSource.getSource());
-
-        if (owner instanceof ServerPlayerEntity playerOwner) {
-            builder = builder.add(LootContextParameters.LAST_DAMAGE_PLAYER, playerOwner).luck(playerOwner.getLuck());
-        }
-
-        LootContextParameterSet lootContext = builder.build(LootContextTypes.ENTITY);
-        List<ItemStack> generatedLoot = lootTable.generateLoot(lootContext, entity.getLootTableSeed() ^ world.getRandom().nextLong());
-        if (generatedLoot.isEmpty()) {
-            return;
-        }
-
-        List<ItemStack> nonEmptyLoot = generatedLoot.stream()
-                .filter(stack -> stack != null && !stack.isEmpty())
-                .toList();
-        if (nonEmptyLoot.isEmpty()) {
-            return;
-        }
-
-        ItemStack extraDrop = nonEmptyLoot.get(world.getRandom().nextInt(nonEmptyLoot.size())).copy();
-        entity.dropStack(extraDrop);
-    }
-
-    private static DamageSource createBountyDamageSource(ServerWorld world, LivingEntity owner) {
-        if (owner instanceof ServerPlayerEntity playerOwner) {
-            return world.getDamageSources().playerAttack(playerOwner);
-        }
-        if (owner != null) {
-            return world.getDamageSources().mobAttack(owner);
-        }
-        return world.getDamageSources().magic();
     }
 
     private static void growFieldVisuals(ServerWorld world, ActiveFlowerField field) {
@@ -1299,7 +1248,7 @@ public final class VineFlowerFieldManager {
         field.springVisuals.clear();
         if (expired && field.tuning().chaosMode()) {
             triggerChaosExpiryBurst(world, field);
-            startChaosCooldown(world, field.ownerId());
+            // Cooldown already started at cast (3× effect duration).
         }
     }
 
@@ -1353,6 +1302,9 @@ public final class VineFlowerFieldManager {
     }
 
     private static boolean isFlowerFieldReady(ServerWorld world, UUID ownerId, List<ActiveFlowerField> fields) {
+        if (!RuneUseCooldown.isPlayerReady(world, ownerId)) {
+            return false;
+        }
         long now = CooldownStorage.currentTick(world);
         Long graceEnd = graceCooldowns(world).get(ownerId);
         if (graceEnd != null && graceEnd > now) {
@@ -1386,7 +1338,7 @@ public final class VineFlowerFieldManager {
         if (ownerId == null) {
             return;
         }
-        graceCooldowns(world).put(ownerId, CooldownStorage.currentTick(world) + Math.max(20, durationTicks));
+        graceCooldowns(world).put(ownerId, CooldownStorage.currentTick(world) + RuneUseCooldown.fromEffectDuration(durationTicks));
     }
 
     private static Map<UUID, Long> graceCooldowns(ServerWorld world) {
@@ -1524,7 +1476,6 @@ public final class VineFlowerFieldManager {
             boolean damageHostiles,
             boolean cleanseNegativeEffects,
             boolean cherryTreeVisual,
-            double bountyLootChance,
             int auraIntervalTicks,
             int visualPoints,
             boolean chaosMode,
