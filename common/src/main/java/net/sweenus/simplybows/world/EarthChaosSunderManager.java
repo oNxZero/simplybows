@@ -30,10 +30,13 @@ public final class EarthChaosSunderManager {
 
     private static final Map<ServerWorld, List<ActiveSunderField>> ACTIVE_FIELDS = new HashMap<>();
     private static final Map<ServerWorld, Long> NEXT_ORPHAN_VISUAL_CLEANUP_TICK = new HashMap<>();
-    private static final double SUNDER_ORBIT_RADIUS_BASE = 5.0; // wide rotating disc
-    private static final double SUNDER_ORBIT_RADIUS_PER_STRING = 0.45;
-    private static final double SUNDER_BAND_HALF_WIDTH = 1.55; // dense band — spikes packed tight
-    private static final double SUNDER_HIT_RADIUS = 1.85; // per-front hit along the band
+    // Smaller orbit circle. Spike front = 25% of that circle (90° wedge), filled dense.
+    private static final double SUNDER_ORBIT_RADIUS_BASE = 2.75;
+    private static final double SUNDER_BAND_HALF_WIDTH = 0.85;
+    private static final double SUNDER_BAND_HALF_WIDTH_PER_STRING = 0.22;
+    private static final double SUNDER_HIT_RADIUS = 1.8;
+    private static final double SUNDER_HIT_RADIUS_PER_STRING = 0.1;
+    private static final double SUNDER_FRONT_ARC_RADIANS = Math.PI / 2.0; // 25% of full circle
     private static final int SUNDER_FULL_ROTATIONS = 2;
     private static final int SUNDER_MIN_DURATION_TICKS = 200; // 10s
     private static final int SUNDER_MAX_DURATION_TICKS = 360; // 18s
@@ -95,7 +98,10 @@ public final class EarthChaosSunderManager {
         int durationTicks = Math.max(SUNDER_MIN_DURATION_TICKS, Math.min(SUNDER_MAX_DURATION_TICKS,
                 Math.max(SUNDER_MIN_DURATION_TICKS, SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get())
                         + Math.max(0, stringLevel) * Math.max(20, SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get())));
-        double orbitRadius = SUNDER_ORBIT_RADIUS_BASE + Math.max(0, stringLevel) * SUNDER_ORBIT_RADIUS_PER_STRING;
+        // Fixed small orbit. String thickens the wedge inward only — never grows the circle.
+        double bandHalfWidth = SUNDER_BAND_HALF_WIDTH + Math.max(0, stringLevel) * SUNDER_BAND_HALF_WIDTH_PER_STRING;
+        double orbitRadius = SUNDER_ORBIT_RADIUS_BASE;
+        double hitRadius = SUNDER_HIT_RADIUS + Math.max(0, stringLevel) * SUNDER_HIT_RADIUS_PER_STRING;
         double startAngle = resolveInitialAngle(world, initialVelocity);
 
         if (ownerId != null) {
@@ -119,6 +125,8 @@ public final class EarthChaosSunderManager {
                 firstPos,
                 startAngle,
                 orbitRadius,
+                bandHalfWidth,
+                hitRadius,
                 angularSpeed,
                 ownerId,
                 world.getTime() + durationTicks,
@@ -200,7 +208,7 @@ public final class EarthChaosSunderManager {
     }
 
     private static void tickField(ServerWorld world, ActiveSunderField field) {
-        Vec3d previous = field.position;
+        Vec3d previousPos = field.position;
         field.orbitAngle += field.angularSpeed;
         if (field.orbitAngle > Math.PI * 2.0) {
             field.orbitAngle -= Math.PI * 2.0;
@@ -211,7 +219,7 @@ public final class EarthChaosSunderManager {
                 0.0,
                 Math.sin(field.orbitAngle) * field.orbitRadius
         );
-        field.direction = field.position.subtract(previous);
+        field.direction = field.position.subtract(previousPos);
         if (field.direction.lengthSquared() > 1.0E-6) {
             field.direction = field.direction.normalize();
         }
@@ -227,15 +235,15 @@ public final class EarthChaosSunderManager {
         }
         animateSunderVisuals(world, field);
 
-        world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), field.position.x, field.position.y + 0.08, field.position.z, 10, SUNDER_BAND_HALF_WIDTH * 0.55, 0.08, SUNDER_BAND_HALF_WIDTH * 0.55, 0.01);
-        world.spawnParticles(ParticleTypes.POOF, field.position.x, field.position.y + 0.1, field.position.z, 4, SUNDER_BAND_HALF_WIDTH * 0.4, 0.05, SUNDER_BAND_HALF_WIDTH * 0.4, 0.0);
+        world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), field.position.x, field.position.y + 0.08, field.position.z, 10, field.bandHalfWidth * 0.55, 0.08, field.bandHalfWidth * 0.55, 0.01);
+        world.spawnParticles(ParticleTypes.POOF, field.position.x, field.position.y + 0.1, field.position.z, 4, field.bandHalfWidth * 0.4, 0.05, field.bandHalfWidth * 0.4, 0.0);
 
         LivingEntity owner = getOwnerEntity(world, field.ownerId);
         // Slightly softer per hit — bigger denser ring covers more ground.
         float damage = (float) (SimplyBowsConfig.INSTANCE.tremorstrike.spikeDamage.get() * 0.52
                 * (1.0 + field.frameLevel * SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get() * 0.5));
 
-        double outer = field.orbitRadius + SUNDER_BAND_HALF_WIDTH + SUNDER_HIT_RADIUS;
+        double outer = field.orbitRadius + field.bandHalfWidth + field.hitRadius;
         Box damageBox = Box.of(field.orbitCenter, outer * 2.0, 2.4, outer * 2.0);
 
         for (LivingEntity candidate : world.getEntitiesByClass(
@@ -251,14 +259,21 @@ public final class EarthChaosSunderManager {
             double dx = candidate.getX() - field.orbitCenter.x;
             double dz = candidate.getZ() - field.orbitCenter.z;
             double dist = Math.sqrt(dx * dx + dz * dz);
-            double inner = Math.max(0.4, field.orbitRadius - SUNDER_BAND_HALF_WIDTH);
-            double bandOuter = field.orbitRadius + SUNDER_BAND_HALF_WIDTH;
-            // Thick ring: must be in the radial band, and near the moving front (or previous).
+            double bandOuter = field.orbitRadius + field.bandHalfWidth;
+            double inner = Math.max(0.35, field.orbitRadius - field.bandHalfWidth);
             if (dist < inner || dist > bandOuter) {
                 continue;
             }
-            if (candidate.squaredDistanceTo(field.position) > (SUNDER_HIT_RADIUS * SUNDER_HIT_RADIUS * 2.25)
-                    && candidate.squaredDistanceTo(previous) > (SUNDER_HIT_RADIUS * SUNDER_HIT_RADIUS * 2.25)) {
+            // Must sit inside the moving quarter-circle front (left/right coverage).
+            double candidateAngle = Math.atan2(dz, dx);
+            double delta = candidateAngle - field.orbitAngle;
+            while (delta > Math.PI) {
+                delta -= Math.PI * 2.0;
+            }
+            while (delta < -Math.PI) {
+                delta += Math.PI * 2.0;
+            }
+            if (Math.abs(delta) > SUNDER_FRONT_ARC_RADIANS * 0.5) {
                 continue;
             }
 
@@ -291,16 +306,20 @@ public final class EarthChaosSunderManager {
         } else {
             side = side.normalize();
         }
-        // Dense packed front — reads as a rotating disc segment, not sparse poles.
+        // Fill the 25% arc as a solid patch (not 3 sparse lines) — ~2× denser coverage.
         Vec3d inward = field.orbitCenter.subtract(field.position);
         Vec3d radial = inward.horizontalLengthSquared() > 1.0E-4
                 ? new Vec3d(inward.x, 0.0, inward.z).normalize()
                 : new Vec3d(1.0, 0.0, 0.0);
-        double[] sideOffsets = {-0.95, -0.45, 0.0, 0.45, 0.95};
-        double[] radialOffsets = {-SUNDER_BAND_HALF_WIDTH * 0.75, 0.0, SUNDER_BAND_HALF_WIDTH * 0.75};
-        for (double sideOff : sideOffsets) {
-            for (double radialOff : radialOffsets) {
-                float height = (Math.abs(sideOff) < 0.1 && Math.abs(radialOff) < 0.2) ? 1.55F : 1.25F;
+        double arcHalf = field.orbitRadius * (SUNDER_FRONT_ARC_RADIANS * 0.5);
+        int sideColumns = Math.max(10, (int) Math.round(arcHalf / 0.28));
+        int radialColumns = Math.max(6, (int) Math.round((field.bandHalfWidth * 2.0) / 0.28));
+        for (int s = -sideColumns; s <= sideColumns; s++) {
+            double sideOff = sideColumns == 0 ? 0.0 : (arcHalf / sideColumns) * s;
+            for (int r = 0; r < radialColumns; r++) {
+                double t = radialColumns <= 1 ? 0.5 : r / (double) (radialColumns - 1);
+                double radialOff = -field.bandHalfWidth + (field.bandHalfWidth * 2.0) * t;
+                float height = (Math.abs(s) <= 1 && Math.abs(t - 0.5) < 0.2) ? 1.55F : 1.2F;
                 spawnSunderSpikeAt(world, field, field.position.add(side.multiply(sideOff)).add(radial.multiply(radialOff)), now, height);
             }
         }
@@ -406,6 +425,8 @@ public final class EarthChaosSunderManager {
         private Vec3d direction;
         private double orbitAngle;
         private final double orbitRadius;
+        private final double bandHalfWidth;
+        private final double hitRadius;
         private final double angularSpeed;
         private final UUID ownerId;
         private final long expiryTick;
@@ -416,11 +437,14 @@ public final class EarthChaosSunderManager {
         private long nextVisualSpawnTick;
 
         private ActiveSunderField(Vec3d orbitCenter, Vec3d position, double orbitAngle, double orbitRadius,
-                                  double angularSpeed, UUID ownerId, long expiryTick, int frameLevel) {
+                                  double bandHalfWidth, double hitRadius, double angularSpeed, UUID ownerId,
+                                  long expiryTick, int frameLevel) {
             this.orbitCenter = orbitCenter;
             this.position = position;
             this.orbitAngle = orbitAngle;
             this.orbitRadius = orbitRadius;
+            this.bandHalfWidth = bandHalfWidth;
+            this.hitRadius = hitRadius;
             this.angularSpeed = angularSpeed;
             this.direction = new Vec3d(-Math.sin(orbitAngle), 0.0, Math.cos(orbitAngle));
             this.ownerId = ownerId;

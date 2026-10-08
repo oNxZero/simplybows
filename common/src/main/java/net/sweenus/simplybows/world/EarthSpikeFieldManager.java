@@ -5,6 +5,7 @@ import net.minecraft.entity.LivingEntity;
 import net.minecraft.block.Blocks;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
+import net.minecraft.entity.projectile.ProjectileEntity;
 import net.minecraft.particle.BlockStateParticleEffect;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
@@ -19,9 +20,11 @@ import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.entity.EarthSpikeVisualEntity;
+import net.sweenus.simplybows.entity.IceChaosWallVisualEntity;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
+import net.sweenus.simplybows.util.GraceProjectile;
 import net.sweenus.simplybows.util.NetworkCompat;
 
 import java.util.ArrayList;
@@ -43,14 +46,31 @@ public final class EarthSpikeFieldManager {
     private static final double SPIKE_SEGMENT_HEIGHT = 0.34;
     private static final double START_DEPTH = 3.2;
     private static final double BASE_GROUND_OFFSET = -0.18;
-    private static final int PAIN_STAR_RAYS = 8;
-    private static final int PAIN_WAVE_STEP_TICKS = 1;
-    private static final double PAIN_WAVE_DAMAGE_RADIUS = 0.8;
+    private static final int PAIN_FISSURE_STEPS = 9; // ~+2 blocks travel
+    private static final double PAIN_FISSURE_STEP = 0.95;
+    private static final double PAIN_FISSURE_HIT_RADIUS = 3.15; // +2 blocks wider
     private static final double BOUNTY_CENTER_KNOCKBACK_BASE_MULTIPLIER = 0.55;
     private static final double BOUNTY_CENTER_KNOCKBACK_PROXIMITY_MULTIPLIER = 0.35;
     private static final double BOUNTY_MAX_KNOCKUP = 0.55;
-    private static final float PAIN_WAVE_DAMAGE_SCALE = 0.28F;
+    private static final int BOUNTY_PULSE_COUNT = 3;
+    private static final int BOUNTY_PULSE_GAP_TICKS = 10; // 0.5s between pulses
+    private static final int GRACE_WALL_BASE_DURATION_TICKS = 120; // 6s base (+3s vs old)
+    private static final int GRACE_WALL_DURATION_PER_FRAME = 20; // Frame = duration
+    private static final int GRACE_WALL_COOLDOWN_MULTIPLIER = 3; // longer CD for balance
+    private static final int GRACE_RISE_TICKS = 6;
+    private static final int GRACE_SINK_TICKS = 10;
+    private static final double GRACE_WALL_THICKNESS = 1.45;
+    private static final float GRACE_WALL_HEIGHT = 2.85F;
+    private static final double GRACE_BASE_RADIUS = 2.75;
+    private static final double GRACE_RADIUS_PER_STRING = 0.28; // String5 ≈ 4.15, not 9+
+    private static final double GRACE_FORWARD_SCALE = 1.15; // oval depth
+    private static final double GRACE_SIDE_SCALE = 1.08; // wider oval
+    private static final double GRACE_ARC_HALF = Math.PI * 0.62; // ~112° wrap
+    private static final double GRACE_SEGMENT_HALF_WIDTH = 0.55;
+    private static final int GRACE_ABSORPTION_AMPLIFIER = 2; // Absorption III
+    private static final int GRACE_ABSORPTION_TICKS = 120; // 6s
     private static final String SPIKE_VISUAL_TAG = "simplybows_earth_spike_visual";
+    private static final String GRACE_WALL_VISUAL_TAG = "simplybows_earth_grace_wall_visual";
 
     private static double fieldRadius() { return SimplyBowsConfig.INSTANCE.tremorstrike.fieldRadius.get(); }
     private static float spikeDamage() { return SimplyBowsConfig.INSTANCE.tremorstrike.spikeDamage.get(); }
@@ -80,10 +100,18 @@ public final class EarthSpikeFieldManager {
     }
 
     public static void createOrReplaceField(ServerWorld world, Vec3d center, Entity owner) {
-        createOrReplaceField(world, center, owner, BowUpgradeData.none());
+        createOrReplaceField(world, center, owner, BowUpgradeData.none(), null);
     }
 
     public static void createOrReplaceField(ServerWorld world, Vec3d center, Entity owner, BowUpgradeData upgrades) {
+        createOrReplaceField(world, center, owner, upgrades, null);
+    }
+
+    public static void createOrReplaceField(ServerWorld world, Vec3d center, Entity owner, BowUpgradeData upgrades, Vec3d impactDirection) {
+        createOrReplaceField(world, center, owner, upgrades, impactDirection, null);
+    }
+
+    public static void createOrReplaceField(ServerWorld world, Vec3d center, Entity owner, BowUpgradeData upgrades, Vec3d impactDirection, LivingEntity hitTarget) {
         List<ActiveSpikeField> fields = ACTIVE_FIELDS.computeIfAbsent(world, w -> new ArrayList<>());
         UUID ownerId = owner != null ? owner.getUuid() : null;
         if (ownerId != null && !isFieldReady(world, ownerId, fields)) {
@@ -92,17 +120,35 @@ public final class EarthSpikeFieldManager {
 
         long now = world.getTime();
         FieldTuning tuning = buildTuning(upgrades);
-        List<SpikePoint> points = buildPatchPoints(world, center, tuning);
-        int painTravelTicks = tuning.outwardPainWaves() ? getPainWaveMaxSteps(tuning) * PAIN_WAVE_STEP_TICKS : 0;
-        ActiveSpikeField field = new ActiveSpikeField(center, now, now + FIELD_DURATION_TICKS + painTravelTicks, ownerId, tuning);
-        spawnSpikeVisuals(world, field, points);
+        Vec3d fissureDir = resolveFissureDirection(impactDirection, owner);
+        int bountyExtra = tuning.bountyCenterSpike()
+                ? (BOUNTY_PULSE_COUNT - 1) * (FIELD_DURATION_TICKS + BOUNTY_PULSE_GAP_TICKS)
+                : 0;
+        int painExtra = tuning.directedFissure() ? PAIN_FISSURE_STEPS : 0;
+        int graceWallTicks = GRACE_WALL_BASE_DURATION_TICKS + Math.max(0, upgrades.frameLevel()) * GRACE_WALL_DURATION_PER_FRAME;
+        int lifetime = tuning.graceSupport() ? graceWallTicks : FIELD_DURATION_TICKS + bountyExtra + painExtra;
+        ActiveSpikeField field = new ActiveSpikeField(center, now, now + lifetime, ownerId, tuning, fissureDir);
+        if (tuning.directedFissure()) {
+            spawnPainFissureVisuals(world, field);
+        } else if (tuning.graceSupport()) {
+            spawnGraceDripstoneRing(world, field);
+        } else {
+            List<SpikePoint> points = buildPatchPoints(world, center, tuning);
+            spawnSpikeVisuals(world, field, points);
+            if (tuning.bountyCenterSpike()) {
+                spawnBountyCenterSpikeVisuals(world, field);
+            }
+        }
         if (tuning.bountyCenterSpike()) {
-            spawnBountyCenterSpikeVisuals(world, field);
+            field.bountyPulsesRemaining = BOUNTY_PULSE_COUNT - 1;
+            field.nextBountyPulseTick = now + FIELD_DURATION_TICKS + BOUNTY_PULSE_GAP_TICKS;
         }
         fields.add(field);
         if (ownerId != null) {
-            int effectTicks = FIELD_DURATION_TICKS + painTravelTicks;
-            int lockoutTicks = RuneUseCooldown.fromEffectDuration(effectTicks);
+            // Grace: ~2× wall duration CD (was 3× — too punishing after Absorption buff).
+            int lockoutTicks = tuning.graceSupport()
+                    ? Math.max(160, graceWallTicks * 2)
+                    : Math.max(fieldLockoutTicks(), RuneUseCooldown.fromEffectDuration(lifetime));
             CooldownStorage.forWorld(FIELD_LOCKOUTS_BY_SERVER, world)
                     .put(ownerId, now + lockoutTicks);
             RuneUseCooldown.start(world, ownerId, "earth-field", "earth", lockoutTicks);
@@ -110,15 +156,11 @@ public final class EarthSpikeFieldManager {
 
         LivingEntity ownerEntity = getOwnerEntity(world, ownerId);
         if (tuning.graceSupport()) {
-            // Support-only: no hostile spike damage / knockback on Grace.
-            applyGraceAllySupport(world, ownerEntity, center, tuning);
+            applyGraceAllySupport(world, ownerEntity, center, tuning, hitTarget);
         } else if (tuning.bountyCenterSpike()) {
-            // Bounty: center impact only (no double knockup from the base field).
             applyBountyCenterImpact(world, ownerEntity, center, tuning);
-        } else if (tuning.outwardPainWaves()) {
-            // Pain: light initial tap, then waves carry most of the damage.
-            applySpikeDamage(world, ownerEntity, center, tuning.radius(), tuning.damage() * 0.45F, Math.min(0.18, tuning.upwardKnockback()));
-            initializePainWaves(field, now);
+        } else if (tuning.directedFissure()) {
+            applyPainFissure(world, ownerEntity, field);
         } else {
             applySpikeDamage(world, ownerEntity, center, tuning.radius(), tuning.damage(), tuning.upwardKnockback());
         }
@@ -150,8 +192,14 @@ public final class EarthSpikeFieldManager {
         }
 
         for (ActiveSpikeField field : fields) {
-            tickPainWaves(world, field);
-            animateField(world, field);
+            tickBountyPulses(world, field);
+            if (field.tuning().graceSupport()) {
+                animateGraceWall(world, field);
+                blockGraceRing(world, field);
+                spawnGraceGroundMarker(world, field);
+            } else {
+                animateField(world, field);
+            }
         }
     }
 
@@ -204,8 +252,8 @@ public final class EarthSpikeFieldManager {
             }
 
             double proximity = 1.0 - MathHelper.clamp(dist / centerRadius, 0.0, 1.0);
-            // Already halved once; strip another 40% (×0.6 → net ×0.3 of base field damage).
-            float scaledDamage = tuning.damage() * 0.3F
+            // Per-pulse damage — three pulses make this stronger than a single base field.
+            float scaledDamage = tuning.damage() * 0.55F
                     * (bountyCenterDamageBaseMultiplier() + (float) (proximity * bountyCenterDamageProximityMultiplier()));
             boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, scaledDamage, false, false);
             if (damaged) {
@@ -217,7 +265,7 @@ public final class EarthSpikeFieldManager {
         }
     }
 
-    private static void applyGraceAllySupport(ServerWorld world, LivingEntity owner, Vec3d center, FieldTuning tuning) {
+    private static void applyGraceAllySupport(ServerWorld world, LivingEntity owner, Vec3d center, FieldTuning tuning, LivingEntity hitTarget) {
         if (owner == null) {
             return;
         }
@@ -235,6 +283,16 @@ public final class EarthSpikeFieldManager {
             applyUpwardKnockback(candidate, tuning.upwardKnockback());
             candidate.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, graceResistanceDurationTicks(), 0), owner);
             candidate.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOW_FALLING, graceSlowFallingDurationTicks(), 0), owner);
+        }
+
+        LivingEntity absorbTarget = hitTarget != null && hitTarget.isAlive() && GraceProjectile.isSupportTarget(hitTarget)
+                ? hitTarget
+                : owner;
+        if (absorbTarget != null && absorbTarget.isAlive()) {
+            absorbTarget.addStatusEffect(
+                    new StatusEffectInstance(StatusEffects.ABSORPTION, GRACE_ABSORPTION_TICKS, GRACE_ABSORPTION_AMPLIFIER),
+                    owner
+            );
         }
     }
 
@@ -262,12 +320,18 @@ public final class EarthSpikeFieldManager {
     private static FieldTuning buildTuning(BowUpgradeData upgrades) {
         double sizeMultiplier = upgrades.sizeMultiplier();
         float damage = (float) (spikeDamage() * upgrades.damageMultiplier());
-        boolean painWaves = upgrades.runeEtching() == RuneEtching.PAIN;
+        boolean directedFissure = upgrades.runeEtching() == RuneEtching.PAIN;
         boolean graceSupport = upgrades.runeEtching() == RuneEtching.GRACE;
         boolean bountyCenterSpike = upgrades.runeEtching() == RuneEtching.BOUNTY;
-        double radius = fieldRadius() * sizeMultiplier + upgrades.stringLevel() * stringRadiusBonusPerLevel();
+        double radius;
+        if (graceSupport) {
+            // String = wall radius only (no global sizeMultiplier stack).
+            radius = GRACE_BASE_RADIUS + upgrades.stringLevel() * GRACE_RADIUS_PER_STRING;
+        } else {
+            radius = fieldRadius() * sizeMultiplier + upgrades.stringLevel() * stringRadiusBonusPerLevel();
+        }
         double visualRadius = PATCH_VISUAL_RADIUS * sizeMultiplier + upgrades.stringLevel() * (stringRadiusBonusPerLevel() * 0.45);
-        double painWaveDistance = Math.min(10.0, painWaveMaxDistance() * 0.65 + upgrades.stringLevel() * stringWaveDistanceBonusPerLevel() * 0.5);
+        double painWaveDistance = Math.min(12.0, painWaveMaxDistance() * 0.85 + upgrades.stringLevel() * stringWaveDistanceBonusPerLevel() * 0.5);
         double upwardKnockback = Math.min(0.55, baseUpwardKnockback() * 0.7 + upgrades.frameLevel() * Math.min(0.06, frameUpwardKnockbackPerLevel()));
         int centerSpikeHeightSegments = bountyCenterBaseHeightSegments() + upgrades.frameLevel() * bountyCenterExtraHeightPerFrame();
         return new FieldTuning(
@@ -275,7 +339,7 @@ public final class EarthSpikeFieldManager {
                 visualRadius,
                 PATCH_VISUAL_POINTS + upgrades.stringLevel() * 5,
                 damage,
-                painWaves,
+                directedFissure,
                 painWaveDistance,
                 upwardKnockback,
                 graceSupport,
@@ -333,42 +397,260 @@ public final class EarthSpikeFieldManager {
         }
     }
 
-    private static void initializePainWaves(ActiveSpikeField field, long now) {
-        for (int i = 0; i < PAIN_STAR_RAYS; i++) {
-            double angle = ((Math.PI * 2.0) / PAIN_STAR_RAYS) * i;
-            Vec3d direction = new Vec3d(Math.cos(angle), 0.0, Math.sin(angle));
-            field.painWaves.add(new PainWaveState(direction, 1, now));
+    private static Vec3d resolveFissureDirection(Vec3d impactDirection, Entity owner) {
+        if (impactDirection != null) {
+            Vec3d horizontal = new Vec3d(impactDirection.x, 0.0, impactDirection.z);
+            if (horizontal.lengthSquared() > 1.0E-6) {
+                return horizontal.normalize();
+            }
+        }
+        if (owner != null) {
+            Vec3d look = owner.getRotationVec(1.0F);
+            Vec3d horizontal = new Vec3d(look.x, 0.0, look.z);
+            if (horizontal.lengthSquared() > 1.0E-6) {
+                return horizontal.normalize();
+            }
+        }
+        return new Vec3d(1.0, 0.0, 0.0);
+    }
+
+    private static void spawnPainFissureVisuals(ServerWorld world, ActiveSpikeField field) {
+        Vec3d dir = field.fissureDirection;
+        for (int step = 0; step <= PAIN_FISSURE_STEPS; step++) {
+            Vec3d pos = field.center().add(dir.multiply(step * PAIN_FISSURE_STEP));
+            double y = findGroundTopY(world, pos.x, pos.z, field.center().y) + BASE_GROUND_OFFSET;
+            int heightSegments = 4 + (step % 3) * 2;
+            spawnSpikeVisual(world, field, pos.x, y, pos.z, heightSegments, world.getTime() + step);
+            // Wider trench (+~2 blocks) so Pain reads as a corridor, not a pole line.
+            Vec3d side = new Vec3d(-dir.z, 0.0, dir.x).multiply(2.55);
+            spawnSpikeVisual(world, field, pos.x + side.x, findGroundTopY(world, pos.x + side.x, pos.z + side.z, field.center().y) + BASE_GROUND_OFFSET, pos.z + side.z, Math.max(3, heightSegments - 2), world.getTime() + step);
+            spawnSpikeVisual(world, field, pos.x - side.x, findGroundTopY(world, pos.x - side.x, pos.z - side.z, field.center().y) + BASE_GROUND_OFFSET, pos.z - side.z, Math.max(3, heightSegments - 2), world.getTime() + step);
+            Vec3d mid = side.multiply(0.5);
+            spawnSpikeVisual(world, field, pos.x + mid.x, findGroundTopY(world, pos.x + mid.x, pos.z + mid.z, field.center().y) + BASE_GROUND_OFFSET, pos.z + mid.z, Math.max(3, heightSegments - 1), world.getTime() + step);
+            spawnSpikeVisual(world, field, pos.x - mid.x, findGroundTopY(world, pos.x - mid.x, pos.z - mid.z, field.center().y) + BASE_GROUND_OFFSET, pos.z - mid.z, Math.max(3, heightSegments - 1), world.getTime() + step);
         }
     }
 
-    private static void tickPainWaves(ServerWorld world, ActiveSpikeField field) {
-        if (!field.tuning().outwardPainWaves() || field.painWaves.isEmpty()) {
-            return;
-        }
+    /** Half-oval dripstone wall — segment planes block like frost wall. */
+    private static void spawnGraceDripstoneRing(ServerWorld world, ActiveSpikeField field) {
+        double radius = Math.max(GRACE_BASE_RADIUS, field.tuning().radius());
+        double forwardR = radius * GRACE_FORWARD_SCALE;
+        double sideR = radius * GRACE_SIDE_SCALE;
+        Vec3d facing = field.fissureDirection;
+        double facingAngle = Math.atan2(facing.z, facing.x);
+        double fx = Math.cos(facingAngle);
+        double fz = Math.sin(facingAngle);
+        double sx = -fz;
+        double sz = fx;
+        int segments = Math.max(16, (int) Math.round((forwardR + sideR) * 2.6));
+        field.graceSegments.clear();
+        for (int i = 0; i < segments; i++) {
+            double t = segments <= 1 ? 0.5 : i / (double) (segments - 1);
+            double ang = -GRACE_ARC_HALF + (GRACE_ARC_HALF * 2.0) * t;
+            double localF = forwardR * Math.cos(ang);
+            double localS = sideR * Math.sin(ang);
+            double x = field.center().x + fx * localF + sx * localS;
+            double z = field.center().z + fz * localF + sz * localS;
+            double y = findGroundTopY(world, x, z, field.center().y);
+            // Outward radial normal in world XZ (ice-wall style plane).
+            double ox = x - field.center().x;
+            double oz = z - field.center().z;
+            double olen = Math.sqrt(ox * ox + oz * oz);
+            Vec3d outward = olen > 1.0E-4 ? new Vec3d(ox / olen, 0.0, oz / olen) : new Vec3d(fx, 0.0, fz);
+            Vec3d tangent = new Vec3d(-outward.z, 0.0, outward.x);
+            field.graceSegments.add(new GraceSegment(new Vec3d(x, y, z), outward, tangent));
 
-        int maxSteps = getPainWaveMaxSteps(field.tuning());
-        field.painWaves.removeIf(wave -> {
-            if (world.getTime() < wave.nextSpawnTick()) {
-                return false;
+            IceChaosWallVisualEntity visual = new IceChaosWallVisualEntity(world, x, y, z, GRACE_WALL_HEIGHT);
+            visual.setDripstoneStyle(true);
+            float yaw = (float) (Math.atan2(outward.x, outward.z) * (180.0 / Math.PI));
+            visual.setYaw(yaw);
+            visual.prevYaw = yaw;
+            visual.addCommandTag(GRACE_WALL_VISUAL_TAG);
+            if (world.spawnEntity(visual)) {
+                field.visuals.add(new SpikeVisual(visual.getUuid(), x, y, z, world.getTime()));
             }
-            if (wave.nextStep() > maxSteps) {
+        }
+        world.playSound(null, field.center().x, field.center().y, field.center().z,
+                SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 1.0F, 0.65F);
+        world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.DRIPSTONE_BLOCK.getDefaultState()),
+                field.center().x, field.center().y + 0.4, field.center().z, 28, sideR * 0.55, 0.6, forwardR * 0.35, 0.02);
+    }
+
+    private static void animateGraceWall(ServerWorld world, ActiveSpikeField field) {
+        long age = world.getTime() - field.spawnTick();
+        long remaining = field.expiryTick() - world.getTime();
+        float rise = MathHelper.clamp((float) age / (float) GRACE_RISE_TICKS, 0.0F, 1.0F);
+        float sink = remaining <= GRACE_SINK_TICKS
+                ? MathHelper.clamp((float) remaining / (float) GRACE_SINK_TICKS, 0.0F, 1.0F)
+                : 1.0F;
+        float scale = Math.min(rise, sink);
+
+        field.visuals.removeIf(visual -> {
+            Entity entity = world.getEntity(visual.id());
+            if (!(entity instanceof IceChaosWallVisualEntity wallVisual)) {
                 return true;
             }
-
-            double distance = wave.nextStep() * painWaveStepDistance();
-            Vec3d pos = field.center().add(wave.direction().multiply(distance));
-            double y = findGroundTopY(world, pos.x, pos.z, field.center().y) + BASE_GROUND_OFFSET;
-            int heightSegments = 2 + (wave.nextStep() % 4);
-            spawnSpikeVisual(world, field, pos.x, y, pos.z, heightSegments, world.getTime());
-            damageAtWaveStep(world, field, getOwnerEntity(world, field.ownerId()), pos.x, y, pos.z,
-                    field.tuning().damage() * painWaveDamageMultiplier() * PAIN_WAVE_DAMAGE_SCALE);
-            world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.POINTED_DRIPSTONE.getDefaultState()), pos.x, y + 0.2, pos.z, 3, 0.1, 0.08, 0.1, 0.005);
-            world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.DRIPSTONE_BLOCK.getDefaultState()), pos.x, y + 0.15, pos.z, 5, 0.16, 0.08, 0.16, 0.01);
-            world.playSound(null, pos.x, y, pos.z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.45F, 1.05F + world.random.nextFloat() * 0.15F);
-
-            wave.advance(PAIN_WAVE_STEP_TICKS);
-            return wave.nextStep() > maxSteps;
+            wallVisual.setPos(visual.baseX(), visual.baseY(), visual.baseZ());
+            wallVisual.setHeightScale(scale);
+            return false;
         });
+    }
+
+    /** Block walking/shooting through each dripstone segment (same rules as frost wall). */
+    private static void blockGraceRing(ServerWorld world, ActiveSpikeField field) {
+        if (field.graceSegments.isEmpty()) {
+            return;
+        }
+        double height = GRACE_WALL_HEIGHT;
+        double search = Math.max(field.tuning().radius() * GRACE_FORWARD_SCALE, field.tuning().radius() * GRACE_SIDE_SCALE)
+                + GRACE_WALL_THICKNESS + 2.5;
+        Box box = Box.of(field.center().add(0.0, height * 0.5, 0.0), search * 2.0, height + 1.4, search * 2.0);
+        LivingEntity owner = getOwnerEntity(world, field.ownerId());
+
+        for (Entity entity : world.getEntitiesByClass(Entity.class, box,
+                e -> e.isAlive() && !e.isRemoved()
+                        && !(e instanceof EarthSpikeVisualEntity)
+                        && !(e instanceof IceChaosWallVisualEntity)
+                        && !(e instanceof ProjectileEntity))) {
+            // Only owner-friendlies pass — enemy players must be blocked.
+            if (owner != null && entity instanceof LivingEntity living && CombatTargeting.isFriendlyTo(living, owner)) {
+                continue;
+            }
+            for (GraceSegment seg : field.graceSegments) {
+                if (pushOffGraceSegment(world, entity, seg, height)) {
+                    break;
+                }
+            }
+        }
+
+        for (ProjectileEntity projectile : world.getEntitiesByClass(ProjectileEntity.class, box, p -> p.isAlive() && !p.isRemoved())) {
+            for (GraceSegment seg : field.graceSegments) {
+                if (isInsideGraceSegment(projectile.getPos(), projectile.getBoundingBox(), seg, height)
+                        || isInsideGraceSegment(new Vec3d(projectile.prevX, projectile.prevY, projectile.prevZ), projectile.getBoundingBox(), seg, height)) {
+                    world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.DRIPSTONE_BLOCK.getDefaultState()),
+                            projectile.getX(), projectile.getY(), projectile.getZ(), 8, 0.12, 0.12, 0.12, 0.01);
+                    projectile.discard();
+                    break;
+                }
+            }
+        }
+    }
+
+    private static boolean isInsideGraceSegment(Vec3d pos, Box box, GraceSegment seg, double height) {
+        Vec3d rel = pos.subtract(seg.pos);
+        double lateral = Math.abs(rel.dotProduct(seg.tangent));
+        double halfExtentLateral = getHorizontalHalfExtent(box, seg.tangent) + 0.12;
+        if (lateral > GRACE_SEGMENT_HALF_WIDTH + halfExtentLateral) {
+            return false;
+        }
+        if (box.maxY < seg.pos.y - 0.15 || box.minY > seg.pos.y + height) {
+            return false;
+        }
+        double normalPadding = getHorizontalHalfExtent(box, seg.outward) + 0.08;
+        double distToPlane = Math.abs(rel.dotProduct(seg.outward));
+        return distToPlane <= GRACE_WALL_THICKNESS + normalPadding;
+    }
+
+    private static boolean pushOffGraceSegment(ServerWorld world, Entity entity, GraceSegment seg, double height) {
+        if (!isInsideGraceSegment(entity.getPos(), entity.getBoundingBox(), seg, height)) {
+            return false;
+        }
+        double side = seg.outward.dotProduct(entity.getPos().subtract(seg.pos));
+        double sideSign;
+        if (side > 1.0E-4) {
+            sideSign = 1.0;
+        } else if (side < -1.0E-4) {
+            sideSign = -1.0;
+        } else {
+            sideSign = entity.getVelocity().dotProduct(seg.outward) >= 0.0 ? 1.0 : -1.0;
+        }
+        double halfExtent = getHorizontalHalfExtent(entity.getBoundingBox(), seg.outward);
+        double allowed = GRACE_WALL_THICKNESS + halfExtent;
+        double penetration = allowed - Math.abs(side);
+        if (penetration <= 0.0) {
+            return false;
+        }
+        Vec3d corrected = entity.getPos().add(seg.outward.multiply(sideSign * (penetration + 0.04)));
+        if (entity instanceof ServerPlayerEntity player) {
+            player.networkHandler.requestTeleport(corrected.x, corrected.y, corrected.z, player.getYaw(), player.getPitch());
+        } else {
+            entity.requestTeleport(corrected.x, corrected.y, corrected.z);
+        }
+        Vec3d vel = entity.getVelocity();
+        double normalComponent = vel.dotProduct(seg.outward);
+        if (sideSign * normalComponent < 0.0) {
+            entity.setVelocity(vel.subtract(seg.outward.multiply(normalComponent)));
+            entity.velocityDirty = true;
+            if (entity instanceof ServerPlayerEntity player) {
+                NetworkCompat.sendVelocityUpdate(player);
+            }
+        }
+        return true;
+    }
+
+    private static double getHorizontalHalfExtent(Box box, Vec3d axis) {
+        double halfX = (box.maxX - box.minX) * 0.5;
+        double halfZ = (box.maxZ - box.minZ) * 0.5;
+        return Math.abs(axis.x) * halfX + Math.abs(axis.z) * halfZ;
+    }
+
+    private record GraceSegment(Vec3d pos, Vec3d outward, Vec3d tangent) {
+    }
+
+    private static void applyPainFissure(ServerWorld world, LivingEntity owner, ActiveSpikeField field) {
+        Vec3d dir = field.fissureDirection;
+        float damage = field.tuning().damage() * Math.max(0.75F, painWaveDamageMultiplier());
+        for (int step = 0; step <= PAIN_FISSURE_STEPS; step++) {
+            Vec3d pos = field.center().add(dir.multiply(step * PAIN_FISSURE_STEP));
+            Box hitBox = Box.of(pos.add(0.0, 0.35, 0.0), PAIN_FISSURE_HIT_RADIUS * 2.0, 2.2, PAIN_FISSURE_HIT_RADIUS * 2.0);
+            for (LivingEntity candidate : world.getEntitiesByClass(
+                    LivingEntity.class,
+                    hitBox,
+                    entity -> CombatTargeting.isOffensiveTargetCandidate(entity, owner)
+            )) {
+                boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, damage, false, false);
+                if (damaged) {
+                    candidate.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 60, 1), owner);
+                    applyUpwardKnockback(candidate, Math.min(0.22, field.tuning().upwardKnockback() * 0.55));
+                }
+            }
+            world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.POINTED_DRIPSTONE.getDefaultState()), pos.x, pos.y + 0.2, pos.z, 4, 0.18, 0.08, 0.18, 0.005);
+        }
+        world.playSound(null, field.center().x, field.center().y, field.center().z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.9F, 0.7F);
+    }
+
+    private static void tickBountyPulses(ServerWorld world, ActiveSpikeField field) {
+        if (!field.tuning().bountyCenterSpike() || field.bountyPulsesRemaining <= 0) {
+            return;
+        }
+        if (world.getTime() < field.nextBountyPulseTick) {
+            return;
+        }
+        LivingEntity owner = getOwnerEntity(world, field.ownerId());
+        // Reset visuals so spikes push up again.
+        removeField(world, field);
+        field.visuals.clear();
+        List<SpikePoint> points = buildPatchPoints(world, field.center(), field.tuning());
+        spawnSpikeVisuals(world, field, points);
+        spawnBountyCenterSpikeVisuals(world, field);
+        applyBountyCenterImpact(world, owner, field.center(), field.tuning());
+        world.playSound(null, field.center().x, field.center().y, field.center().z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.85F, 0.8F + world.random.nextFloat() * 0.15F);
+        spawnBurstParticles(world, field.center());
+        field.bountyPulsesRemaining--;
+        field.nextBountyPulseTick = world.getTime() + FIELD_DURATION_TICKS + BOUNTY_PULSE_GAP_TICKS;
+    }
+
+    private static void spawnGraceGroundMarker(ServerWorld world, ActiveSpikeField field) {
+        if ((world.getTime() - field.spawnTick()) % 4L != 0L) {
+            return;
+        }
+        double radius = field.tuning().radius();
+        world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.DRIPSTONE_BLOCK.getDefaultState()),
+                field.center().x, field.center().y + 0.05, field.center().z, 6, radius * 0.45, 0.04, radius * 0.45, 0.0);
+        world.spawnParticles(ParticleTypes.ENCHANT,
+                field.center().x, field.center().y + 0.15, field.center().z, 3, radius * 0.4, 0.08, radius * 0.4, 0.0);
+        world.spawnParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
+                field.center().x, field.center().y + 0.02, field.center().z, 2, radius * 0.35, 0.02, radius * 0.35, 0.0);
     }
 
     private static void spawnSpikeVisual(ServerWorld world, ActiveSpikeField field, double x, double y, double z, int heightSegments, long spawnTick) {
@@ -379,31 +661,12 @@ public final class EarthSpikeFieldManager {
         field.visuals.add(new SpikeVisual(visual.getUuid(), x, y, z, spawnTick));
     }
 
-    private static void damageAtWaveStep(ServerWorld world, ActiveSpikeField field, LivingEntity owner, double x, double y, double z, float damage) {
-        Box hitBox = Box.of(new Vec3d(x, y + 0.3, z), PAIN_WAVE_DAMAGE_RADIUS * 2.0, 2.0, PAIN_WAVE_DAMAGE_RADIUS * 2.0);
-        for (LivingEntity candidate : world.getEntitiesByClass(
-                LivingEntity.class,
-                hitBox,
-                entity -> CombatTargeting.isOffensiveTargetCandidate(entity, owner)
-        )) {
-            // Respect iframes so multi-ray waves cannot oneshot.
-            boolean damaged = CombatTargeting.applyDamage(world, owner, candidate, damage, false, false);
-            if (damaged && field.painLaunched.add(candidate.getUuid())) {
-                applyUpwardKnockback(candidate, 0.14);
-            }
-        }
-    }
-
     private static LivingEntity getOwnerEntity(ServerWorld world, UUID ownerId) {
         if (ownerId == null) {
             return null;
         }
         Entity entity = world.getEntity(ownerId);
         return entity instanceof LivingEntity living ? living : null;
-    }
-
-    private static int getPainWaveMaxSteps(FieldTuning tuning) {
-        return Math.max(1, (int) Math.floor(tuning.painWaveDistance() / painWaveStepDistance()));
     }
 
     private static void applyUpwardKnockback(LivingEntity target, double upwardKnockback) {
@@ -492,6 +755,9 @@ public final class EarthSpikeFieldManager {
             if (entity instanceof EarthSpikeVisualEntity && entity.getCommandTags().contains(SPIKE_VISUAL_TAG)) {
                 entity.discard();
             }
+            if (entity instanceof IceChaosWallVisualEntity && entity.getCommandTags().contains(GRACE_WALL_VISUAL_TAG)) {
+                entity.discard();
+            }
         }
     }
 
@@ -501,16 +767,19 @@ public final class EarthSpikeFieldManager {
         private final long expiryTick;
         private final UUID ownerId;
         private final FieldTuning tuning;
+        private final Vec3d fissureDirection;
         private final List<SpikeVisual> visuals = new ArrayList<>();
-        private final List<PainWaveState> painWaves = new ArrayList<>();
-        private final java.util.Set<UUID> painLaunched = new java.util.HashSet<>();
+        private final List<GraceSegment> graceSegments = new ArrayList<>();
+        private int bountyPulsesRemaining;
+        private long nextBountyPulseTick;
 
-        private ActiveSpikeField(Vec3d center, long spawnTick, long expiryTick, UUID ownerId, FieldTuning tuning) {
+        private ActiveSpikeField(Vec3d center, long spawnTick, long expiryTick, UUID ownerId, FieldTuning tuning, Vec3d fissureDirection) {
             this.center = center;
             this.spawnTick = spawnTick;
             this.expiryTick = expiryTick;
             this.ownerId = ownerId;
             this.tuning = tuning;
+            this.fissureDirection = fissureDirection == null ? new Vec3d(1.0, 0.0, 0.0) : fissureDirection;
         }
 
         private Vec3d center() {
@@ -537,41 +806,12 @@ public final class EarthSpikeFieldManager {
     private record SpikeVisual(UUID id, double baseX, double baseY, double baseZ, long spawnTick) {
     }
 
-    private static final class PainWaveState {
-        private final Vec3d direction;
-        private int nextStep;
-        private long nextSpawnTick;
-
-        private PainWaveState(Vec3d direction, int nextStep, long nextSpawnTick) {
-            this.direction = direction;
-            this.nextStep = nextStep;
-            this.nextSpawnTick = nextSpawnTick;
-        }
-
-        private Vec3d direction() {
-            return this.direction;
-        }
-
-        private int nextStep() {
-            return this.nextStep;
-        }
-
-        private long nextSpawnTick() {
-            return this.nextSpawnTick;
-        }
-
-        private void advance(int spawnIntervalTicks) {
-            this.nextStep++;
-            this.nextSpawnTick += spawnIntervalTicks;
-        }
-    }
-
     private record FieldTuning(
             double radius,
             double visualRadius,
             int points,
             float damage,
-            boolean outwardPainWaves,
+            boolean directedFissure,
             double painWaveDistance,
             double upwardKnockback,
             boolean graceSupport,

@@ -18,27 +18,31 @@ import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.util.CombatTargeting;
 import net.sweenus.simplybows.util.GraceProjectile;
 import net.sweenus.simplybows.world.IceChaosWallManager;
+import net.sweenus.simplybows.world.IceFrostBloomManager;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 public class HomingSpectralArrowEntity extends SpectralArrowEntity {
 
-    private static final double HOMING_RADIUS = 16.0; // Radius to detect mobs
-    private static final double HOMING_ACCEL = 0.3; // Strength of homing adjustment
-    private static final int HOMING_START_TICKS = 15; // Delay before arrows begin homing
-    private static final float INITIAL_SPREAD_YAW_RADIANS = 0.90F; // ~20.1 degrees
-    private static final float INITIAL_SPREAD_PITCH_RADIANS = 0.14F; // ~8.0 degrees
-    private static final double START_SPEED = 0.2; // Initial speed cap at spawn
-    private static final double MAX_SPEED = 0.7; // Maximum speed cap over lifetime
-    private static final int SPEED_RAMP_TICKS = 40; // Ticks to ramp from START_SPEED to MAX_SPEED
+    private static final double HOMING_RADIUS = 25.0;
+    private static final double HOMING_ACCEL = 0.55;
+    private static final int HOMING_START_TICKS = 6;
+    private static final float INITIAL_SPREAD_YAW_RADIANS = 0.28F;
+    private static final float INITIAL_SPREAD_PITCH_RADIANS = 0.06F;
+    private static final double START_SPEED = 0.45;
+    private static final double MAX_SPEED = 1.15;
+    private static final int SPEED_RAMP_TICKS = 18;
     private LivingEntity target;
     private boolean initialSpreadApplied;
     private boolean lockSingleTarget;
     private boolean stackingSlowness;
     private boolean chaosWallOnImpact;
+    private boolean painFrostBloom;
+    private boolean bountyFrostBloom;
+    private int frostStringLevel;
+    private int frostFrameLevel;
+    private boolean spawnedFrostBloom;
     private boolean homingEnabled = true;
     private int chaosWallStringLevel;
     private int chaosWallFrameLevel;
@@ -136,42 +140,16 @@ public class HomingSpectralArrowEntity extends SpectralArrowEntity {
                         && (owner == null || CombatTargeting.checkFriendlyFire(entity, owner)));
 
         if (!entities.isEmpty()) {
-            Set<LivingEntity> avoided = new HashSet<>();
-            if (this.getOwner() != null) {
-                for (HomingArrowEntity arrow : getEntityWorld().getEntitiesByClass(
-                        HomingArrowEntity.class, searchBox, arrow -> arrow.getOwner() == this.getOwner())) {
-                    LivingEntity otherTarget = arrow.getTargetEntity();
-                    if (otherTarget != null && otherTarget.isAlive()) {
-                        avoided.add(otherTarget);
-                    }
-                }
-                for (HomingSpectralArrowEntity arrow : getEntityWorld().getEntitiesByClass(
-                        HomingSpectralArrowEntity.class, searchBox, arrow -> arrow != this && arrow.getOwner() == this.getOwner())) {
-                    LivingEntity otherTarget = arrow.getTargetEntity();
-                    if (otherTarget != null && otherTarget.isAlive()) {
-                        avoided.add(otherTarget);
-                    }
-                }
-            }
-
             LivingEntity best = null;
             double bestDist = Double.MAX_VALUE;
             for (LivingEntity entity : entities) {
-                if (avoided.contains(entity)) {
-                    continue;
-                }
                 double dist = this.squaredDistanceTo(entity);
                 if (dist < bestDist) {
                     bestDist = dist;
                     best = entity;
                 }
             }
-            if (best != null) {
-                return best;
-            }
-
-            // Fallback: allow duplicates if not enough unique targets
-            return entities.getFirst();
+            return best;
         }
 
         return null;
@@ -280,23 +258,17 @@ public class HomingSpectralArrowEntity extends SpectralArrowEntity {
     @Override
     protected void onHit(LivingEntity target) {
         if (isGraceSupportProjectile() && GraceProjectile.isSupportTarget(target)) {
-            applyStackingSlow(target);
+            trySpawnGraceSanctuary(target.getPos());
             if (this.getWorld() instanceof ServerWorld serverWorld) {
                 spawnImpactParticles(serverWorld, target);
             }
             this.discard();
             return;
         }
-        // Allow multiple fan arrows to damage in the same tick by clearing invulnerability frames.
-        target.hurtTime = 0;
-        target.timeUntilRegen = 0;
-        applyStackingSlow(target);
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             spawnImpactParticles(serverWorld, target);
         }
         super.onHit(target);
-        target.hurtTime = 0;
-        target.timeUntilRegen = 0;
     }
 
     public boolean isGraceSupportProjectile() {
@@ -305,20 +277,77 @@ public class HomingSpectralArrowEntity extends SpectralArrowEntity {
 
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
-        if (!this.spawnedChaosWall && this.chaosWallOnImpact && this.getWorld() instanceof ServerWorld serverWorld) {
-            IceChaosWallManager.spawnAtImpact(serverWorld, entityHitResult.getPos(), this.getVelocity(), this.getOwner() != null ? this.getOwner().getUuid() : null, this.chaosWallStringLevel, this.chaosWallFrameLevel);
-            this.spawnedChaosWall = true;
+        trySpawnChaosWall(entityHitResult.getPos());
+        trySpawnFrostBloom(entityHitResult.getPos());
+        if (this.isRemoved()) {
+            return;
         }
         super.onEntityHit(entityHitResult);
     }
 
     @Override
     protected void onBlockHit(BlockHitResult blockHitResult) {
-        if (!this.spawnedChaosWall && this.chaosWallOnImpact && this.getWorld() instanceof ServerWorld serverWorld) {
-            IceChaosWallManager.spawnAtImpact(serverWorld, blockHitResult.getPos(), this.getVelocity(), this.getOwner() != null ? this.getOwner().getUuid() : null, this.chaosWallStringLevel, this.chaosWallFrameLevel);
-            this.spawnedChaosWall = true;
+        trySpawnChaosWall(blockHitResult.getPos());
+        trySpawnFrostBloom(blockHitResult.getPos());
+        if (this.isRemoved()) {
+            return;
         }
         super.onBlockHit(blockHitResult);
+    }
+
+    private void trySpawnChaosWall(Vec3d pos) {
+        if (this.spawnedChaosWall || !this.chaosWallOnImpact || !(this.getWorld() instanceof ServerWorld serverWorld)) {
+            return;
+        }
+        IceChaosWallManager.spawnAtImpact(serverWorld, pos, this.getVelocity(),
+                this.getOwner() != null ? this.getOwner().getUuid() : null, this.chaosWallStringLevel, this.chaosWallFrameLevel);
+        this.spawnedChaosWall = true;
+    }
+
+    private void trySpawnFrostBloom(Vec3d pos) {
+        if (this.spawnedFrostBloom || !(this.getWorld() instanceof ServerWorld serverWorld)) {
+            return;
+        }
+        LivingEntity owner = this.getOwner() instanceof LivingEntity living ? living : null;
+        float base = (float) this.getDamage();
+        if (this.painFrostBloom) {
+            IceFrostBloomManager.spawnPainBloom(serverWorld, pos, owner, base, this.frostStringLevel);
+            this.spawnedFrostBloom = true;
+        } else if (this.bountyFrostBloom) {
+            IceFrostBloomManager.spawnBountyBloom(serverWorld, pos, owner, base, this.frostStringLevel, this.frostFrameLevel);
+            this.spawnedFrostBloom = true;
+        } else if (this.stackingSlowness) {
+            trySpawnGraceSanctuary(pos);
+            this.discard();
+        }
+    }
+
+    private void trySpawnGraceSanctuary(Vec3d pos) {
+        if (this.spawnedFrostBloom || !this.stackingSlowness || !(this.getWorld() instanceof ServerWorld serverWorld)) {
+            return;
+        }
+        LivingEntity owner = this.getOwner() instanceof LivingEntity living ? living : null;
+        if (owner == null) {
+            return;
+        }
+        IceFrostBloomManager.spawnGraceSanctuary(serverWorld, pos, owner, this.frostStringLevel);
+        this.spawnedFrostBloom = true;
+        this.discard();
+    }
+
+    public void setPainFrostBloom(boolean painFrostBloom, int stringLevel) {
+        this.painFrostBloom = painFrostBloom;
+        this.frostStringLevel = stringLevel;
+    }
+
+    public void setBountyFrostBloom(boolean bountyFrostBloom, int stringLevel) {
+        setBountyFrostBloom(bountyFrostBloom, stringLevel, 0);
+    }
+
+    public void setBountyFrostBloom(boolean bountyFrostBloom, int stringLevel, int frameLevel) {
+        this.bountyFrostBloom = bountyFrostBloom;
+        this.frostStringLevel = stringLevel;
+        this.frostFrameLevel = Math.max(0, frameLevel);
     }
 
     LivingEntity getTargetEntity() {
@@ -337,6 +366,10 @@ public class HomingSpectralArrowEntity extends SpectralArrowEntity {
         this.stackingSlowness = stackingSlowness;
     }
 
+    public void setFrostStringLevel(int stringLevel) {
+        this.frostStringLevel = Math.max(0, stringLevel);
+    }
+
     public void setChaosWallOnImpact(boolean chaosWallOnImpact) {
         this.chaosWallOnImpact = chaosWallOnImpact;
     }
@@ -350,16 +383,9 @@ public class HomingSpectralArrowEntity extends SpectralArrowEntity {
         this.chaosWallFrameLevel = Math.max(0, frameLevel);
     }
 
-    private void applyStackingSlow(LivingEntity target) {
-        if (!this.stackingSlowness) {
-            return;
-        }
-        int amplifier = 0;
-        StatusEffectInstance existing = target.getStatusEffect(StatusEffects.SLOWNESS);
-        if (existing != null) {
-            amplifier = Math.min(4, existing.getAmplifier() + 1);
-        }
-        target.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, 80, amplifier), this.getOwner());
+    @Override
+    public void setCritical(boolean critical) {
+        super.setCritical(false);
     }
 
     private static ItemStack sanitizeArrowStack(ItemStack arrowStack) {

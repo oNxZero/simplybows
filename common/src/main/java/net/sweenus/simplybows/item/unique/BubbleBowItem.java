@@ -48,7 +48,9 @@ public class BubbleBowItem extends SimplyBowItem {
                     + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.bubbleveil.chaosLengthStepsPerString.get();
             int stepInterval = Math.max(1, SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveStepIntervalTicks.get());
             BubbleChaosWaveManager.cast(serverWorld, shooter, upgrades);
-            RuneUseCooldown.startForEffect(serverWorld, ownerId, "bubble-chaos", "bubble", Math.max(1, steps) * stepInterval);
+            int effectTicks = Math.max(1, steps) * stepInterval;
+            int cooldownTicks = Math.max(1, (int) Math.round(RuneUseCooldown.fromEffectDuration(effectTicks) * 2.5));
+            RuneUseCooldown.start(serverWorld, ownerId, "bubble-chaos", "bubble", cooldownTicks);
             ItemStack ammoReference = projectiles.isEmpty() ? ItemStack.EMPTY : projectiles.getFirst();
             stack.damage(this.getWeaponStackDamage(ammoReference), shooter, LivingEntity.getSlotForHand(hand));
             return;
@@ -91,7 +93,13 @@ public class BubbleBowItem extends SimplyBowItem {
             arrowEntity = new BubbleArrowEntity(world, shooter, firedArrowStack, weaponStack);
         }
         if (arrowEntity instanceof net.minecraft.entity.projectile.PersistentProjectileEntity persistent) {
-            persistent.setDamage(SimplyBowsConfig.INSTANCE.bubbleveil.baseDamage.get());
+            double damage = SimplyBowsConfig.INSTANCE.bubbleveil.baseDamage.get() * upgrades.damageMultiplier();
+            if (upgrades.runeEtching() == RuneEtching.PAIN && !FORCE_DEFAULT_BUBBLE_ARROW.get()) {
+                // Line volleys stack hard — keep total Pain damage well under a normal shot.
+                int quantity = Math.max(1, upgrades.stringLevel() + 1);
+                damage *= 0.28 / quantity;
+            }
+            persistent.setDamage(damage);
             persistent.setCritical(critical);
         }
         return arrowEntity;

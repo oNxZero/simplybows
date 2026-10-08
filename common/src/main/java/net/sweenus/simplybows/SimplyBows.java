@@ -58,7 +58,20 @@ public final class SimplyBows {
     }
 
     public static void init() {
-        LOGGER.info("Simply Bows config loaded: {}", SimplyBowsConfig.INSTANCE.getId());
+        // Register content first. A bad/outdated config.toml must never prevent item/entity IDs
+        // from existing — that bricks saved worlds with "Unknown registry key" on reload.
+        ComponentRegistry.register();
+        ItemRegistry.ITEM.register();
+        SimplyBowsCreativeTabRegistry.register();
+        EntityRegistry.registerEntities();
+        ParticleRegistry.registerParticles();
+        SimplyBowsCommands.register();
+
+        try {
+            LOGGER.info("Simply Bows config loaded: {}", SimplyBowsConfig.INSTANCE.getId());
+        } catch (Throwable t) {
+            LOGGER.error("Simply Bows config failed to load. Items/entities are still registered; fix or delete config/simplybows/config.toml", t);
+        }
 
         // Wire global ability CD overlay without a class-init cycle.
         RuneUseCooldown.CLIENT_SYNC = (player, ticks) ->
@@ -68,8 +81,6 @@ public final class SimplyBows {
                         System.currentTimeMillis() + (long) ticks * 50L,
                         ticks);
 
-        ComponentRegistry.register();
-        ItemRegistry.ITEM.register();
         PlayerEvent.PLAYER_JOIN.register(player -> {
             if (player.getWorld().isClient()) {
                 return;
@@ -79,10 +90,6 @@ public final class SimplyBows {
                 BowUpgradeData.migrateLegacy(inventory.getStack(slot));
             }
         });
-        SimplyBowsCreativeTabRegistry.register();
-        EntityRegistry.registerEntities();
-        ParticleRegistry.registerParticles();
-        SimplyBowsCommands.register();
         if (Platform.getEnvironment() != Env.CLIENT) {
             NetworkManager.registerS2CPayloadType(AbilityCooldownPayload.ID, AbilityCooldownPayload.CODEC);
         }

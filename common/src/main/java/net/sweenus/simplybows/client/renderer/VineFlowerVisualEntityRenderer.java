@@ -82,6 +82,7 @@ public class VineFlowerVisualEntityRenderer extends EntityRenderer<VineFlowerVis
             case 4 -> Blocks.CHERRY_LOG.getDefaultState();
             case 5 -> Blocks.CHERRY_LEAVES.getDefaultState();
             case 7, 8 -> lichenFace(Direction.UP);
+            case 17 -> Blocks.WITHER_ROSE.getDefaultState();
             default -> Blocks.SHORT_GRASS.getDefaultState();
         };
 

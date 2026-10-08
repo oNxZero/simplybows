@@ -41,9 +41,9 @@ public class BeeBowItem extends SimplyBowItem {
                 && BeeChaosHoneyStormManager.isStormReady(serverWorld, ownerId);
 
         if (chaosStormReady) {
-            int durationTicks = Math.max(20, Math.min(280,
+            int durationTicks = Math.max(100, Math.min(160,
                     SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDurationTicks.get()
-                            + Math.max(0, upgrades.stringLevel()) * Math.min(10, SimplyBowsConfig.INSTANCE.buzzkill.chaosDurationPerStringTicks.get())));
+                            + Math.max(0, upgrades.stringLevel()) * Math.min(8, SimplyBowsConfig.INSTANCE.buzzkill.chaosDurationPerStringTicks.get())));
             simplybows$startAbilityItemCooldown(shooter, RuneUseCooldown.fromEffectDuration(durationTicks));
         }
 
@@ -52,12 +52,12 @@ public class BeeBowItem extends SimplyBowItem {
             if (upgrades.runeEtching() == RuneEtching.PAIN
                     && RuneUseCooldown.isReady(serverWorld, ownerId, "bee-pain")) {
                 int quantity = Math.max(1, upgrades.stringLevel() + 1);
-                // Total fan damage ≈ ~35% of one normal Buzzkill shot when every bee lands.
-                float painDamageScale = 0.35F / quantity;
+                // Total fan damage ≈ ~20% of one normal Buzzkill shot when every bee lands.
+                float painDamageScale = 0.20F / quantity;
                 float painSpeed = Math.min(speed, 0.8F);
                 BeeArrowEntity.setPainHoming(true, painDamageScale);
                 try {
-                    this.shootFan(this, serverWorld, shooter, hand, stack, projectiles, painSpeed, SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), false, target, quantity);
+                    this.shootFan(this, serverWorld, shooter, hand, stack, projectiles, painSpeed, SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), critical, target, quantity);
                 } finally {
                     BeeArrowEntity.setPainHoming(false);
                 }

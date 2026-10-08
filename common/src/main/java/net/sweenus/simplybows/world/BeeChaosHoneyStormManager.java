@@ -30,9 +30,9 @@ public final class BeeChaosHoneyStormManager {
 
     private static final Map<ServerWorld, List<ActiveHoneyStorm>> ACTIVE_STORMS = new HashMap<>();
     private static final Map<MinecraftServer, Map<UUID, Long>> STORM_COOLDOWNS_BY_SERVER = CooldownStorage.newServerScopedStore();
-    private static final double STORM_HEIGHT_OFFSET = 6.0;
+    private static final double STORM_HEIGHT_OFFSET = 4.5;
     private static final long TARGET_HIT_COOLDOWN_TICKS = 10L;
-    private static final int HONEY_FADE_TICKS = 12;
+    private static final int HONEY_FADE_TICKS = 24;
 
     private BeeChaosHoneyStormManager() {
     }
@@ -66,15 +66,15 @@ public final class BeeChaosHoneyStormManager {
             storms.removeIf(storm -> ownerId.equals(storm.ownerId));
         }
 
-        // Hard-cap near 13s so String/Frame cannot stretch the storm into a half-minute zone.
-        int durationTicks = Math.max(20, Math.min(280,
+        // Default 5s storm; String can stretch a little but stays short.
+        int durationTicks = Math.max(100, Math.min(160,
                 SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDurationTicks.get()
-                        + Math.max(0, stringLevel) * Math.min(10, SimplyBowsConfig.INSTANCE.buzzkill.chaosDurationPerStringTicks.get())));
+                        + Math.max(0, stringLevel) * Math.min(8, SimplyBowsConfig.INSTANCE.buzzkill.chaosDurationPerStringTicks.get())));
         double radius = Math.max(1.5, Math.min(7.0,
                 SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseRadius.get()
                         + Math.max(0, stringLevel) * Math.min(0.35, SimplyBowsConfig.INSTANCE.buzzkill.chaosRadiusPerString.get())));
         int diveInterval = Math.max(
-                SimplyBowsConfig.INSTANCE.buzzkill.chaosMinDiveIntervalTicks.get(),
+                16,
                 SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDiveIntervalTicks.get()
                         - Math.max(0, frameLevel) * SimplyBowsConfig.INSTANCE.buzzkill.chaosDiveIntervalReductionPerFrameTicks.get()
         );
@@ -150,7 +150,8 @@ public final class BeeChaosHoneyStormManager {
             storm.nextAuraTick = now + Math.max(1, SimplyBowsConfig.INSTANCE.buzzkill.chaosAuraIntervalTicks.get());
         }
 
-        if (now >= storm.nextDiveTick) {
+        // Keep diving through the whole storm; cloud stays until expiry + fade.
+        if (now >= storm.nextDiveTick && now < storm.expiryTick) {
             triggerDiveBomb(world, storm);
             storm.nextDiveTick = now + storm.diveIntervalTicks;
         }
@@ -245,18 +246,27 @@ public final class BeeChaosHoneyStormManager {
             return;
         }
         double radius = storm.radius * presence;
-        int honeyCount = Math.max(1, Math.round(3.0F * presence));
-        for (int i = 0; i < honeyCount; i++) {
-            double angle = world.random.nextDouble() * Math.PI * 2.0;
-            double distance = MathHelper.lerp(world.random.nextDouble(), radius * 0.1, radius);
+        // Cloud + bees for the full storm lifetime (including fade).
+        world.spawnParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, storm.center.x, storm.center.y, storm.center.z,
+                Math.max(4, Math.round(10.0F * presence)), radius * 0.45, 0.22, radius * 0.45, 0.008);
+        world.spawnParticles(ParticleTypes.FALLING_HONEY, storm.center.x, storm.center.y - 0.3, storm.center.z,
+                Math.max(2, Math.round(6.0F * presence)), radius * 0.4, 0.25, radius * 0.4, 0.0);
+        int beeSparks = Math.max(4, Math.round(8.0F * presence));
+        for (int i = 0; i < beeSparks; i++) {
+            double angle = (world.getTime() * 0.28) + (Math.PI * 2.0 / beeSparks) * i;
+            double distance = radius * (0.25 + world.random.nextDouble() * 0.55);
             double x = storm.center.x + Math.cos(angle) * distance;
             double z = storm.center.z + Math.sin(angle) * distance;
-            double y = storm.groundY + 0.12 + world.random.nextDouble() * 0.35 * presence;
+            double midY = storm.groundY + 1.2 + (storm.center.y - storm.groundY) * 0.35;
+            double y = midY + Math.sin(angle * 2.0 + world.getTime() * 0.15) * 0.45;
+            world.spawnParticles(ParticleTypes.CRIT, x, y, z, 2, 0.03, 0.03, 0.03, 0.0);
             world.spawnParticles(ParticleTypes.WAX_ON, x, y, z, 1, 0.02, 0.02, 0.02, 0.0);
+            if ((i & 1) == 0) {
+                world.spawnParticles(ParticleTypes.POOF, x, y, z, 1, 0.04, 0.04, 0.04, 0.0);
+            }
         }
-        if (world.getTime() % 3L == 0L) {
-            world.spawnParticles(ParticleTypes.POOF, storm.center.x, storm.groundY + 0.2, storm.center.z, Math.max(1, Math.round(3.0F * presence)), radius * 0.35, 0.05, radius * 0.35, 0.0);
-        }
+        world.spawnParticles(ParticleTypes.POOF, storm.center.x, storm.groundY + 0.25, storm.center.z,
+                Math.max(1, Math.round(3.0F * presence)), radius * 0.35, 0.06, radius * 0.35, 0.0);
     }
 
     private static LivingEntity findRandomHostileInStorm(ServerWorld world, ActiveHoneyStorm storm, LivingEntity owner) {

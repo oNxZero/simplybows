@@ -98,16 +98,24 @@ public class VineArrowEntity extends ArrowEntity {
             spawnImpactParticles(serverWorld, entityHitResult.getPos());
         }
         trySpawnFlowerField(entityHitResult.getPos());
-        if (playerHit && hit instanceof PlayerEntity player && !player.isSpectator()) {
-            healDirectHit(player);
-            return;
-        }
-        if (golemHit && hit instanceof IronGolemEntity golem) {
-            healDirectHit(golem);
-            return;
-        }
-        if (animalHit && hit instanceof AnimalEntity animal) {
-            healDirectHit(animal);
+        // Direct heals only from a fully drawn shot — no tap-spam healing.
+        if (this.isCritical()) {
+            if (playerHit && hit instanceof PlayerEntity player && !player.isSpectator()) {
+                healDirectHit(player);
+                return;
+            }
+            if (golemHit && hit instanceof IronGolemEntity golem) {
+                healDirectHit(golem);
+                return;
+            }
+            if (animalHit && hit instanceof AnimalEntity animal) {
+                healDirectHit(animal);
+                return;
+            }
+        } else if (playerHit || golemHit || animalHit) {
+            // Partial draws still don't hurt friendlies.
+            this.setDamage(0.0);
+            this.discard();
             return;
         }
         super.onEntityHit(entityHitResult);

@@ -74,6 +74,9 @@ public final class VineFlowerFieldManager {
     private static final int FLOWER_TYPE_GLOW_LICHEN_VERTICAL_WEST_ACTIVE = 14;
     private static final int FLOWER_TYPE_GLOW_LICHEN_VERTICAL_NORTH_ACTIVE = 15;
     private static final int FLOWER_TYPE_GLOW_LICHEN_VERTICAL_SOUTH_ACTIVE = 16;
+    private static final int FLOWER_TYPE_WITHER_ROSE = 17;
+    private static final int BOUNTY_TREE_COUNT = 3;
+    private static final int BOUNTY_DEBUFF_TICKS = 80;
     private static final int MAX_VISUAL_POINTS = 180;
     private static final int FIELD_PULSE_INTERVAL_TICKS = 24;
     private static final int FIELD_PULSE_CUTOFF_TICKS = 80;
@@ -147,15 +150,30 @@ public final class VineFlowerFieldManager {
         }
 
         List<FlowerPoint> pendingPoints = new ArrayList<>();
-        if (tuning.cherryTreeVisual()) {
-            pendingPoints.addAll(buildCherryTreeVisualPoints(world, center));
+        if (tuning.bountyThorns()) {
+            // Three grace-style trees that volley hostiles — not a flower patch.
+            for (Vec3d treeCenter : bountyTreeCenters(center, tuning.fieldRadius())) {
+                pendingPoints.addAll(buildCherryTreeVisualPoints(world, treeCenter));
+            }
+        } else {
+            if (tuning.cherryTreeVisual()) {
+                pendingPoints.addAll(buildCherryTreeVisualPoints(world, center));
+            }
+            pendingPoints.addAll(buildPatchPoints(world, center, tuning.visualPoints(), tuning.visualRadius(), tuning.painMode()));
         }
-        pendingPoints.addAll(buildPatchPoints(world, center, tuning.visualPoints(), tuning.visualRadius()));
         ActiveFlowerField field = new ActiveFlowerField(center, expiryTick, ownerId, tuning, (int) baseDuration);
         field.pendingPoints.addAll(pendingPoints);
+        field.nextAuraTick = world.getTime(); // first pulse immediately
         fields.add(field);
         playFieldCreationSound(world, center);
         spawnBurstParticles(world, center, tuning);
+        if (tuning.bountyThorns()) {
+            tickBountyTreeVolley(world, field);
+            field.nextAuraTick = world.getTime() + Math.max(5, tuning.auraIntervalTicks());
+        } else if (tuning.damageHostiles() && tuning.hostileDamage() > 0.0F) {
+            applyAuraEffects(world, field);
+            field.nextAuraTick = world.getTime() + Math.max(5, tuning.auraIntervalTicks());
+        }
         if (ownerId != null) {
             int durationTicks = (int) baseDuration;
             int cooldownTicks = RuneUseCooldown.fromEffectDuration(durationTicks);
@@ -217,8 +235,16 @@ public final class VineFlowerFieldManager {
                 healingFields.add(field);
             }
 
-            if (world.getTime() % field.tuning().auraIntervalTicks() == 0L) {
-                applyAuraEffects(world, field);
+            if (world.getTime() >= field.nextAuraTick) {
+                if (field.tuning().bountyThorns()) {
+                    tickBountyTreeVolley(world, field);
+                } else {
+                    applyAuraEffects(world, field);
+                    if (field.tuning().painMode()) {
+                        spawnPainFieldPulse(world, field);
+                    }
+                }
+                field.nextAuraTick = world.getTime() + Math.max(5, field.tuning().auraIntervalTicks());
             }
         }
         if (!healingFields.isEmpty()) {
@@ -825,6 +851,21 @@ public final class VineFlowerFieldManager {
     }
 
     private static void spawnAmbientParticles(ServerWorld world, Vec3d center, FieldTuning tuning) {
+        if (tuning.painMode()) {
+            world.spawnParticles(ParticleTypes.SMOKE, center.x, center.y + 0.2, center.z, 4, tuning.fieldRadius() * 0.5, 0.12, tuning.fieldRadius() * 0.5, 0.0);
+            world.spawnParticles(ParticleTypes.SQUID_INK, center.x, center.y + 0.15, center.z, 2, tuning.fieldRadius() * 0.4, 0.08, tuning.fieldRadius() * 0.4, 0.0);
+            world.spawnParticles(ParticleTypes.ASH, center.x, center.y + 0.25, center.z, 3, tuning.fieldRadius() * 0.45, 0.15, tuning.fieldRadius() * 0.45, 0.0);
+            if (world.getTime() % 3L == 0L) {
+                world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.WITHER_ROSE.getDefaultState()),
+                        center.x, center.y + 0.08, center.z, 5, tuning.fieldRadius() * 0.55, 0.05, tuning.fieldRadius() * 0.55, 0.0);
+            }
+            return;
+        }
+        if (tuning.bountyThorns()) {
+            world.spawnParticles(ParticleTypes.CHERRY_LEAVES, center.x, center.y + 1.8, center.z, 3, tuning.fieldRadius() * 0.4, 0.5, tuning.fieldRadius() * 0.4, 0.0);
+            world.spawnParticles(ParticleTypes.CRIT, center.x, center.y + 1.2, center.z, 1, tuning.fieldRadius() * 0.35, 0.4, tuning.fieldRadius() * 0.35, 0.0);
+            return;
+        }
         world.spawnParticles(ParticleTypes.FALLING_SPORE_BLOSSOM, center.x, center.y + 0.35, center.z, 2, 1.6, 0.2, 1.6, 0.0);
         world.spawnParticles(ParticleTypes.COMPOSTER, center.x, center.y + 0.2, center.z, 2, 1.3, 0.1, 1.3, 0.0);
         spawnGlitterParticles(world, center, tuning);
@@ -834,6 +875,86 @@ public final class VineFlowerFieldManager {
                 world.spawnParticles(ParticleTypes.SPORE_BLOSSOM_AIR, center.x, center.y + 2.2, center.z, 1, 0.28, 0.4, 0.28, 0.0);
             }
         }
+    }
+
+    /** Three cherry trees each volley one hostile with petal bolts + area Blindness/Nausea. */
+    private static void tickBountyTreeVolley(ServerWorld world, ActiveFlowerField field) {
+        Vec3d center = field.center();
+        FieldTuning tuning = field.tuning();
+        LivingEntity owner = getOwnerEntity(world, field.ownerId());
+        List<Vec3d> trees = bountyTreeCenters(center, tuning.fieldRadius());
+        Box box = Box.of(center, tuning.fieldRadius() * 2.0, 6.0, tuning.fieldRadius() * 2.0);
+        List<LivingEntity> hostiles = new ArrayList<>();
+        for (LivingEntity entity : world.getEntitiesByClass(LivingEntity.class, box, LivingEntity::isAlive)) {
+            if (entity.squaredDistanceTo(center) > tuning.fieldRadius() * tuning.fieldRadius()) {
+                continue;
+            }
+            if (!isFlowerFieldMonster(entity)) {
+                continue;
+            }
+            if (owner != null && !CombatTargeting.checkFriendlyFire(entity, owner)) {
+                continue;
+            }
+            hostiles.add(entity);
+            entity.addStatusEffect(new StatusEffectInstance(StatusEffects.BLINDNESS, BOUNTY_DEBUFF_TICKS, 0), owner);
+            entity.addStatusEffect(new StatusEffectInstance(StatusEffects.NAUSEA, BOUNTY_DEBUFF_TICKS, 0), owner);
+        }
+        hostiles.sort((a, b) -> Double.compare(a.squaredDistanceTo(center), b.squaredDistanceTo(center)));
+
+        int shots = Math.min(BOUNTY_TREE_COUNT, Math.max(1, hostiles.size()));
+        for (int i = 0; i < shots; i++) {
+            LivingEntity target = hostiles.get(i % hostiles.size());
+            Vec3d tree = trees.get(i % trees.size());
+            Vec3d from = tree.add(0.0, 2.4, 0.0);
+            Vec3d to = target.getPos().add(0.0, target.getStandingEyeHeight() * 0.6, 0.0);
+            spawnBountyTreeBolt(world, from, to);
+            dealAuraDamage(world, owner, target, tuning.hostileDamage());
+            if (target.getType().isIn(EntityTypeTags.UNDEAD)) {
+                dealAuraDamage(world, owner, target, tuning.undeadBonusDamage());
+            }
+        }
+        if (shots > 0) {
+            world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_CHERRY_LEAVES_BREAK, SoundCategory.PLAYERS, 0.85F, 0.85F);
+            world.playSound(null, center.x, center.y, center.z, SoundEvents.ENTITY_BREEZE_SHOOT, SoundCategory.PLAYERS, 0.35F, 1.4F);
+        }
+    }
+
+    private static List<Vec3d> bountyTreeCenters(Vec3d center, double fieldRadius) {
+        List<Vec3d> trees = new ArrayList<>(BOUNTY_TREE_COUNT);
+        double ring = Math.max(1.1, fieldRadius * 0.38);
+        for (int i = 0; i < BOUNTY_TREE_COUNT; i++) {
+            double ang = (Math.PI * 2.0 / BOUNTY_TREE_COUNT) * i - Math.PI / 6.0;
+            trees.add(new Vec3d(center.x + Math.cos(ang) * ring, center.y, center.z + Math.sin(ang) * ring));
+        }
+        return trees;
+    }
+
+    private static void spawnBountyTreeBolt(ServerWorld world, Vec3d from, Vec3d to) {
+        Vec3d delta = to.subtract(from);
+        int steps = Math.max(6, (int) Math.round(delta.length() * 3.0));
+        for (int i = 0; i <= steps; i++) {
+            double t = i / (double) steps;
+            double x = MathHelper.lerp(t, from.x, to.x);
+            double y = MathHelper.lerp(t, from.y, to.y);
+            double z = MathHelper.lerp(t, from.z, to.z);
+            world.spawnParticles(ParticleTypes.CHERRY_LEAVES, x, y, z, 1, 0.02, 0.02, 0.02, 0.0);
+            if (i % 2 == 0) {
+                world.spawnParticles(ParticleTypes.CRIT, x, y, z, 1, 0.0, 0.0, 0.0, 0.0);
+            }
+        }
+        world.spawnParticles(ParticleTypes.CRIT, to.x, to.y, to.z, 8, 0.15, 0.2, 0.15, 0.02);
+        world.spawnParticles(ParticleTypes.DAMAGE_INDICATOR, to.x, to.y, to.z, 3, 0.1, 0.15, 0.1, 0.0);
+    }
+
+    private static void spawnPainFieldPulse(ServerWorld world, ActiveFlowerField field) {
+        Vec3d center = field.center();
+        double radius = field.tuning().fieldRadius();
+        world.spawnParticles(ParticleTypes.SQUID_INK, center.x, center.y + 0.25, center.z, 12, radius * 0.45, 0.2, radius * 0.45, 0.0);
+        world.spawnParticles(ParticleTypes.SMOKE, center.x, center.y + 0.2, center.z, 14, radius * 0.5, 0.15, radius * 0.5, 0.0);
+        world.spawnParticles(ParticleTypes.ASH, center.x, center.y + 0.3, center.z, 10, radius * 0.45, 0.2, radius * 0.45, 0.0);
+        world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.WITHER_ROSE.getDefaultState()),
+                center.x, center.y + 0.1, center.z, 18, radius * 0.55, 0.12, radius * 0.55, 0.02);
+        world.playSound(null, center.x, center.y, center.z, SoundEvents.ENTITY_WITHER_AMBIENT, SoundCategory.PLAYERS, 0.2F, 1.55F);
     }
 
     private static void spawnGlitterParticles(ServerWorld world, Vec3d center, FieldTuning tuning) {
@@ -879,15 +1000,24 @@ public final class VineFlowerFieldManager {
     }
 
     private static void spawnBurstParticles(ServerWorld world, Vec3d center, FieldTuning tuning) {
+        if (tuning.painMode()) {
+            world.spawnParticles(ParticleTypes.SQUID_INK, center.x, center.y + 0.2, center.z, 16, 1.0, 0.2, 1.0, 0.0);
+            world.spawnParticles(ParticleTypes.SMOKE, center.x, center.y + 0.15, center.z, 18, 1.0, 0.15, 1.0, 0.0);
+            world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.WITHER_ROSE.getDefaultState()), center.x, center.y + 0.1, center.z, 20, 1.0, 0.12, 1.0, 0.02);
+            return;
+        }
+        if (tuning.bountyThorns() || tuning.cherryTreeVisual()) {
+            world.spawnParticles(ParticleTypes.CHERRY_LEAVES, center.x, center.y + 1.5, center.z, 36, 0.9, 1.0, 0.9, 0.01);
+            world.spawnParticles(ParticleTypes.SPORE_BLOSSOM_AIR, center.x, center.y + 1.2, center.z, 20, 0.8, 0.8, 0.8, 0.0);
+            world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.CHERRY_LEAVES.getDefaultState()), center.x, center.y + 1.0, center.z, 16, 0.75, 0.6, 0.75, 0.01);
+            if (tuning.bountyThorns()) {
+                return;
+            }
+        }
         world.spawnParticles(ParticleTypes.COMPOSTER, center.x, center.y + 0.2, center.z, 10, 0.9, 0.15, 0.9, 0.0);
         world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.SHORT_GRASS.getDefaultState()), center.x, center.y + 0.1, center.z, 10, 0.9, 0.1, 0.9, 0.015);
         world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.DANDELION.getDefaultState()), center.x, center.y + 0.15, center.z, 4, 0.8, 0.12, 0.8, 0.015);
         world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.POPPY.getDefaultState()), center.x, center.y + 0.15, center.z, 4, 0.8, 0.12, 0.8, 0.015);
-        if (tuning.cherryTreeVisual()) {
-            world.spawnParticles(ParticleTypes.CHERRY_LEAVES, center.x, center.y + 1.5, center.z, 36, 0.9, 1.0, 0.9, 0.01);
-            world.spawnParticles(ParticleTypes.SPORE_BLOSSOM_AIR, center.x, center.y + 1.2, center.z, 20, 0.8, 0.8, 0.8, 0.0);
-            world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, Blocks.CHERRY_LEAVES.getDefaultState()), center.x, center.y + 1.0, center.z, 16, 0.75, 0.6, 0.75, 0.01);
-        }
     }
 
     private static void playFieldCreationSound(ServerWorld world, Vec3d center) {
@@ -903,7 +1033,7 @@ public final class VineFlowerFieldManager {
         );
     }
 
-    private static List<FlowerPoint> buildPatchPoints(ServerWorld world, Vec3d center, int pointCount, double visualRadius) {
+    private static List<FlowerPoint> buildPatchPoints(ServerWorld world, Vec3d center, int pointCount, double visualRadius, boolean painMode) {
         List<FlowerPoint> points = new ArrayList<>();
         if (pointCount <= 0 || visualRadius <= 0.0) {
             return points;
@@ -917,7 +1047,9 @@ public final class VineFlowerFieldManager {
             double z = center.z + Math.sin(angle) * radius;
             double y = findGroundTopY(world, x, z, center.y) + 0.03;
             int flowerType;
-            if (i % 4 == 0) {
+            if (painMode) {
+                flowerType = FLOWER_TYPE_WITHER_ROSE;
+            } else if (i % 4 == 0) {
                 flowerType = FLOWER_TYPE_DANDELION;
             } else if (i % 5 == 0) {
                 flowerType = FLOWER_TYPE_POPPY;
@@ -944,11 +1076,14 @@ public final class VineFlowerFieldManager {
         boolean damageHostiles = true;
         boolean cleanseNegative = false;
         boolean cherryTreeVisual = false;
+        boolean bountyThorns = false;
+        boolean painMode = false;
         int auraInterval = SimplyBowsConfig.INSTANCE.everbloom.auraIntervalTicks.get();
 
         if (rune == RuneEtching.PAIN) {
             healFriendlies = false;
             damageHostiles = true;
+            painMode = true;
             auraInterval = SimplyBowsConfig.INSTANCE.everbloom.painAuraInterval.get();
         } else if (rune == RuneEtching.GRACE) {
             healFriendlies = true;
@@ -958,12 +1093,13 @@ public final class VineFlowerFieldManager {
             cleanseNegative = true;
             cherryTreeVisual = true;
         } else if (rune == RuneEtching.BOUNTY) {
-            // Combat AOE: no heal, faster pulses, a bit more damage than base (still under Pain DPS).
+            // Three trees volley hostiles. String = radius, Frame = bolt damage.
             healFriendlies = false;
             damageHostiles = true;
             friendlyHeal = 0.0F;
-            hostileDamage *= SimplyBowsConfig.INSTANCE.everbloom.bountyDamageMultiplier.get();
-            undeadBonusDamage *= SimplyBowsConfig.INSTANCE.everbloom.bountyDamageMultiplier.get();
+            bountyThorns = true;
+            hostileDamage = 1.0F + upgrades.frameLevel() * 0.425F;
+            undeadBonusDamage = 0.3F + upgrades.frameLevel() * 0.1F;
             auraInterval = SimplyBowsConfig.INSTANCE.everbloom.bountyAuraInterval.get();
         } else if (rune == RuneEtching.CHAOS) {
             healFriendlies = false;
@@ -1061,7 +1197,9 @@ public final class VineFlowerFieldManager {
                 chaosBurstBaseBuffDuration,
                 chaosBurstBuffDurationPerEnergy,
                 chaosBurstEnergyPerAmplifier,
-                chaosBurstMaxAmplifier
+                chaosBurstMaxAmplifier,
+                bountyThorns,
+                painMode
         );
     }
 
@@ -1197,6 +1335,7 @@ public final class VineFlowerFieldManager {
             case FLOWER_TYPE_DANDELION -> Blocks.DANDELION.getDefaultState();
             case FLOWER_TYPE_POPPY -> Blocks.POPPY.getDefaultState();
             case FLOWER_TYPE_FERN -> Blocks.FERN.getDefaultState();
+            case FLOWER_TYPE_WITHER_ROSE -> Blocks.WITHER_ROSE.getDefaultState();
             case FLOWER_TYPE_CHERRY_LOG -> Blocks.CHERRY_LOG.getDefaultState();
             case FLOWER_TYPE_CHERRY_LEAVES -> Blocks.CHERRY_LEAVES.getDefaultState();
             case FLOWER_TYPE_SPORE_BLOSSOM -> Blocks.SPORE_BLOSSOM.getDefaultState();
@@ -1414,6 +1553,7 @@ public final class VineFlowerFieldManager {
         private long bonusDurationTicks;
         private long lastSentCooldownEndMs;
         private int spawnCursor;
+        private long nextAuraTick;
 
         private ActiveFlowerField(Vec3d center, long expiryTick, UUID ownerId, FieldTuning tuning, int baseDurationTicks) {
             this.center = center;
@@ -1421,6 +1561,7 @@ public final class VineFlowerFieldManager {
             this.ownerId = ownerId;
             this.tuning = tuning;
             this.baseDurationTicks = baseDurationTicks;
+            this.nextAuraTick = 0L;
         }
 
         private Vec3d center() {
@@ -1497,7 +1638,9 @@ public final class VineFlowerFieldManager {
             int chaosBurstBaseBuffDuration,
             int chaosBurstBuffDurationPerEnergy,
             int chaosBurstEnergyPerAmplifier,
-            int chaosBurstMaxAmplifier
+            int chaosBurstMaxAmplifier,
+            boolean bountyThorns,
+            boolean painMode
     ) {
     }
 }

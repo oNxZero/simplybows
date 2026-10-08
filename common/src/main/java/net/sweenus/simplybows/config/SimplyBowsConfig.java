@@ -41,54 +41,58 @@ public class SimplyBowsConfig extends Config {
         @Comment("Number of arrows fired before Enchanted String level bonuses.")
         public ValidatedInt baseQuantity = new ValidatedInt(1, 20, 1);
         @Comment("Initial flight speed multiplier for Winterfang arrows.")
-        public ValidatedFloat arrowSpeed = new ValidatedFloat(1.3F, 5.0F, 0.1F);
+        public ValidatedFloat arrowSpeed = new ValidatedFloat(1.0F, 5.0F, 0.1F);
         @Comment("Random spread applied to each fired arrow.")
         public ValidatedFloat arrowDivergence = new ValidatedFloat(1.0F, 5.0F, 0.0F);
         @Comment("Base damage dealt by Winterfang arrows before upgrades/runes.")
-        public ValidatedDouble baseDamage = new ValidatedDouble(3.0, 20.0, 0.1);
+        public ValidatedDouble baseDamage = new ValidatedDouble(0.95, 20.0, 0.1);
         @Comment("The radius that arrows will check for a suitable target.")
         public ValidatedDouble homingRadius = new ValidatedDouble(25.0, 50.0, 1.0);
         @Comment("How strongly arrows steer toward a target each tick.")
-        public ValidatedDouble homingAccel = new ValidatedDouble(0.3, 2.0, 0.01);
+        public ValidatedDouble homingAccel = new ValidatedDouble(0.55, 2.0, 0.01);
         @Comment("Ticks after spawn before homing behavior begins.")
-        public ValidatedInt homingStartTicks = new ValidatedInt(15, 100, 0);
+        public ValidatedInt homingStartTicks = new ValidatedInt(6, 100, 0);
         @Comment("Horizontal fan spread applied at launch.")
-        public ValidatedFloat initialSpreadYaw = new ValidatedFloat(0.90F, 3.0F, 0.0F);
+        public ValidatedFloat initialSpreadYaw = new ValidatedFloat(0.28F, 3.0F, 0.0F);
         @Comment("Vertical fan spread applied at launch.")
-        public ValidatedFloat initialSpreadPitch = new ValidatedFloat(0.14F, 1.0F, 0.0F);
+        public ValidatedFloat initialSpreadPitch = new ValidatedFloat(0.06F, 1.0F, 0.0F);
         @Comment("Starting speed used by homing speed ramp logic.")
-        public ValidatedDouble startSpeed = new ValidatedDouble(0.2, 2.0, 0.01);
+        public ValidatedDouble startSpeed = new ValidatedDouble(0.45, 2.0, 0.01);
         @Comment("Maximum speed homing arrows can ramp up to.")
-        public ValidatedDouble maxSpeed = new ValidatedDouble(0.7, 3.0, 0.1);
+        public ValidatedDouble maxSpeed = new ValidatedDouble(1.0, 3.0, 0.1);
         @ConfigGroup.Pop
         @Comment("Ticks taken to ramp from start speed to max speed.")
-        public ValidatedInt speedRampTicks = new ValidatedInt(40, 200, 1);
+        public ValidatedInt speedRampTicks = new ValidatedInt(18, 200, 1);
 
         // Rune: Pain
         public ConfigGroup painGroup = new ConfigGroup("pain");
-        @Comment("Horizontal search range for Pain focus targeting.")
-        public ValidatedDouble painTargetHorizontalRange = new ValidatedDouble(48.0, 128.0, 1.0);
-        @Comment("Vertical search range for Pain focus targeting.")
-        public ValidatedDouble painTargetVerticalRange = new ValidatedDouble(16.0, 64.0, 1.0);
+        @Comment("Frost bloom radius on Pain impact.")
+        public ValidatedDouble painFrostRadius = new ValidatedDouble(3.25, 12.0, 1.0);
+        @Comment("Extra frost bloom radius per Enchanted String level.")
+        public ValidatedDouble painFrostRadiusPerString = new ValidatedDouble(0.35, 3.0, 0.0);
         @ConfigGroup.Pop
-        @Comment("Damage multiplier applied while Pain rune is active.")
-        public ValidatedDouble painDamageMultiplier = new ValidatedDouble(1.2, 10.0, 0.1);
+        @Comment("Unused legacy — Pain frost bloom is Slowness-only now.")
+        public ValidatedDouble painFrostDamageMultiplier = new ValidatedDouble(0.175, 10.0, 0.0);
 
         // Rune: Grace
         public ConfigGroup graceGroup = new ConfigGroup("grace");
         @Comment("Duration of Slowness stacks applied by Grace hits.")
-        public ValidatedInt graceSlownessDuration = new ValidatedInt(80, 600, 1);
+        public ValidatedInt graceSlownessDuration = new ValidatedInt(200, 600, 1);
         @ConfigGroup.Pop
         @Comment("Maximum Slowness stack count from Grace arrows.")
         public ValidatedInt graceMaxSlownessStacks = new ValidatedInt(4, 10, 0);
 
         // Rune: Bounty
         public ConfigGroup bountyGroup = new ConfigGroup("bounty");
-        @Comment("Damage multiplier applied in Bounty mode.")
-        public ValidatedDouble bountyDamageMultiplier = new ValidatedDouble(0.75, 5.0, 0.1);
+        @Comment("Frost bloom zone radius on Bounty impact.")
+        public ValidatedDouble bountyFrostRadius = new ValidatedDouble(3.75, 14.0, 1.0);
+        @Comment("Extra Bounty frost radius per Enchanted String level.")
+        public ValidatedDouble bountyFrostRadiusPerString = new ValidatedDouble(0.4, 3.0, 0.0);
+        @Comment("Damage per Bounty frost pulse vs base arrow damage.")
+        public ValidatedDouble bountyFrostDamageMultiplier = new ValidatedDouble(0.14, 5.0, 0.05);
         @ConfigGroup.Pop
-        @Comment("Multiplier for extra arrows fired in Bounty mode.")
-        public ValidatedInt bountyExtraArrowMultiplier = new ValidatedInt(2, 10, 1);
+        @Comment("How many frost pulses a Bounty bloom fires.")
+        public ValidatedInt bountyFrostPulseCount = new ValidatedInt(3, 8, 1);
 
         // Rune: Chaos
         public ConfigGroup chaosGroup = new ConfigGroup("chaos");
@@ -133,9 +137,9 @@ public class SimplyBowsConfig extends Config {
         @Comment("Health restored to players and animals on each flower-field pulse. Multiplied by Reinforced Frame.")
         public ValidatedFloat friendlyHeal = new ValidatedFloat(2.0F, 20.0F, 0.0F);
         @Comment("Damage dealt to monsters on each flower-field pulse. Players and animals are not damaged. Multiplied by Reinforced Frame. Undead monsters also take the undead bonus.")
-        public ValidatedFloat hostileDamage = new ValidatedFloat(1.0F, 20.0F, 0.0F);
+        public ValidatedFloat hostileDamage = new ValidatedFloat(0.16F, 20.0F, 0.0F);
         @Comment("Additional damage dealt to undead targets.")
-        public ValidatedFloat undeadBonusDamage = new ValidatedFloat(0.6F, 20.0F, 0.0F);
+        public ValidatedFloat undeadBonusDamage = new ValidatedFloat(0.48F, 20.0F, 0.0F);
         @ConfigGroup.Pop
         @Comment("Ticks between flower field aura pulses.")
         public ValidatedInt auraIntervalTicks = new ValidatedInt(20, 200, 1);
@@ -148,11 +152,11 @@ public class SimplyBowsConfig extends Config {
 
         // Rune: Bounty
         public ConfigGroup bountyGroup = new ConfigGroup("bounty");
-        @Comment("Aura pulse interval while Bounty DPS field is active.")
-        public ValidatedInt bountyAuraInterval = new ValidatedInt(12, 100, 1);
+        @Comment("Aura pulse interval while Bounty DPS field is active (30 = 1.5s).")
+        public ValidatedInt bountyAuraInterval = new ValidatedInt(14, 100, 1);
         @ConfigGroup.Pop
-        @Comment("Hostile damage multiplier for the Bounty DPS field (no healing).")
-        public ValidatedFloat bountyDamageMultiplier = new ValidatedFloat(1.35F, 5.0F, 0.1F);
+        @Comment("Hostile damage multiplier for the Bounty DPS field vs base field damage.")
+        public ValidatedFloat bountyDamageMultiplier = new ValidatedFloat(4.5F, 12.0F, 0.1F);
 
         // Rune: Chaos
         public ConfigGroup chaosGroup = new ConfigGroup("chaos");
@@ -247,7 +251,7 @@ public class SimplyBowsConfig extends Config {
         @Comment("Ticks between Grace support pulses.")
         public ValidatedInt gracePulseIntervalTicks = new ValidatedInt(10, 100, 1);
         @Comment("Resistance duration applied to allies in Grace mode.")
-        public ValidatedInt graceResistanceDuration = new ValidatedInt(40, 600, 1);
+        public ValidatedInt graceResistanceDuration = new ValidatedInt(200, 600, 1);
         @ConfigGroup.Pop
         @Comment("Slowness duration applied to hostiles in Grace mode.")
         public ValidatedInt graceSlownessDuration = new ValidatedInt(35, 600, 1);
@@ -258,7 +262,7 @@ public class SimplyBowsConfig extends Config {
         public ValidatedInt bountyDamageIntervalTicks = new ValidatedInt(10, 100, 1);
         @ConfigGroup.Pop
         @Comment("Base damage for Bubble Bounty swarm ticks.")
-        public ValidatedFloat bountyBaseDamage = new ValidatedFloat(3.75F, 30.0F, 0.1F);
+        public ValidatedFloat bountyBaseDamage = new ValidatedFloat(0.22F, 30.0F, 0.05F);
 
         // Chaos
         public ConfigGroup chaosGroup = new ConfigGroup("chaos");
@@ -281,12 +285,12 @@ public class SimplyBowsConfig extends Config {
         @Comment("Additional Chaos wave damage per Reinforced Frame level.")
         public ValidatedFloat chaosDamagePerFrame = new ValidatedFloat(1.35F, 10.0F, 0.1F);
         @Comment("Base forward knockback applied by Chaos wave hits.")
-        public ValidatedDouble chaosBaseKnockback = new ValidatedDouble(0.52, 3.0, 0.0);
+        public ValidatedDouble chaosBaseKnockback = new ValidatedDouble(1.55, 3.0, 0.0);
         @Comment("Additional Chaos wave knockback per Reinforced Frame level.")
-        public ValidatedDouble chaosKnockbackPerFrame = new ValidatedDouble(0.08, 1.0, 0.0);
+        public ValidatedDouble chaosKnockbackPerFrame = new ValidatedDouble(0.22, 1.0, 0.0);
         @ConfigGroup.Pop
         @Comment("Vertical launch applied when the Chaos wave hits a target.")
-        public ValidatedDouble chaosKnockUp = new ValidatedDouble(0.14, 2.0, 0.0);
+        public ValidatedDouble chaosKnockUp = new ValidatedDouble(0.32, 2.0, 0.0);
     }
 
     public static class BeeBowSection extends ConfigSection {
@@ -333,23 +337,23 @@ public class SimplyBowsConfig extends Config {
         // Rune: Bounty (hive)
         public ConfigGroup bountyGroup = new ConfigGroup("bounty");
         @Comment("Base lifetime of Bounty beehives.")
-        public ValidatedInt bountyHiveDuration = new ValidatedInt(60, 600, 10);
+        public ValidatedInt bountyHiveDuration = new ValidatedInt(40, 600, 10);
         @Comment("Extra hive duration per Enchanted String level.")
-        public ValidatedInt bountyHiveDurationBonusPerString = new ValidatedInt(20, 200, 0);
+        public ValidatedInt bountyHiveDurationBonusPerString = new ValidatedInt(4, 200, 0);
         @Comment("Base interval between beehive-fired bee shots.")
-        public ValidatedInt bountyFireInterval = new ValidatedInt(5, 60, 1);
-        @Comment("Base number of bees a Bounty hive can fire.")
-        public ValidatedInt bountyBaseShots = new ValidatedInt(7, 50, 1);
-        @Comment("Additional hive shots per Reinforced Frame level.")
-        public ValidatedInt bountyFrameBonusShots = new ValidatedInt(1, 10, 0);
+        public ValidatedInt bountyFireInterval = new ValidatedInt(14, 60, 1);
+        @Comment("Base bees spawned instantly by Bounty (String adds more).")
+        public ValidatedInt bountyBaseShots = new ValidatedInt(5, 50, 1);
+        @Comment("Legacy key — Frame now boosts per-bee damage, not shot count.")
+        public ValidatedInt bountyFrameBonusShots = new ValidatedInt(0, 10, 0);
         @ConfigGroup.Pop
         @Comment("Radius a Bounty hive searches for hostile targets.")
-        public ValidatedDouble bountyTargetRadius = new ValidatedDouble(14.0, 50.0, 1.0);
+        public ValidatedDouble bountyTargetRadius = new ValidatedDouble(7.0, 50.0, 1.0);
 
         // Rune: Chaos (honey storm)
         public ConfigGroup chaosGroup = new ConfigGroup("chaos");
-        @Comment("How long the Bee Chaos honey storm remains active before subsiding.")
-        public ValidatedInt chaosBaseDurationTicks = new ValidatedInt(260, 280, 20);
+        @Comment("How long the Bee Chaos honey storm remains active before subsiding. 100 = 5 seconds.")
+        public ValidatedInt chaosBaseDurationTicks = new ValidatedInt(100, 280, 20);
         @Comment("Additional honey storm duration gained per Enchanted String level. Capped in code.")
         public ValidatedInt chaosDurationPerStringTicks = new ValidatedInt(10, 40, 0);
         @Comment("Cooldown applied after the honey storm ends before another can be created.")
@@ -493,21 +497,21 @@ public class SimplyBowsConfig extends Config {
         @Comment("Base Earth spike field radius.")
         public ValidatedDouble fieldRadius = new ValidatedDouble(3.6, 20.0, 1.0);
         @Comment("Base damage dealt by Earth spikes.")
-        public ValidatedFloat spikeDamage = new ValidatedFloat(4.0F, 30.0F, 0.1F);
+        public ValidatedFloat spikeDamage = new ValidatedFloat(1.25F, 30.0F, 0.1F);
         @Comment("Base vertical knock-up applied by spike hits.")
         public ValidatedDouble baseUpwardKnockback = new ValidatedDouble(0.4, 3.0, 0.0);
         @Comment("Additional knock-up per Reinforced Frame level.")
         public ValidatedDouble frameUpwardKnockbackPerLevel = new ValidatedDouble(0.10, 1.0, 0.0);
         @Comment("Additional spike field radius per Enchanted String level.")
         public ValidatedDouble stringRadiusBonusPerLevel = new ValidatedDouble(0.45, 3.0, 0.0);
-        @Comment("Ticks before another spike field can be placed. Grace launches allies only when a new field is placed. 100 is five seconds. 20 ticks = 1 second.")
+        @Comment("Ticks before another spike field can be placed. Grace launches allies only when a new field is placed. 200 is ten seconds. 20 ticks = 1 second.")
         @ConfigGroup.Pop
-        public ValidatedInt fieldLockoutTicks = new ValidatedInt(100, 600, 20);
+        public ValidatedInt fieldLockoutTicks = new ValidatedInt(200, 600, 20);
 
         // Rune: Pain
         public ConfigGroup painGroup = new ConfigGroup("pain");
         @Comment("Maximum travel distance of Pain rune spike waves.")
-        public ValidatedDouble painWaveMaxDistance = new ValidatedDouble(4.0, 20.0, 1.0);
+        public ValidatedDouble painWaveMaxDistance = new ValidatedDouble(6.0, 20.0, 1.0);
         @Comment("Distance between consecutive Pain wave spike steps.")
         public ValidatedDouble painWaveStepDistance = new ValidatedDouble(0.8, 5.0, 0.1);
         @Comment("Damage multiplier applied to Pain wave spikes.")

@@ -80,9 +80,9 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
 
         List<UpgradeRow> rows = List.of(
                 new UpgradeRow("◇", "String", defaults.stringColor(), upgrades.stringLevel(), maxString,
-                        BowUpgradeTooltip.stringGain(bowKey)),
+                        BowUpgradeTooltip.stringGain(bowKey, upgrades)),
                 new UpgradeRow("◇", "Frame", defaults.frameColor(), upgrades.frameLevel(), maxFrame,
-                        BowUpgradeTooltip.frameGain(bowKey))
+                        BowUpgradeTooltip.frameGain(bowKey, upgrades))
         );
 
         UpgradeSection upgradeSection = new UpgradeSection(maxSlots, usedSlots, rows, upgradeRune);

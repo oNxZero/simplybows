@@ -62,25 +62,26 @@ public class EarthArrowEntity extends ArrowEntity {
                 Vec3d pos = living.getPos();
                 serverWorld.playSound(null, pos.x, pos.y, pos.z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.85F, 1.1F);
             }
-            trySpawnField(living.getPos());
+            trySpawnField(living.getPos(), living);
             this.discard();
             return;
         }
-        if (entityHitResult.getEntity() instanceof LivingEntity living) {
-            living.hurtTime = 0;
-            living.timeUntilRegen = 0;
+        LivingEntity struck = entityHitResult.getEntity() instanceof LivingEntity living ? living : null;
+        if (struck != null) {
+            struck.hurtTime = 0;
+            struck.timeUntilRegen = 0;
         }
         super.onEntityHit(entityHitResult);
-        if (entityHitResult.getEntity() instanceof LivingEntity living) {
-            living.hurtTime = 0;
-            living.timeUntilRegen = 0;
+        if (struck != null) {
+            struck.hurtTime = 0;
+            struck.timeUntilRegen = 0;
         }
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             Vec3d pos = entityHitResult.getPos();
             serverWorld.playSound(null, pos.x, pos.y, pos.z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.9F, 0.95F + this.random.nextFloat() * 0.2F);
             serverWorld.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), pos.x, pos.y + 0.1, pos.z, 12, 0.3, 0.1, 0.3, 0.01);
         }
-        trySpawnField(entityHitResult.getPos());
+        trySpawnField(entityHitResult.getPos(), struck);
     }
 
     public boolean isGraceSupportProjectile() {
@@ -95,7 +96,7 @@ public class EarthArrowEntity extends ArrowEntity {
             serverWorld.playSound(null, pos.x, pos.y, pos.z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.9F, 0.95F + this.random.nextFloat() * 0.2F);
             serverWorld.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), pos.x, pos.y + 0.1, pos.z, 12, 0.3, 0.1, 0.3, 0.01);
         }
-        trySpawnField(blockHitResult.getPos());
+        trySpawnField(blockHitResult.getPos(), null);
     }
 
     @Override
@@ -106,7 +107,7 @@ public class EarthArrowEntity extends ArrowEntity {
         return super.canHit(entity);
     }
 
-    private void trySpawnField(Vec3d pos) {
+    private void trySpawnField(Vec3d pos, LivingEntity hitTarget) {
         if (this.spawnedField) {
             return;
         }
@@ -124,7 +125,8 @@ public class EarthArrowEntity extends ArrowEntity {
                     );
                 }
             } else {
-                EarthSpikeFieldManager.createOrReplaceField(serverWorld, pos, this.getOwner(), this.upgrades);
+                EarthSpikeFieldManager.createOrReplaceField(
+                        serverWorld, pos, this.getOwner(), this.upgrades, this.getVelocity(), hitTarget);
             }
             this.spawnedField = true;
         }

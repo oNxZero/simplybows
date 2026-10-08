@@ -11,6 +11,7 @@ import net.sweenus.simplybows.world.BubbleChaosWaveManager;
 import net.sweenus.simplybows.world.EarthChaosSunderManager;
 import net.sweenus.simplybows.world.EarthSpikeFieldManager;
 import net.sweenus.simplybows.world.IceChaosWallManager;
+import net.sweenus.simplybows.world.IceFrostBloomManager;
 import net.sweenus.simplybows.world.MobBowFireManager;
 import net.sweenus.simplybows.world.VineFlowerFieldManager;
 import org.spongepowered.asm.mixin.Mixin;
@@ -37,6 +38,9 @@ public abstract class ServerWorldMixin {
         }
         if (IceChaosWallManager.hasActive(world)) {
             IceChaosWallManager.tick(world);
+        }
+        if (IceFrostBloomManager.hasActive(world)) {
+            IceFrostBloomManager.tick(world);
         }
         if (BlossomStormManager.hasActive(world)) {
             BlossomStormManager.tick(world);

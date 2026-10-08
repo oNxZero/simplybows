@@ -4,10 +4,8 @@ import net.minecraft.entity.Entity;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.MinecraftServer;
-import net.minecraft.server.network.ServerPlayerEntity;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.sound.SoundCategory;
 import net.minecraft.sound.SoundEvents;
@@ -17,41 +15,40 @@ import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.entity.BeeGraceVisualEntity;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
-import net.sweenus.simplybows.util.CombatTargeting;
+import net.sweenus.simplybows.util.GraceProjectile;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Grace: bees sting allies for Resistance, then hop to the next ally in range.
+ * String = bee count. Frame = stings/hops per bee.
+ */
 public final class BeeGraceShieldManager {
 
     public static final String GRACE_VISUAL_TAG = "simplybows_bee_grace_visual";
-    private static double graceApplyRadius() { return SimplyBowsConfig.INSTANCE.buzzkill.graceApplyRadius.get(); }
-    private static int maxBeesPerTarget() { return SimplyBowsConfig.INSTANCE.buzzkill.graceMaxBeesPerTarget.get(); }
-    private static int baseDurationTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.graceBaseDuration.get(); }
-    private static int stringDurationBonusTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.graceStringDurationBonus.get(); }
-    private static int graceCooldownTicks() { return SimplyBowsConfig.INSTANCE.buzzkill.graceCooldownTicks.get(); }
-    private static final double ORBIT_RADIUS = 2.0;
-    private static final double ORBIT_HEIGHT = 1.2;
-    private static final double ORBIT_BOB_HEIGHT = 0.18;
-    private static final double BASE_ORBIT_ANGULAR_SPEED = 0.15;
-    private static final double ORBIT_ANGULAR_SPEED_RANDOM_RANGE = 0.03;
-    private static final float ORBIT_POSITION_SMOOTHING = 0.24F;
-    private static final float ORBIT_YAW_SMOOTHING = 0.35F;
-    private static final int FADE_OUT_TICKS = 20;
-    private static final double MIN_HORIZONTAL_MOTION_SQ_FOR_YAW = 1.0E-4;
+    private static final double HOP_SEARCH_RADIUS = 10.0;
+    private static final double STING_REACH = 1.15;
+    private static final double FLY_SPEED = 0.55;
+    private static final int RESISTANCE_TICKS = 60; // 3s
+    private static final int RESISTANCE_AMPLIFIER = 1; // Res II
+    private static final int BEE_LIFETIME_TICKS = 200;
 
-    private static final Map<ServerWorld, List<ActiveGraceShield>> ACTIVE_SHIELDS = new HashMap<>();
+    private static final Map<ServerWorld, List<ActiveGraceBee>> ACTIVE_BEES = new HashMap<>();
     private static final Map<MinecraftServer, Map<UUID, Long>> GRACE_COOLDOWNS_BY_SERVER = CooldownStorage.newServerScopedStore();
 
     private BeeGraceShieldManager() {
     }
 
     public static boolean hasActive(ServerWorld world) {
-        List<ActiveGraceShield> shields = ACTIVE_SHIELDS.get(world);
-        return (shields != null && !shields.isEmpty()) || (world.getTime() % 20L == 0L);
+        List<ActiveGraceBee> bees = ACTIVE_BEES.get(world);
+        return (bees != null && !bees.isEmpty()) || (world.getTime() % 20L == 0L);
     }
 
     public static void tryApplyFromImpact(ServerWorld world, Vec3d impactPos, LivingEntity owner, BowUpgradeData upgrades, LivingEntity struck) {
@@ -59,27 +56,194 @@ public final class BeeGraceShieldManager {
             return;
         }
 
-        LivingEntity orbitTarget = struck != null && struck.isAlive() ? struck : nearestPlayer(world, impactPos, 4.0);
-        if (orbitTarget == null) {
+        int beeCount = Math.max(1, 1 + upgrades.stringLevel());
+        int hopsPerBee = Math.max(1, 1 + upgrades.frameLevel());
+        List<LivingEntity> allies = findAlliesNear(world, impactPos, HOP_SEARCH_RADIUS + 2.0);
+        if (struck != null && struck.isAlive() && GraceProjectile.isSupportTarget(struck) && !allies.contains(struck)) {
+            allies.addFirst(struck);
+        }
+        if (allies.isEmpty()) {
             return;
         }
 
-        applyShield(world, orbitTarget, upgrades);
-        int duration = baseDurationTicks() + Math.max(0, upgrades.stringLevel()) * stringDurationBonusTicks();
-        startGraceCooldown(world, owner, Math.max(20, duration));
+        // Prefer struck ally as first sting target for bee 0.
+        if (struck != null && GraceProjectile.isSupportTarget(struck)) {
+            allies.remove(struck);
+            allies.addFirst(struck);
+        }
+
+        long now = world.getTime();
+        List<ActiveGraceBee> bees = ACTIVE_BEES.computeIfAbsent(world, w -> new ArrayList<>());
+        int spawned = 0;
+        for (int i = 0; i < beeCount; i++) {
+            LivingEntity startTarget = allies.get(i % allies.size());
+            Vec3d start = impactPos.add(
+                    (world.random.nextDouble() - 0.5) * 0.6,
+                    0.4 + world.random.nextDouble() * 0.3,
+                    (world.random.nextDouble() - 0.5) * 0.6
+            );
+            BeeGraceVisualEntity visual = new BeeGraceVisualEntity(world, start.x, start.y, start.z);
+            visual.addCommandTag(GRACE_VISUAL_TAG);
+            if (!world.spawnEntity(visual)) {
+                continue;
+            }
+            Set<UUID> stung = new HashSet<>();
+            bees.add(new ActiveGraceBee(
+                    visual.getUuid(),
+                    startTarget.getUuid(),
+                    hopsPerBee,
+                    stung,
+                    now + BEE_LIFETIME_TICKS
+            ));
+            spawned++;
+        }
+
+        if (spawned <= 0) {
+            return;
+        }
+
+        int duration = SimplyBowsConfig.INSTANCE.buzzkill.graceBaseDuration.get()
+                + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.buzzkill.graceStringDurationBonus.get();
+        startGraceCooldown(world, owner, Math.max(40, duration));
+        world.playSound(null, impactPos.x, impactPos.y, impactPos.z, SoundEvents.ENTITY_BEE_LOOP_AGGRESSIVE, SoundCategory.PLAYERS, 0.55F, 1.25F);
+        world.spawnParticles(ParticleTypes.WAX_ON, impactPos.x, impactPos.y + 0.3, impactPos.z, 10, 0.25, 0.2, 0.25, 0.01);
     }
 
-    private static PlayerEntity nearestPlayer(ServerWorld world, Vec3d pos, double radius) {
-        PlayerEntity best = null;
-        double bestDist = radius * radius;
-        for (PlayerEntity player : world.getEntitiesByClass(PlayerEntity.class, Box.of(pos, radius * 2.0, radius * 2.0, radius * 2.0), PlayerEntity::isAlive)) {
-            double dist = player.squaredDistanceTo(pos);
-            if (dist <= bestDist) {
-                bestDist = dist;
-                best = player;
+    /** Legacy no-op — Grace no longer absorbs hits; bees apply Resistance by stinging. */
+    public static boolean consumeShield(ServerWorld world, LivingEntity target) {
+        return false;
+    }
+
+    public static void tick(ServerWorld world) {
+        List<ActiveGraceBee> bees = ACTIVE_BEES.get(world);
+        if (bees == null || bees.isEmpty()) {
+            if (world.getTime() % 20L == 0L) {
+                purgeOrphanVisuals(world);
+            }
+            return;
+        }
+
+        Iterator<ActiveGraceBee> it = bees.iterator();
+        while (it.hasNext()) {
+            ActiveGraceBee bee = it.next();
+            Entity visualEntity = world.getEntity(bee.visualId);
+            if (!(visualEntity instanceof BeeGraceVisualEntity visual) || world.getTime() > bee.expiryTick || bee.hopsLeft <= 0) {
+                if (visualEntity != null) {
+                    visualEntity.discard();
+                }
+                it.remove();
+                continue;
+            }
+
+            LivingEntity target = bee.targetId != null && world.getEntity(bee.targetId) instanceof LivingEntity living && living.isAlive()
+                    ? living : null;
+            if (target != null && !isStingable(target, bee.stung)) {
+                target = null;
+                bee.targetId = null;
+            }
+            if (target == null) {
+                LivingEntity next = findNextAlly(world, visual.getPos(), bee.stung);
+                if (next == null) {
+                    wanderGraceBee(world, visual, bee);
+                    continue;
+                }
+                bee.targetId = next.getUuid();
+                target = next;
+            }
+
+            Vec3d aim = target.getPos().add(0.0, target.getStandingEyeHeight() * 0.55, 0.0);
+            Vec3d delta = aim.subtract(visual.getPos());
+            double distSq = delta.lengthSquared();
+            if (distSq <= STING_REACH * STING_REACH) {
+                sting(world, visual, target, bee);
+                if (bee.hopsLeft <= 0) {
+                    visual.discard();
+                    it.remove();
+                    continue;
+                }
+                LivingEntity next = findNextAlly(world, target.getPos(), bee.stung);
+                if (next == null) {
+                    bee.targetId = null;
+                    wanderGraceBee(world, visual, bee);
+                    continue;
+                }
+                bee.targetId = next.getUuid();
+                continue;
+            }
+
+            Vec3d step = delta.normalize().multiply(FLY_SPEED);
+            visual.setPos(visual.getX() + step.x, visual.getY() + step.y, visual.getZ() + step.z);
+            faceVelocity(visual, step);
+            visual.setHeightScale(1.0F);
+        }
+
+        if (bees.isEmpty()) {
+            ACTIVE_BEES.remove(world);
+        }
+    }
+
+    private static void sting(ServerWorld world, BeeGraceVisualEntity visual, LivingEntity target, ActiveGraceBee bee) {
+        bee.stung.add(target.getUuid());
+        bee.hopsLeft--;
+        target.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, RESISTANCE_TICKS, RESISTANCE_AMPLIFIER), null);
+        world.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.ENTITY_BEE_STING, SoundCategory.PLAYERS, 0.7F, 1.25F);
+        world.playSound(null, target.getX(), target.getY(), target.getZ(), SoundEvents.ENTITY_BEE_POLLINATE, SoundCategory.PLAYERS, 0.45F, 1.35F);
+        world.spawnParticles(ParticleTypes.CRIT, target.getX(), target.getBodyY(0.55), target.getZ(), 8, 0.15, 0.2, 0.15, 0.02);
+        world.spawnParticles(ParticleTypes.WAX_ON, target.getX(), target.getBodyY(0.55), target.getZ(), 10, 0.2, 0.2, 0.2, 0.01);
+        Vec3d bounce = visual.getPos().subtract(target.getPos()).normalize().multiply(0.65);
+        if (bounce.lengthSquared() < 1.0E-4) {
+            bounce = new Vec3d(0.4, 0.2, 0.0);
+        }
+        visual.setPos(target.getX() + bounce.x, target.getBodyY(0.7) + 0.2, target.getZ() + bounce.z);
+    }
+
+    private static void wanderGraceBee(ServerWorld world, BeeGraceVisualEntity visual, ActiveGraceBee bee) {
+        if (bee.wanderDir == null || world.getTime() % 12L == 0L) {
+            double ang = world.random.nextDouble() * Math.PI * 2.0;
+            bee.wanderDir = new Vec3d(Math.cos(ang), (world.random.nextDouble() - 0.5) * 0.25, Math.sin(ang)).normalize();
+        }
+        Vec3d step = bee.wanderDir.multiply(FLY_SPEED * 0.75);
+        visual.setPos(visual.getX() + step.x, visual.getY() + step.y, visual.getZ() + step.z);
+        faceVelocity(visual, step);
+        visual.setHeightScale(1.0F);
+        // Keep scanning while idle-swarming.
+        LivingEntity next = findNextAlly(world, visual.getPos(), bee.stung);
+        if (next != null) {
+            bee.targetId = next.getUuid();
+        }
+    }
+
+    private static void faceVelocity(BeeGraceVisualEntity visual, Vec3d step) {
+        if (step.horizontalLengthSquared() > 1.0E-6) {
+            visual.setYaw((float) (Math.atan2(-step.x, step.z) * (180.0 / Math.PI)));
+        }
+        visual.setPitch((float) MathHelper.clamp(-Math.atan2(step.y, step.horizontalLength()) * (180.0 / Math.PI), -40.0, 40.0));
+    }
+
+    private static boolean isStingable(LivingEntity ally, Set<UUID> stung) {
+        if (stung.contains(ally.getUuid())) {
+            return false;
+        }
+        // Don't re-sting someone who already has Resistance.
+        return !ally.hasStatusEffect(StatusEffects.RESISTANCE);
+    }
+
+    private static List<LivingEntity> findAlliesNear(ServerWorld world, Vec3d pos, double radius) {
+        Box box = Box.of(pos, radius * 2.0, radius * 2.0, radius * 2.0);
+        List<LivingEntity> allies = world.getEntitiesByClass(LivingEntity.class, box,
+                e -> e.isAlive() && GraceProjectile.isSupportTarget(e) && e.squaredDistanceTo(pos) <= radius * radius);
+        allies.sort((a, b) -> Double.compare(a.squaredDistanceTo(pos), b.squaredDistanceTo(pos)));
+        return allies;
+    }
+
+    private static LivingEntity findNextAlly(ServerWorld world, Vec3d from, Set<UUID> stung) {
+        List<LivingEntity> allies = findAlliesNear(world, from, HOP_SEARCH_RADIUS);
+        for (LivingEntity ally : allies) {
+            if (isStingable(ally, stung)) {
+                return ally;
             }
         }
-        return best;
+        return null;
     }
 
     private static boolean isGraceReady(ServerWorld world, UUID ownerId) {
@@ -98,214 +262,6 @@ public final class BeeGraceShieldManager {
         RuneUseCooldown.start(world, owner.getUuid(), "bee-grace", "bee", cooldownTicks);
     }
 
-    public static boolean consumeShield(ServerWorld world, LivingEntity target) {
-        List<ActiveGraceShield> shields = ACTIVE_SHIELDS.get(world);
-        if (shields == null || shields.isEmpty() || target == null) {
-            return false;
-        }
-
-        int consumeIndex = -1;
-        long bestExpiry = Long.MAX_VALUE;
-        for (int i = 0; i < shields.size(); i++) {
-            ActiveGraceShield shield = shields.get(i);
-            if (!target.getUuid().equals(shield.targetId)) {
-                continue;
-            }
-            if (shield.expiryTick < bestExpiry) {
-                bestExpiry = shield.expiryTick;
-                consumeIndex = i;
-            }
-        }
-        if (consumeIndex >= 0) {
-            ActiveGraceShield consumed = shields.remove(consumeIndex);
-            discardVisual(world, consumed.visualId);
-            if (shields.isEmpty()) {
-                ACTIVE_SHIELDS.remove(world);
-            }
-
-            Vec3d pos = target.getPos().add(0.0, target.getStandingEyeHeight() * 0.7, 0.0);
-            world.playSound(null, pos.x, pos.y, pos.z, SoundEvents.ITEM_HONEY_BOTTLE_DRINK, SoundCategory.PLAYERS, 0.75F, 1.35F + world.random.nextFloat() * 0.1F);
-            world.spawnParticles(ParticleTypes.WAX_OFF, pos.x, pos.y, pos.z, 8, 0.22, 0.2, 0.22, 0.01);
-            world.spawnParticles(ParticleTypes.POOF, pos.x, pos.y, pos.z, 5, 0.16, 0.14, 0.16, 0.01);
-            return true;
-        }
-        return false;
-    }
-
-    public static void tick(ServerWorld world) {
-        List<ActiveGraceShield> shields = ACTIVE_SHIELDS.get(world);
-        if (shields == null || shields.isEmpty()) {
-            if (world.getTime() % 20L == 0L) {
-                purgeOrphanVisuals(world);
-            }
-            return;
-        }
-
-        shields.removeIf(shield -> {
-            if (world.getTime() > shield.expiryTick) {
-                discardVisual(world, shield.visualId);
-                return true;
-            }
-            LivingEntity target = getLivingEntity(world, shield.targetId);
-            if (target == null || !target.isAlive()) {
-                discardVisual(world, shield.visualId);
-                return true;
-            }
-
-            Entity visualEntity = world.getEntity(shield.visualId);
-            if (!(visualEntity instanceof BeeGraceVisualEntity visual)) {
-                return true;
-            }
-            return false;
-        });
-
-        if (shields.isEmpty()) {
-            ACTIVE_SHIELDS.remove(world);
-            return;
-        }
-
-        Map<UUID, List<ActiveGraceShield>> shieldsByTarget = new HashMap<>();
-        for (ActiveGraceShield shield : shields) {
-            shieldsByTarget.computeIfAbsent(shield.targetId, ignored -> new ArrayList<>()).add(shield);
-        }
-
-        for (Map.Entry<UUID, List<ActiveGraceShield>> entry : shieldsByTarget.entrySet()) {
-            LivingEntity target = getLivingEntity(world, entry.getKey());
-            if (target == null || !target.isAlive()) {
-                continue;
-            }
-
-            List<ActiveGraceShield> targetShields = entry.getValue();
-            targetShields.sort((a, b) -> Long.compare(a.spawnTick, b.spawnTick));
-            if (world.getTime() % 10L == 0L) {
-                pulseResistance(world, target, targetShields.getFirst().resistanceAmplifier);
-            }
-            int count = targetShields.size();
-            for (int i = 0; i < count; i++) {
-                ActiveGraceShield shield = targetShields.get(i);
-                Entity visualEntity = world.getEntity(shield.visualId);
-                if (visualEntity instanceof BeeGraceVisualEntity visual) {
-                    updateOrbit(world, visual, target, shield, i, count);
-                }
-            }
-        }
-    }
-
-    private static void applyShield(ServerWorld world, LivingEntity target, BowUpgradeData upgrades) {
-        List<ActiveGraceShield> shields = ACTIVE_SHIELDS.computeIfAbsent(world, w -> new ArrayList<>());
-        UUID targetId = target.getUuid();
-        int maxStacks = getMaxBeesForStringLevel(upgrades.stringLevel());
-        int currentStacks = 0;
-        int replaceIndex = -1;
-        long earliestExpiry = Long.MAX_VALUE;
-        for (int i = 0; i < shields.size(); i++) {
-            ActiveGraceShield shield = shields.get(i);
-            if (!targetId.equals(shield.targetId)) {
-                continue;
-            }
-            currentStacks++;
-            if (shield.expiryTick < earliestExpiry) {
-                earliestExpiry = shield.expiryTick;
-                replaceIndex = i;
-            }
-        }
-        if (currentStacks >= maxStacks && replaceIndex >= 0) {
-            ActiveGraceShield replaced = shields.remove(replaceIndex);
-            discardVisual(world, replaced.visualId);
-        }
-
-        Vec3d start = target.getPos().add(ORBIT_RADIUS, ORBIT_HEIGHT, 0.0);
-        BeeGraceVisualEntity visual = new BeeGraceVisualEntity(world, start.x, start.y, start.z);
-        visual.addCommandTag(GRACE_VISUAL_TAG);
-        if (!world.spawnEntity(visual)) {
-            return;
-        }
-
-        int duration = baseDurationTicks() + upgrades.stringLevel() * stringDurationBonusTicks();
-        long now = world.getTime();
-        int resistanceAmplifier = MathHelper.clamp(upgrades.frameLevel(), 0, 4);
-        ActiveGraceShield shield = new ActiveGraceShield(
-                targetId,
-                visual.getUuid(),
-                now,
-                now + Math.max(20, duration),
-                world.random.nextDouble() * Math.PI * 2.0,
-                BASE_ORBIT_ANGULAR_SPEED + (world.random.nextDouble() * 2.0 - 1.0) * ORBIT_ANGULAR_SPEED_RANDOM_RANGE,
-                resistanceAmplifier
-        );
-        shields.add(shield);
-
-        Vec3d pos = target.getPos().add(0.0, target.getStandingEyeHeight() * 0.7, 0.0);
-        world.playSound(null, pos.x, pos.y, pos.z, SoundEvents.ENTITY_BEE_POLLINATE, SoundCategory.PLAYERS, 0.55F, 1.2F + world.random.nextFloat() * 0.1F);
-        world.spawnParticles(ParticleTypes.WAX_ON, pos.x, pos.y, pos.z, 7, 0.18, 0.14, 0.18, 0.01);
-    }
-
-    private static void updateOrbit(ServerWorld world, BeeGraceVisualEntity visual, LivingEntity target, ActiveGraceShield shield, int slotIndex, int slotCount) {
-        long ticksRemaining = shield.expiryTick - world.getTime();
-        float fade = MathHelper.clamp((float) ticksRemaining / FADE_OUT_TICKS, 0.0F, 1.0F);
-        visual.setHeightScale(fade);
-
-        double slotOffset = slotCount <= 1 ? 0.0 : (Math.PI * 2.0 / slotCount) * slotIndex;
-        double t = (world.getTime() * shield.angularSpeed) + shield.angleOffset + slotOffset;
-        double radius = ORBIT_RADIUS + (slotCount <= 1 ? 0.0 : 0.06 * (slotIndex % 2));
-        double targetX = target.getX() + Math.cos(t) * radius;
-        double targetZ = target.getZ() + Math.sin(t) * radius;
-        double targetY = target.getY() + ORBIT_HEIGHT + Math.sin(t * 1.6) * ORBIT_BOB_HEIGHT + (slotCount <= 1 ? 0.0 : (slotIndex - (slotCount - 1) * 0.5) * 0.04);
-
-        Vec3d currentPos = visual.getPos();
-        Vec3d desiredPos = new Vec3d(targetX, targetY, targetZ);
-        Vec3d smoothedPos = currentPos.lerp(desiredPos, ORBIT_POSITION_SMOOTHING);
-        Vec3d motion = smoothedPos.subtract(currentPos);
-
-        if (motion.horizontalLengthSquared() > MIN_HORIZONTAL_MOTION_SQ_FOR_YAW) {
-            float movementYaw = (float) (Math.atan2(motion.x, motion.z) * (180.0F / Math.PI));
-            float smoothedYaw = MathHelper.lerpAngleDegrees(ORBIT_YAW_SMOOTHING, visual.getYaw(), movementYaw);
-            visual.setYaw(smoothedYaw);
-        }
-
-        visual.setPos(smoothedPos.x, smoothedPos.y, smoothedPos.z);
-    }
-
-    private static void pulseResistance(ServerWorld world, LivingEntity center, int amplifier) {
-        Box box = center.getBoundingBox().expand(ORBIT_RADIUS, 1.25, ORBIT_RADIUS);
-        for (PlayerEntity player : world.getEntitiesByClass(PlayerEntity.class, box, PlayerEntity::isAlive)) {
-            if (player.squaredDistanceTo(center) > ORBIT_RADIUS * ORBIT_RADIUS) {
-                continue;
-            }
-            player.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, 40, amplifier), center);
-        }
-    }
-
-    private static int getMaxBeesForStringLevel(int stringLevel) {
-        return Math.min(maxBeesPerTarget(), Math.max(1, stringLevel + 1));
-    }
-
-    private static int getCurrentStacksForTarget(ServerWorld world, UUID targetId) {
-        List<ActiveGraceShield> shields = ACTIVE_SHIELDS.get(world);
-        if (shields == null || shields.isEmpty()) {
-            return 0;
-        }
-        int count = 0;
-        for (ActiveGraceShield shield : shields) {
-            if (targetId.equals(shield.targetId)) {
-                count++;
-            }
-        }
-        return count;
-    }
-
-    private static LivingEntity getLivingEntity(ServerWorld world, UUID uuid) {
-        Entity entity = world.getEntity(uuid);
-        return entity instanceof LivingEntity living ? living : null;
-    }
-
-    private static void discardVisual(ServerWorld world, UUID visualId) {
-        Entity visual = world.getEntity(visualId);
-        if (visual != null) {
-            visual.discard();
-        }
-    }
-
     private static void purgeOrphanVisuals(ServerWorld world) {
         for (Entity entity : world.iterateEntities()) {
             if (entity instanceof BeeGraceVisualEntity && entity.getCommandTags().contains(GRACE_VISUAL_TAG)) {
@@ -314,23 +270,20 @@ public final class BeeGraceShieldManager {
         }
     }
 
-    private static final class ActiveGraceShield {
-        private final UUID targetId;
+    private static final class ActiveGraceBee {
         private final UUID visualId;
-        private final long spawnTick;
+        private UUID targetId;
+        private int hopsLeft;
+        private final Set<UUID> stung;
         private final long expiryTick;
-        private final double angleOffset;
-        private final double angularSpeed;
-        private final int resistanceAmplifier;
+        private Vec3d wanderDir;
 
-        private ActiveGraceShield(UUID targetId, UUID visualId, long spawnTick, long expiryTick, double angleOffset, double angularSpeed, int resistanceAmplifier) {
-            this.targetId = targetId;
+        private ActiveGraceBee(UUID visualId, UUID targetId, int hopsLeft, Set<UUID> stung, long expiryTick) {
             this.visualId = visualId;
-            this.spawnTick = spawnTick;
+            this.targetId = targetId;
+            this.hopsLeft = hopsLeft;
+            this.stung = stung;
             this.expiryTick = expiryTick;
-            this.angleOffset = angleOffset;
-            this.angularSpeed = angularSpeed;
-            this.resistanceAmplifier = resistanceAmplifier;
         }
     }
 }

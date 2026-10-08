@@ -24,6 +24,7 @@ import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
 import net.sweenus.simplybows.util.HelperMethods;
 import net.sweenus.simplybows.world.IceChaosWallManager;
+import net.sweenus.simplybows.world.IceFrostBloomManager;
 import net.sweenus.simplybows.world.RuneUseCooldown;
 import org.jetbrains.annotations.Nullable;
 
@@ -33,12 +34,12 @@ import java.util.UUID;
 
 public class IceBowItem extends SimplyBowItem {
     private static int baseQuantity() { return SimplyBowsConfig.INSTANCE.winterfang.baseQuantity.get(); }
-    private static double painTargetHorizontalRange() { return SimplyBowsConfig.INSTANCE.winterfang.painTargetHorizontalRange.get(); }
-    private static double painTargetVerticalRange() { return SimplyBowsConfig.INSTANCE.winterfang.painTargetVerticalRange.get(); }
     private static final String NBT_DAMAGE_MULTIPLIER = "simplybows_ice_damage_multiplier";
-    private static final String NBT_LOCK_TARGET = "simplybows_ice_lock_target";
     private static final String NBT_SLOW_STACK = "simplybows_ice_stacking_slow";
-    private static final String NBT_TARGET_UUID = "simplybows_ice_target_uuid";
+    private static final String NBT_PAIN_FROST = "simplybows_ice_pain_frost";
+    private static final String NBT_BOUNTY_FROST = "simplybows_ice_bounty_frost";
+    private static final String NBT_STRING_LEVEL = "simplybows_ice_string_level";
+    private static final String NBT_FRAME_LEVEL = "simplybows_ice_frame_level";
     private static final String NBT_CHAOS_WALL_ON_IMPACT = "simplybows_ice_chaos_wall_on_impact";
     private static final String NBT_CHAOS_WALL_STRING_LEVEL = "simplybows_ice_chaos_wall_string_level";
     private static final String NBT_CHAOS_WALL_FRAME_LEVEL = "simplybows_ice_chaos_wall_frame_level";
@@ -79,29 +80,20 @@ public class IceBowItem extends SimplyBowItem {
         }
 
         int quantity = baseQuantity() + upgrades.stringLevel();
-        if (bountyReady) {
-            quantity *= SimplyBowsConfig.INSTANCE.winterfang.bountyExtraArrowMultiplier.get();
+        // One arrow for rune AOEs — String must not multiply frost blooms.
+        if (painReady || bountyReady || graceReady) {
+            quantity = 1;
         }
-        double damageMultiplier = upgrades.damageMultiplier();
-        if (painReady) {
-            damageMultiplier *= SimplyBowsConfig.INSTANCE.winterfang.painDamageMultiplier.get();
-        } else if (bountyReady) {
-            damageMultiplier *= SimplyBowsConfig.INSTANCE.winterfang.bountyDamageMultiplier.get();
-        }
-
-        LivingEntity painTarget = null;
-        if (painReady) {
-            painTarget = livingEntity != null && CombatTargeting.isOffensiveTargetCandidate(livingEntity, shooter)
-                    ? livingEntity
-                    : findNearestHostile(serverWorld, shooter);
-        }
+        // Soft Frame curve — global 0.55/level made headshots nuclear vs abilities.
+        double damageMultiplier = 1.0 + upgrades.frameLevel() * 0.18;
 
         NbtCompound customData = getOrCreateCustomData(stack);
         customData.putDouble(NBT_DAMAGE_MULTIPLIER, damageMultiplier);
-        // Only hard-lock when pain mode found a concrete target.
-        // If no target is found, keep normal homing fallback behavior.
-        customData.putBoolean(NBT_LOCK_TARGET, painReady && painTarget != null);
         customData.putBoolean(NBT_SLOW_STACK, graceReady);
+        customData.putBoolean(NBT_PAIN_FROST, painReady);
+        customData.putBoolean(NBT_BOUNTY_FROST, bountyReady);
+        customData.putInt(NBT_STRING_LEVEL, upgrades.stringLevel());
+        customData.putInt(NBT_FRAME_LEVEL, upgrades.frameLevel());
         customData.putBoolean(NBT_CHAOS_WALL_ON_IMPACT, chaosWallReady);
         if (chaosWallReady) {
             customData.putInt(NBT_CHAOS_WALL_STRING_LEVEL, upgrades.stringLevel());
@@ -110,29 +102,26 @@ public class IceBowItem extends SimplyBowItem {
             customData.remove(NBT_CHAOS_WALL_STRING_LEVEL);
             customData.remove(NBT_CHAOS_WALL_FRAME_LEVEL);
         }
-        if (painTarget != null) {
-            customData.putUuid(NBT_TARGET_UUID, painTarget.getUuid());
-        } else {
-            customData.remove(NBT_TARGET_UUID);
-        }
         stack.set(DataComponentTypes.CUSTOM_DATA, NbtComponent.of(customData));
 
         if (painReady) {
-            RuneUseCooldown.start(serverWorld, ownerId, "ice-pain", "ice");
+            int painCd = RuneUseCooldown.fromEffectDuration(RuneUseCooldown.BURST_EFFECT_TICKS) * 2;
+            RuneUseCooldown.start(serverWorld, ownerId, "ice-pain", "ice", painCd);
         } else if (graceReady) {
-            RuneUseCooldown.start(serverWorld, ownerId, "ice-grace", "ice");
+            int graceCd = RuneUseCooldown.fromEffectDuration(IceFrostBloomManager.graceZoneDurationTicks()) * 2;
+            RuneUseCooldown.start(serverWorld, ownerId, "ice-grace", "ice", graceCd);
         } else if (bountyReady) {
             RuneUseCooldown.start(serverWorld, ownerId, "ice-bounty", "ice");
         }
 
+        // Never pass vanilla crit — multi-arrow + crit was nuking targets ("headshot" spikes).
         if (chaosWallReady) {
-            this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.chaosWallArrowDivergence.get() * 0.01F, f == 1.0F, livingEntity);
+            this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.chaosWallArrowDivergence.get() * 0.01F, false, livingEntity);
         } else {
-            this.shootFan(this, serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.arrowDivergence.get(), f == 1.0F, livingEntity, quantity);
+            this.shootFan(this, serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.arrowDivergence.get(), false, livingEntity, quantity);
         }
         HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, shooter, ParticleTypes.SNOWFLAKE, 6);
         HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, shooter, ParticleTypes.WHITE_ASH, 8);
-
     }
 
     @Override
@@ -170,12 +159,14 @@ public class IceBowItem extends SimplyBowItem {
         }
 
         double damageMultiplier = 1.0;
-        boolean lockTarget = false;
         boolean stackSlow = false;
+        boolean painFrost = false;
+        boolean bountyFrost = false;
+        int stringLevel = 0;
+        int frameLevel = 0;
         boolean chaosWallOnImpact = false;
         int chaosWallStringLevel = 0;
         int chaosWallFrameLevel = 0;
-        UUID targetUuid = null;
         NbtComponent customData = weaponStack.get(DataComponentTypes.CUSTOM_DATA);
         if (customData != null) {
             NbtCompound nbt = customData.copyNbt();
@@ -183,80 +174,64 @@ public class IceBowItem extends SimplyBowItem {
             if (damageMultiplier <= 0.0) {
                 damageMultiplier = 1.0;
             }
-            lockTarget = nbt.getBoolean(NBT_LOCK_TARGET);
             stackSlow = nbt.getBoolean(NBT_SLOW_STACK);
+            painFrost = nbt.getBoolean(NBT_PAIN_FROST);
+            bountyFrost = nbt.getBoolean(NBT_BOUNTY_FROST);
+            stringLevel = nbt.getInt(NBT_STRING_LEVEL);
+            frameLevel = nbt.getInt(NBT_FRAME_LEVEL);
             chaosWallOnImpact = nbt.getBoolean(NBT_CHAOS_WALL_ON_IMPACT);
             chaosWallStringLevel = nbt.getInt(NBT_CHAOS_WALL_STRING_LEVEL);
             chaosWallFrameLevel = nbt.getInt(NBT_CHAOS_WALL_FRAME_LEVEL);
-            if (nbt.containsUuid(NBT_TARGET_UUID)) {
-                targetUuid = nbt.getUuid(NBT_TARGET_UUID);
-            }
         }
 
         ProjectileEntity arrowEntity;
         if (arrowStack.isOf(Items.SPECTRAL_ARROW)) {
             HomingSpectralArrowEntity spectralArrow = new HomingSpectralArrowEntity(world, shooter, arrowStack, weaponStack);
-            spectralArrow.setDamage(SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * damageMultiplier);
-            //spectralArrow.setPunch((int) Math.floor((damageMultiplier - 1.0) * 2.0));
-            spectralArrow.setLockSingleTarget(lockTarget);
-            spectralArrow.setStackingSlowness(stackSlow);
-            if (targetUuid != null) {
-                spectralArrow.setLockedTargetUuid(targetUuid);
+            double damage = SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * damageMultiplier;
+            if (stackSlow) {
+                damage *= 0.35; // Grace is support — soft tips, sanctuary does the work.
             }
+            spectralArrow.setDamage(damage);
+            spectralArrow.setStackingSlowness(stackSlow);
+            spectralArrow.setFrostStringLevel(stringLevel);
+            spectralArrow.setPainFrostBloom(painFrost, stringLevel);
+            spectralArrow.setBountyFrostBloom(bountyFrost, stringLevel, frameLevel);
             spectralArrow.setChaosWallOnImpact(chaosWallOnImpact);
             if (chaosWallOnImpact) {
-                spectralArrow.setHomingEnabled(false);
                 spectralArrow.setChaosWallUpgradeLevels(chaosWallStringLevel, chaosWallFrameLevel);
             }
-            spectralArrow.setCritical(critical);
+            if (stackSlow) {
+                spectralArrow.setHomingEnabled(false);
+            }
+            // No vanilla crit multiplier — multi-arrow + crit was nuking targets.
+            spectralArrow.setCritical(false);
             arrowEntity = spectralArrow;
         } else {
             HomingArrowEntity homingArrow = new HomingArrowEntity(world, shooter, arrowStack, weaponStack);
-            homingArrow.setDamage(SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * damageMultiplier);
-            //homingArrow.setPunch((int) Math.floor((damageMultiplier - 1.0) * 2.0));
-            homingArrow.setLockSingleTarget(lockTarget);
-            homingArrow.setStackingSlowness(stackSlow);
-            if (targetUuid != null) {
-                homingArrow.setLockedTargetUuid(targetUuid);
+            double damage = SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * damageMultiplier;
+            if (stackSlow) {
+                damage *= 0.35;
             }
+            homingArrow.setDamage(damage);
+            homingArrow.setStackingSlowness(stackSlow);
+            homingArrow.setFrostStringLevel(stringLevel);
+            homingArrow.setPainFrostBloom(painFrost, stringLevel);
+            homingArrow.setBountyFrostBloom(bountyFrost, stringLevel, frameLevel);
             homingArrow.setChaosWallOnImpact(chaosWallOnImpact);
             if (chaosWallOnImpact) {
-                homingArrow.setHomingEnabled(false);
                 homingArrow.setChaosWallUpgradeLevels(chaosWallStringLevel, chaosWallFrameLevel);
             }
-            homingArrow.setCritical(critical);
+            if (stackSlow) {
+                homingArrow.setHomingEnabled(false);
+            }
+            homingArrow.setCritical(false);
             arrowEntity = homingArrow;
         }
         return arrowEntity;
     }
 
     private int getArrowQuantity(BowUpgradeData upgrades) {
-        int quantity = baseQuantity() + upgrades.stringLevel();
-        if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
-            quantity *= SimplyBowsConfig.INSTANCE.winterfang.bountyExtraArrowMultiplier.get();
-        }
-        return quantity;
-    }
-
-    private LivingEntity findNearestHostile(ServerWorld world, LivingEntity shooter) {
-        List<LivingEntity> hostiles = world.getEntitiesByClass(
-                LivingEntity.class,
-                shooter.getBoundingBox().expand(painTargetHorizontalRange(), painTargetVerticalRange(), painTargetHorizontalRange()),
-                candidate -> CombatTargeting.isOffensiveTargetCandidate(candidate, shooter)
-        );
-        LivingEntity best = null;
-        double bestDist = Double.MAX_VALUE;
-        for (LivingEntity hostile : hostiles) {
-            if (!CombatTargeting.checkFriendlyFire(hostile, shooter)) {
-                continue;
-            }
-            double dist = hostile.squaredDistanceTo(shooter);
-            if (dist < bestDist) {
-                bestDist = dist;
-                best = hostile;
-            }
-        }
-        return best;
+        return baseQuantity() + upgrades.stringLevel();
     }
 
     private static NbtCompound getOrCreateCustomData(ItemStack stack) {

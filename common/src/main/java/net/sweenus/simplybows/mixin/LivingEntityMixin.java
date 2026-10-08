@@ -26,6 +26,10 @@ public abstract class LivingEntityMixin {
         if (!(living.getWorld() instanceof ServerWorld serverWorld)) {
             return;
         }
+        // Don't pop a shield bee from the wearer's own punch / self-damage.
+        if (source.getAttacker() == living || source.getSource() == living) {
+            return;
+        }
         if (BeeGraceShieldManager.consumeShield(serverWorld, living)) {
             cir.setReturnValue(false);
         }

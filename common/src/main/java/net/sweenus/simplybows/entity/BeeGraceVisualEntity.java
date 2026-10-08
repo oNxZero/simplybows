@@ -2,6 +2,7 @@ package net.sweenus.simplybows.entity;
 
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
+import net.minecraft.entity.damage.DamageSource;
 import net.minecraft.entity.data.DataTracker;
 import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
@@ -17,6 +18,7 @@ public class BeeGraceVisualEntity extends Entity {
         super(type, world);
         this.noClip = true;
         this.setNoGravity(true);
+        this.setInvulnerable(true);
     }
 
     public BeeGraceVisualEntity(World world, double x, double y, double z) {
@@ -41,6 +43,31 @@ public class BeeGraceVisualEntity extends Entity {
     @Override
     public boolean isAttackable() {
         return false;
+    }
+
+    @Override
+    public boolean canHit() {
+        return false;
+    }
+
+    @Override
+    public boolean isCollidable() {
+        return false;
+    }
+
+    @Override
+    public boolean isInvulnerableTo(DamageSource damageSource) {
+        return true;
+    }
+
+    @Override
+    public boolean damage(DamageSource source, float amount) {
+        return false;
+    }
+
+    @Override
+    public boolean handleAttack(Entity attacker) {
+        return true;
     }
 
     @Override

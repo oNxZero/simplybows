@@ -73,7 +73,8 @@ public class BubblePainArrowEntity extends net.minecraft.entity.projectile.Arrow
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             spawnImpact(serverWorld, blockHitResult.getPos());
         }
-        trySpawnBubbleColumn(blockHitResult.getPos());
+        // Pain axolotls are projectiles only — no bubble column spam.
+        this.spawnedBubbleColumn = true;
         super.onBlockHit(blockHitResult);
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             spawnPoofAndDiscard(serverWorld);
@@ -84,19 +85,11 @@ public class BubblePainArrowEntity extends net.minecraft.entity.projectile.Arrow
 
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
-        if (entityHitResult.getEntity() instanceof LivingEntity living) {
-            living.hurtTime = 0;
-            living.timeUntilRegen = 0;
-        }
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             spawnImpact(serverWorld, entityHitResult.getPos());
         }
-        trySpawnBubbleColumn(entityHitResult.getPos());
+        this.spawnedBubbleColumn = true;
         super.onEntityHit(entityHitResult);
-        if (entityHitResult.getEntity() instanceof LivingEntity living) {
-            living.hurtTime = 0;
-            living.timeUntilRegen = 0;
-        }
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             spawnPoofAndDiscard(serverWorld);
         } else {

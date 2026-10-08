@@ -1,81 +1,139 @@
 # Simply Bows Reforged
 
-A balance and feel fork of [Sweenus/simplybows](https://github.com/Sweenus/simplybows) for NeoForge 1.21.1.
+A balance and feel fork of [Sweenus/simplybows](https://github.com/Sweenus/simplybows) for **NeoForge 1.21.1**.
 
 Item IDs for the six remaining bows are unchanged, so existing Winterfang, Everbloom, Bubbleveil, Buzzkill, Petalwind, and Tremorstrike items stay valid. Echo and Starweave are removed.
 
 Upstream author: [Sweenus](https://github.com/Sweenus). This fork keeps the Timefall Development License 1.2 from upstream.
+
+---
 
 ## Install
 
 Build (Gradle **8.9**, Java **21**):
 
 ```bash
-export JAVA_HOME=/usr/lib/jvm/java-21-openjdk
-gradle :neoforge:remapJar
+export JAVA_HOME=/usr/lib/jvm/java-21-openjdk   # or your JDK 21 path
+./gradlew :neoforge:remapJar
 ```
 
 Install `neoforge/build/libs/SimplyBows-neoforge-0.1.4.jar` on the **server and every client**. Do not run it beside the Modrinth upstream jar.
 
-After a first update (or if the server fails to start with `ExceptionInInitializerError`), delete `config/simplybows/config.toml` once so renamed keys are written. A live file can keep old numbers or break on invalid ranges.
+After a first update (or if the server fails to start with `ExceptionInInitializerError`), delete `config/simplybows/config.toml` once so renamed keys are rewritten. A live file can keep old numbers or break on invalid ranges.
 
-Requires [Simply Tooltips](https://modrinth.com/mod/simply-tooltips) for the modern bow tooltips (rune prose under Upgrades; Alt tabs for String/Frame detail).
+Requires [Simply Tooltips](https://modrinth.com/mod/simply-tooltips) for modern bow tooltips (rune prose under Upgrades; Alt tabs for String/Frame detail).
 
-## What Reforged changes
+---
 
-### Shared rules
+## Shared rules
 
-- Unique ability shots need a full draw where that bow has a special.
-- **One shared ability cooldown per player** across every Simply Bow. Swap-spam with five bows does nothing — bring a party with different roles.
-- Cooldown length is based on effect duration: **3×** up to 5s of effect, then **2×** on the remainder, hard-capped at **~30s**. Burst abilities use a short default window.
-- The hotbar shows a dark see-through cooldown wash on every unique bow while locked; normal shots still work.
-- Hold **Alt** on a unique bow for String/Frame gains and rune details (Simply Tooltips).
-- Upgrades live in the `simplybows:upgrades` component so they survive mods that wipe `minecraft:custom_data` on death. Already-wiped upgrades cannot be restored.
-- Effect zones grow in and sink out instead of popping.
+- Unique ability shots need a **full draw** where that bow has a special.
+- **One shared ability cooldown per player** across every Simply Bow. Swapping bows does not reset it.
+- Cooldown length is based on effect duration (roughly **3×** up to 5s of effect, then **2×** on the remainder, hard-capped around **~30s**). Burst abilities use a short default window.
+- The hotbar shows a dark cooldown wash on every unique bow while locked; normal shots still work.
+- Hold **Alt** on a unique bow for String/Frame gains and rune details (Simply Tooltips). String/Frame alt text updates based on the etched rune.
+- Upgrades live in the `simplybows:upgrades` component so they survive mods that wipe `minecraft:custom_data` on death.
+- Support runes (Grace) never hurt players, animals, iron golems, or villagers.
 
-### Everbloom
+### Upgrades
 
-Healing bow. Full draw plants flowers; short draw still heals on hit.
+| Upgrade | Role |
+|---------|------|
+| **Enchanted String** | Size, count, duration, or radius — depends on the bow and rune |
+| **Reinforced Frame** | Power, duration, pulses, hops, or poison level — depends on the bow and rune |
+| **Rune Etching** | Pain / Grace / Bounty / Chaos — replaces the unique ability (does not use a String/Frame slot) |
 
-- Players, animals, and iron golems take no arrow damage and are healed on direct hit.
-- Field heal on the visible flower patch. Pain: damage only, faster pulses. Grace: heal everyone + cleanse via cherry tree. **Bounty: no heal — DPS aura** (stronger pulses than base, a bit slower than Pain). Chaos: spore blossom drain field.
-- One Everbloom field per player at a time. Shared global cooldown with all other unique bows.
+---
 
-### Winterfang
+## The bows
 
-- Pain focuses one target at `1.2x` damage.
-- Grace stacks Slowness; Bounty fires more arrows at reduced damage each; Chaos raises a frost wall.
+### Everbloom (`vine_bow`)
 
-### Bubbleveil
+Nature support field. Impact plants a flower patch that heals allies and chips monsters. Fully drawn shots also heal the ally they hit.
 
-- Pain fires a line of axolotl shots (`painShotSpeedLand` / `Water`).
-- Grace and Bounty plant a bubble column (Resistance / swarm damage).
-- Chaos casts a forward wave on full draw.
+| Rune | Effect | String | Frame |
+|------|--------|--------|-------|
+| *(none)* | Flower field — heal allies, light damage to hostiles | Radius + arrow speed | Heal / field damage |
+| **Pain** | Wither-rose field (dark smoke/ink). No heal. Faster monster damage | Radius | Damage |
+| **Grace** | Heals every ally in the patch; cherry tree cleanses negatives | Radius | Heal strength |
+| **Bounty** | Three cherry trees volley petal bolts at hostiles; Blindness + Nausea in the area | Radius | Bolt damage |
+| **Chaos** | Spore blossom with draining tendrils; burst buffs allies when charged | Radius | Duration |
 
-### Buzzkill
+One Everbloom field per player at a time.
 
-- Pain: fan of weakly homing bees. Grace: orbiting shield bees + Resistance for nearby allies.
-- Bounty: short-lived hive that fires homing bees. Chaos: honey storm that slows and dive-bombs (no leftover smoke).
+---
 
-### Petalwind
+### Winterfang (`ice_bow`)
 
-- Base / Bounty: leaping petal storms. **Bounty locks onto up to 3 targets** (retarget only if one dies); config max is 3.
-- Pain: planted petal ring at half storm damage (AOE).
-- Grace: short filled blossom puddle — Strength II for players inside.
-- Chaos: orbiting koi at impact (~8s base, shorter Frame scaling than before).
+Fan of homing frost arrows. Vanilla crits are disabled so multi-arrow shots do not spike unfairly.
 
-### Tremorstrike
+| Rune | Effect | String | Frame |
+|------|--------|--------|-------|
+| *(none)* | Homing frost fan | +1 arrow | Arrow damage |
+| **Pain** | One focused arrow. 4s frost zone — Slowness II, Mining Fatigue, light chip damage | Zone size | Damage |
+| **Grace** | Soft tip. Sanctuary buffs players, animals, and golems (Res + Speed + Regen); hostiles get Slow | Sanctuary size | — |
+| **Bounty** | One arrow. Frost bloom pulses once per second | Pulse radius | Pulse count |
+| **Chaos** | Frost wall that blocks entities and projectiles | Wall width | Duration |
 
-- Pain: outward spike waves (moderate damage). Grace: ally launch + Resistance / Slow Falling.
-- Bounty: center spike burst with controlled knock-up.
-- Chaos: **dense spike disc** that orbits the impact for **exactly two full turns** (10s+, longer with String). Softened per-hit damage vs. the wider coverage.
+---
 
-### Removed
+### Bubbleveil (`bubble_bow`)
 
-- Echo and Starweave (Cosmic) are gone from items, loot, models, and config.
-- Petalwind Chaos still uses the koi visuals.
+Arrows ignore water drag and leave short bubble columns.
 
-## Bows (registry ids)
+| Rune | Effect | String | Frame |
+|------|--------|--------|-------|
+| *(none)* | Bubble column on impact | Duration | Radius / height |
+| **Pain** | Full draw fires a line of axolotl shots (no columns) | Axolotl count | — |
+| **Grace** | Guardian column — blocks shots, Resistance II for allies, Slowness for hostiles | Duration | Size |
+| **Bounty** | Axolotl swarm column that chips hostiles inside (low sustained DoT) | Duration | Soft damage scale |
+| **Chaos** | Full-draw forward water wave with heavy knockback | Wave length | Wave damage |
+
+---
+
+### Buzzkill (`bee_bow`)
+
+Fires bees. Fully drawn shots apply stacking poison.
+
+| Rune | Effect | String | Frame |
+|------|--------|--------|-------|
+| *(none)* | Bee arrows; full draw stacks poison | Poison duration / strength | Bee damage |
+| **Pain** | Fan of short-lived homing bees at reduced damage | Bee count | Damage |
+| **Grace** | Bees sting allies for Resistance II, then hop to the next ally within 10 blocks. Skips targets that already have Res; wanders until a new ally appears | Bee count | Hops per bee |
+| **Bounty** | Hive releases exploding splash bees that stack poison. Short acquire range; bees launch out and search / wander if nothing is nearby | Bee count | Splash damage + poison level (up to III) |
+| **Chaos** | ~5s honey storm — slowing cloud and dive-bombs | Storm radius | Dive damage |
+
+---
+
+### Petalwind (`blossom_bow`)
+
+Arrows create small blossom storms that leap between targets.
+
+| Rune | Effect | String | Frame |
+|------|--------|--------|-------|
+| *(none)* | Leaping petal storm | Duration | Storm damage |
+| **Pain** | Damaging petal ring at impact (softer than a leaping storm) | Ring radius | Damage |
+| **Grace** | Short blossom puddle; **all** allies inside (players, animals, golems) get Strength II | Puddle size | Buff duration |
+| **Bounty** | Up to **3** petal storms that lock onto separate targets | Duration | Damage |
+| **Chaos** | Orbiting koi that damage hostiles and reflect shots | — | Koi count / duration |
+
+---
+
+### Tremorstrike (`earth_bow`)
+
+Impact erupts a dripstone spike field with knock-up.
+
+| Rune | Effect | String | Frame |
+|------|--------|--------|-------|
+| *(none)* | Spike field on impact | Radius | Damage + knock-up |
+| **Pain** | Seismic fissure along the shot path — spikes, damage, brief Slowness II | Wave travel | Damage |
+| **Grace** | Launches nearby allies with Resistance + Slow Falling. Raises a **half-oval dripstone wall** that blocks walking and shots (frost-wall style). Hit ally gets **Absorption III**. String = radius, Frame = duration | Wall radius | Wall duration |
+| **Bounty** | Three spike pulses (up / down / up) half a second apart | Radius | Center spike power |
+| **Chaos** | Smaller orbit; a filled **25% wedge** of spikes sweeps around | Duration | Damage |
+
+---
+
+## Registry ids
 
 | In-game      | Item id       |
 |--------------|---------------|
@@ -86,6 +144,12 @@ Healing bow. Full draw plants flowers; short draw still heals on hit.
 | Petalwind    | `blossom_bow` |
 | Tremorstrike | `earth_bow`   |
 
+---
+
+## Removed
+
+- Echo and Starweave (Cosmic) are gone from items, loot, models, and config.
+
 ## Docs
 
-Detailed notes live in [CHANGELOG.md](CHANGELOG.md).
+Detailed patch notes live in [CHANGELOG.md](CHANGELOG.md).

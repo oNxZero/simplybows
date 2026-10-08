@@ -13,6 +13,7 @@ public class IceChaosWallVisualEntity extends Entity {
 
     private static final TrackedData<Float> TARGET_HEIGHT = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.FLOAT);
     private static final TrackedData<Float> HEIGHT_SCALE = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.FLOAT);
+    private static final TrackedData<Boolean> DRIPSTONE_STYLE = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
 
     public IceChaosWallVisualEntity(EntityType<? extends IceChaosWallVisualEntity> type, World world) {
         super(type, world);
@@ -31,6 +32,15 @@ public class IceChaosWallVisualEntity extends Entity {
     protected void initDataTracker(DataTracker.Builder builder) {
         builder.add(TARGET_HEIGHT, 1.0F);
         builder.add(HEIGHT_SCALE, 0.0F);
+        builder.add(DRIPSTONE_STYLE, false);
+    }
+
+    public void setDripstoneStyle(boolean dripstoneStyle) {
+        this.dataTracker.set(DRIPSTONE_STYLE, dripstoneStyle);
+    }
+
+    public boolean isDripstoneStyle() {
+        return this.dataTracker.get(DRIPSTONE_STYLE);
     }
 
     public void setTargetHeight(float targetHeight) {
@@ -62,11 +72,15 @@ public class IceChaosWallVisualEntity extends Entity {
         if (nbt.contains("height_scale")) {
             this.setHeightScale(nbt.getFloat("height_scale"));
         }
+        if (nbt.contains("dripstone_style")) {
+            this.setDripstoneStyle(nbt.getBoolean("dripstone_style"));
+        }
     }
 
     @Override
     protected void writeCustomDataToNbt(NbtCompound nbt) {
         nbt.putFloat("target_height", this.getTargetHeight());
         nbt.putFloat("height_scale", this.getHeightScale());
+        nbt.putBoolean("dripstone_style", this.isDripstoneStyle());
     }
 }

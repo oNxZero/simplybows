@@ -33,8 +33,11 @@ public class IceChaosWallVisualEntityRenderer extends EntityRenderer<IceChaosWal
         matrices.push();
         matrices.translate(-0.5, 0.0, -0.5);
         matrices.scale(1.0F, height, 1.0F);
+        var blockState = entity.isDripstoneStyle()
+                ? Blocks.DRIPSTONE_BLOCK.getDefaultState()
+                : Blocks.PACKED_ICE.getDefaultState();
         MinecraftClient.getInstance().getBlockRenderManager().renderBlockAsEntity(
-                Blocks.PACKED_ICE.getDefaultState(),
+                blockState,
                 matrices,
                 vertexConsumers,
                 light,

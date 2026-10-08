@@ -5,6 +5,7 @@ import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
+import net.sweenus.simplybows.world.BeeHiveSwarmManager;
 import net.sweenus.simplybows.world.VineFlowerFieldManager;
 
 import java.util.ArrayList;
@@ -26,25 +27,79 @@ public final class BowUpgradeTooltip {
     }
 
     public static String stringGain(String bowKey) {
-        var upgrades = SimplyBowsConfig.INSTANCE.upgrades;
+        return stringGain(bowKey, new BowUpgradeData(0, 0, RuneEtching.NONE));
+    }
+
+    public static String stringGain(String bowKey, BowUpgradeData upgrades) {
+        RuneEtching rune = upgrades != null ? upgrades.runeEtching() : RuneEtching.NONE;
         return switch (bowKey) {
-            case "vine" -> t("tooltip.simplybows.alt.string.vine", num(VineFlowerFieldManager.flowerPatchRadiusPerString()));
-            case "ice" -> t("tooltip.simplybows.alt.string.ice");
-            case "bubble" -> t("tooltip.simplybows.alt.string.bubble", seconds(SimplyBowsConfig.INSTANCE.bubbleveil.columnDurationBonusPerString.get()));
-            case "bee" -> t("tooltip.simplybows.alt.string.bee", seconds(SimplyBowsConfig.INSTANCE.buzzkill.stringPoisonDurationBonus.get()));
-            case "blossom" -> t("tooltip.simplybows.alt.string.blossom", seconds(SimplyBowsConfig.INSTANCE.petalwind.stormDurationBonusPerString.get()));
+            case "vine" -> rune == RuneEtching.CHAOS
+                    ? t("tooltip.simplybows.alt.string.vine.chaos", num(SimplyBowsConfig.INSTANCE.everbloom.chaosRadiusPerString.get()))
+                    : t("tooltip.simplybows.alt.string.vine", num(VineFlowerFieldManager.flowerPatchRadiusPerString()));
+            case "ice" -> switch (rune) {
+                case PAIN -> t("tooltip.simplybows.alt.string.ice.pain", num(SimplyBowsConfig.INSTANCE.winterfang.painFrostRadiusPerString.get()));
+                case GRACE -> t("tooltip.simplybows.alt.string.ice.grace");
+                case BOUNTY -> t("tooltip.simplybows.alt.string.ice.bounty", num(SimplyBowsConfig.INSTANCE.winterfang.bountyFrostRadiusPerString.get()));
+                case CHAOS -> t("tooltip.simplybows.alt.string.ice.chaos");
+                default -> t("tooltip.simplybows.alt.string.ice");
+            };
+            case "bubble" -> switch (rune) {
+                case PAIN -> t("tooltip.simplybows.alt.string.bubble.pain");
+                case CHAOS -> t("tooltip.simplybows.alt.string.bubble.chaos");
+                default -> t("tooltip.simplybows.alt.string.bubble", seconds(SimplyBowsConfig.INSTANCE.bubbleveil.columnDurationBonusPerString.get()));
+            };
+            case "bee" -> switch (rune) {
+                case PAIN -> t("tooltip.simplybows.alt.string.bee.pain");
+                case GRACE -> t("tooltip.simplybows.alt.string.bee.grace");
+                case BOUNTY -> t("tooltip.simplybows.alt.string.bee.bounty");
+                case CHAOS -> t("tooltip.simplybows.alt.string.bee.chaos", num(SimplyBowsConfig.INSTANCE.buzzkill.chaosRadiusPerString.get()));
+                default -> t("tooltip.simplybows.alt.string.bee", seconds(SimplyBowsConfig.INSTANCE.buzzkill.stringPoisonDurationBonus.get()));
+            };
+            case "blossom" -> switch (rune) {
+                case PAIN -> t("tooltip.simplybows.alt.string.blossom.pain", num(SimplyBowsConfig.INSTANCE.petalwind.painAreaRadiusPerString.get()));
+                case GRACE -> t("tooltip.simplybows.alt.string.blossom.grace");
+                default -> t("tooltip.simplybows.alt.string.blossom", seconds(SimplyBowsConfig.INSTANCE.petalwind.stormDurationBonusPerString.get()));
+            };
             case "earth" -> t("tooltip.simplybows.alt.string.earth", num(SimplyBowsConfig.INSTANCE.tremorstrike.stringRadiusBonusPerLevel.get()));
             default -> t("tooltip.simplybows.alt.string.generic");
         };
     }
 
     public static String frameGain(String bowKey) {
-        var upgrades = SimplyBowsConfig.INSTANCE.upgrades;
+        return frameGain(bowKey, new BowUpgradeData(0, 0, RuneEtching.NONE));
+    }
+
+    public static String frameGain(String bowKey, BowUpgradeData upgrades) {
+        RuneEtching rune = upgrades != null ? upgrades.runeEtching() : RuneEtching.NONE;
+        var cfg = SimplyBowsConfig.INSTANCE.upgrades;
         return switch (bowKey) {
-            case "vine" -> t("tooltip.simplybows.alt.frame.vine", hearts(SimplyBowsConfig.INSTANCE.everbloom.friendlyHeal.get() * 0.6F * 0.5F));
-            case "ice", "bee", "blossom" -> t("tooltip.simplybows.alt.frame.damage", pct(upgrades.damageMultiplierPerFrame.get()));
-            case "bubble" -> t("tooltip.simplybows.alt.frame.bubble", num(SimplyBowsConfig.INSTANCE.bubbleveil.columnRadiusPerFrame.get()));
-            case "earth" -> t("tooltip.simplybows.alt.frame.earth", pct(upgrades.damageMultiplierPerFrame.get()));
+            case "vine" -> switch (rune) {
+                case PAIN -> t("tooltip.simplybows.alt.frame.damage", pct(cfg.damageMultiplierPerFrame.get()));
+                case BOUNTY -> t("tooltip.simplybows.alt.frame.vine.bounty");
+                case CHAOS -> t("tooltip.simplybows.alt.frame.vine.chaos", seconds(SimplyBowsConfig.INSTANCE.everbloom.chaosDurationPerFrameTicks.get()));
+                default -> t("tooltip.simplybows.alt.frame.vine", hearts(SimplyBowsConfig.INSTANCE.everbloom.friendlyHeal.get() * 0.6F * 0.5F));
+            };
+            case "ice" -> switch (rune) {
+                case BOUNTY -> t("tooltip.simplybows.alt.frame.ice.bounty");
+                case CHAOS -> t("tooltip.simplybows.alt.frame.ice.chaos", seconds(SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationPerFrameTicks.get()));
+                default -> t("tooltip.simplybows.alt.frame.damage", pct(cfg.damageMultiplierPerFrame.get()));
+            };
+            case "bee" -> switch (rune) {
+                case GRACE -> t("tooltip.simplybows.alt.frame.bee.grace");
+                case BOUNTY -> t("tooltip.simplybows.alt.frame.bee.bounty");
+                default -> t("tooltip.simplybows.alt.frame.damage", pct(cfg.damageMultiplierPerFrame.get()));
+            };
+            case "earth" -> rune == RuneEtching.GRACE
+                    ? t("tooltip.simplybows.alt.frame.earth.grace")
+                    : t("tooltip.simplybows.alt.frame.earth", pct(cfg.damageMultiplierPerFrame.get()));
+            case "blossom" -> switch (rune) {
+                case GRACE -> t("tooltip.simplybows.alt.frame.blossom.grace");
+                case CHAOS -> t("tooltip.simplybows.alt.frame.blossom.chaos");
+                default -> t("tooltip.simplybows.alt.frame.damage", pct(cfg.damageMultiplierPerFrame.get()));
+            };
+            case "bubble" -> rune == RuneEtching.CHAOS
+                    ? t("tooltip.simplybows.alt.frame.bubble.chaos", num(SimplyBowsConfig.INSTANCE.bubbleveil.chaosDamagePerFrame.get()))
+                    : t("tooltip.simplybows.alt.frame.bubble", num(SimplyBowsConfig.INSTANCE.bubbleveil.columnRadiusPerFrame.get()));
             default -> t("tooltip.simplybows.alt.frame.generic");
         };
     }
@@ -57,7 +112,7 @@ public final class BowUpgradeTooltip {
             case "bubble" -> bubbleString(upgrades, string);
             case "bee" -> beeString(upgrades, string);
             case "blossom" -> t("tooltip.simplybows.detail.blossom.string", string, seconds(blossomDuration(upgrades)));
-            case "earth" -> t("tooltip.simplybows.detail.earth.string", string, num(earthRadius(upgrades)));
+            case "earth" -> earthString(upgrades, string);
             default -> t("tooltip.simplybows.detail.generic.string", string);
         };
     }
@@ -66,11 +121,11 @@ public final class BowUpgradeTooltip {
         int frame = upgrades.frameLevel();
         return switch (bowKey) {
             case "vine" -> vineFrame(upgrades, frame);
-            case "ice" -> t("tooltip.simplybows.detail.ice.frame", frame, num(iceDamage(upgrades)));
+            case "ice" -> iceFrame(upgrades, frame);
             case "bubble" -> bubbleFrame(upgrades, frame);
-            case "bee" -> t("tooltip.simplybows.detail.bee.frame", frame, num(beeDamage(upgrades)));
+            case "bee" -> beeFrame(upgrades, frame);
             case "blossom" -> t("tooltip.simplybows.detail.blossom.frame", frame, num(blossomDamage(upgrades)));
-            case "earth" -> t("tooltip.simplybows.detail.earth.frame", frame, num(earthDamage(upgrades)), num(earthKnockup(upgrades)));
+            case "earth" -> earthFrame(upgrades, frame);
             default -> t("tooltip.simplybows.detail.generic.frame", frame);
         };
     }
@@ -135,6 +190,9 @@ public final class BowUpgradeTooltip {
         if (upgrades.runeEtching() == RuneEtching.PAIN) {
             return t("tooltip.simplybows.detail.vine.frame.pain", frame, num(arrow), num(field));
         }
+        if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
+            return t("tooltip.simplybows.detail.vine.frame.bounty", frame, num(1.0 + frame * 0.425));
+        }
         if (upgrades.runeEtching() == RuneEtching.GRACE) {
             return t("tooltip.simplybows.detail.vine.frame.grace", frame, hearts(vineHealPerSecond(upgrades)), hearts(2.0 + frame));
         }
@@ -146,21 +204,32 @@ public final class BowUpgradeTooltip {
     }
 
     private static String iceString(BowUpgradeData upgrades, int string) {
-        int arrows = SimplyBowsConfig.INSTANCE.winterfang.baseQuantity.get() + string;
-        if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
-            arrows *= SimplyBowsConfig.INSTANCE.winterfang.bountyExtraArrowMultiplier.get();
-        }
-        return t("tooltip.simplybows.detail.ice.string", string, arrows);
+        var cfg = SimplyBowsConfig.INSTANCE.winterfang;
+        return switch (upgrades.runeEtching()) {
+            case PAIN -> t("tooltip.simplybows.detail.ice.string.pain", string,
+                    num(cfg.painFrostRadius.get() + string * cfg.painFrostRadiusPerString.get()));
+            case GRACE -> t("tooltip.simplybows.detail.ice.string.grace", string, num(3.25 + string * 0.35));
+            case BOUNTY -> t("tooltip.simplybows.detail.ice.string.bounty", string,
+                    num(cfg.bountyFrostRadius.get() + string * cfg.bountyFrostRadiusPerString.get()));
+            case CHAOS -> t("tooltip.simplybows.detail.ice.string.chaos", string,
+                    cfg.chaosWallWidth.get() + string * cfg.chaosWallWidthPerString.get());
+            default -> t("tooltip.simplybows.detail.ice.string", string, cfg.baseQuantity.get() + string);
+        };
+    }
+
+    private static String iceFrame(BowUpgradeData upgrades, int frame) {
+        var cfg = SimplyBowsConfig.INSTANCE.winterfang;
+        return switch (upgrades.runeEtching()) {
+            case BOUNTY -> t("tooltip.simplybows.detail.ice.frame.bounty", frame,
+                    Math.max(2, cfg.bountyFrostPulseCount.get() + frame));
+            case CHAOS -> t("tooltip.simplybows.detail.ice.frame.chaos", frame,
+                    seconds(cfg.chaosWallDurationTicks.get() + frame * cfg.chaosWallDurationPerFrameTicks.get()));
+            default -> t("tooltip.simplybows.detail.ice.frame", frame, num(iceDamage(upgrades)));
+        };
     }
 
     private static double iceDamage(BowUpgradeData upgrades) {
-        double damage = SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * upgrades.damageMultiplier();
-        if (upgrades.runeEtching() == RuneEtching.PAIN) {
-            damage *= SimplyBowsConfig.INSTANCE.winterfang.painDamageMultiplier.get();
-        } else if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
-            damage *= SimplyBowsConfig.INSTANCE.winterfang.bountyDamageMultiplier.get();
-        }
-        return damage;
+        return SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * upgrades.damageMultiplier();
     }
 
     private static String bubbleString(BowUpgradeData upgrades, int string) {
@@ -190,12 +259,44 @@ public final class BowUpgradeTooltip {
     }
 
     private static String beeString(BowUpgradeData upgrades, int string) {
+        var cfg = SimplyBowsConfig.INSTANCE.buzzkill;
         int amplifier = Math.min(4, string / 2);
-        int ticks = SimplyBowsConfig.INSTANCE.buzzkill.basePoisonDuration.get() + string * SimplyBowsConfig.INSTANCE.buzzkill.stringPoisonDurationBonus.get();
-        if (upgrades.runeEtching() == RuneEtching.PAIN) {
-            return t("tooltip.simplybows.detail.bee.string.pain", string, Math.max(1, string + 1), amplifier + 1, seconds(ticks));
+        int ticks = cfg.basePoisonDuration.get() + string * cfg.stringPoisonDurationBonus.get();
+        return switch (upgrades.runeEtching()) {
+            case PAIN -> t("tooltip.simplybows.detail.bee.string.pain", string, Math.max(1, string + 1), amplifier + 1, seconds(ticks));
+            case GRACE -> t("tooltip.simplybows.detail.bee.string.grace", string, Math.max(1, 1 + string));
+            case BOUNTY -> t("tooltip.simplybows.detail.bee.string.bounty", string,
+                    BeeHiveSwarmManager.beeCountFor(upgrades),
+                    seconds(BeeHiveSwarmManager.hiveDurationTicks(upgrades)));
+            case CHAOS -> t("tooltip.simplybows.detail.bee.string.chaos", string,
+                    num(cfg.chaosBaseRadius.get() + string * cfg.chaosRadiusPerString.get()));
+            default -> t("tooltip.simplybows.detail.bee.string", string, amplifier + 1, seconds(ticks));
+        };
+    }
+
+    private static String beeFrame(BowUpgradeData upgrades, int frame) {
+        if (upgrades.runeEtching() == RuneEtching.GRACE) {
+            return t("tooltip.simplybows.detail.bee.frame.grace", frame, Math.max(1, 1 + frame));
         }
-        return t("tooltip.simplybows.detail.bee.string", string, amplifier + 1, seconds(ticks));
+        if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
+            float dmg = (float) (SimplyBowsConfig.INSTANCE.buzzkill.baseDamage.get() * (1.35 + frame * 0.35));
+            return t("tooltip.simplybows.detail.bee.frame.bounty", frame, num(dmg), Math.min(3, 1 + Math.min(2, frame)));
+        }
+        return t("tooltip.simplybows.detail.bee.frame", frame, num(beeDamage(upgrades)));
+    }
+
+    private static String earthString(BowUpgradeData upgrades, int string) {
+        if (upgrades.runeEtching() == RuneEtching.GRACE) {
+            return t("tooltip.simplybows.detail.earth.string.grace", string, num(2.75 + string * 0.28));
+        }
+        return t("tooltip.simplybows.detail.earth.string", string, num(earthRadius(upgrades)));
+    }
+
+    private static String earthFrame(BowUpgradeData upgrades, int frame) {
+        if (upgrades.runeEtching() == RuneEtching.GRACE) {
+            return t("tooltip.simplybows.detail.earth.frame.grace", frame, seconds(120 + frame * 20));
+        }
+        return t("tooltip.simplybows.detail.earth.frame", frame, num(earthDamage(upgrades)), num(earthKnockup(upgrades)));
     }
 
     private static double beeDamage(BowUpgradeData upgrades) {
@@ -234,7 +335,7 @@ public final class BowUpgradeTooltip {
                 case PAIN -> t("tooltip.simplybows.rune_stat.vine.pain", seconds(SimplyBowsConfig.INSTANCE.everbloom.painAuraInterval.get()));
                 case GRACE -> t("tooltip.simplybows.rune_stat.vine.grace", seconds(SimplyBowsConfig.INSTANCE.everbloom.fieldDurationTicks.get()));
                 case BOUNTY -> t("tooltip.simplybows.rune_stat.vine.bounty",
-                        num(SimplyBowsConfig.INSTANCE.everbloom.bountyDamageMultiplier.get()),
+                        num(1.0 + frame * 0.425),
                         seconds(SimplyBowsConfig.INSTANCE.everbloom.bountyAuraInterval.get()));
                 case CHAOS -> t("tooltip.simplybows.rune_stat.vine.chaos",
                         num(SimplyBowsConfig.INSTANCE.everbloom.chaosBaseRadius.get() + string * SimplyBowsConfig.INSTANCE.everbloom.chaosRadiusPerString.get()),
@@ -242,9 +343,12 @@ public final class BowUpgradeTooltip {
                 default -> null;
             };
             case "ice" -> switch (rune) {
-                case PAIN -> t("tooltip.simplybows.rune_stat.ice.pain", num(SimplyBowsConfig.INSTANCE.winterfang.painDamageMultiplier.get()));
-                case GRACE -> t("tooltip.simplybows.rune_stat.ice.grace", seconds(SimplyBowsConfig.INSTANCE.winterfang.graceSlownessDuration.get()), SimplyBowsConfig.INSTANCE.winterfang.graceMaxSlownessStacks.get());
-                case BOUNTY -> t("tooltip.simplybows.rune_stat.ice.bounty", SimplyBowsConfig.INSTANCE.winterfang.bountyExtraArrowMultiplier.get(), num(SimplyBowsConfig.INSTANCE.winterfang.bountyDamageMultiplier.get()));
+                case PAIN -> t("tooltip.simplybows.rune_stat.ice.pain",
+                        num(SimplyBowsConfig.INSTANCE.winterfang.painFrostRadius.get() + string * SimplyBowsConfig.INSTANCE.winterfang.painFrostRadiusPerString.get()));
+                case GRACE -> t("tooltip.simplybows.rune_stat.ice.grace", seconds(120), seconds(100));
+                case BOUNTY -> t("tooltip.simplybows.rune_stat.ice.bounty",
+                        Math.max(2, SimplyBowsConfig.INSTANCE.winterfang.bountyFrostPulseCount.get() + frame),
+                        num(SimplyBowsConfig.INSTANCE.winterfang.bountyFrostRadius.get() + string * SimplyBowsConfig.INSTANCE.winterfang.bountyFrostRadiusPerString.get()));
                 case CHAOS -> t("tooltip.simplybows.rune_stat.ice.chaos",
                         SimplyBowsConfig.INSTANCE.winterfang.chaosWallWidth.get() + string * SimplyBowsConfig.INSTANCE.winterfang.chaosWallWidthPerString.get(),
                         seconds(SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationTicks.get() + frame * SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationPerFrameTicks.get()));
@@ -262,13 +366,14 @@ public final class BowUpgradeTooltip {
             case "bee" -> switch (rune) {
                 case PAIN -> t("tooltip.simplybows.rune_stat.bee.pain", Math.max(1, string + 1));
                 case GRACE -> t("tooltip.simplybows.rune_stat.bee.grace",
-                        Math.min(SimplyBowsConfig.INSTANCE.buzzkill.graceMaxBeesPerTarget.get(), Math.max(1, string + 1)),
-                        seconds(SimplyBowsConfig.INSTANCE.buzzkill.graceBaseDuration.get() + string * SimplyBowsConfig.INSTANCE.buzzkill.graceStringDurationBonus.get()));
+                        Math.max(1, 1 + string),
+                        Math.max(1, 1 + frame));
                 case BOUNTY -> t("tooltip.simplybows.rune_stat.bee.bounty",
-                        SimplyBowsConfig.INSTANCE.buzzkill.bountyBaseShots.get() + frame * SimplyBowsConfig.INSTANCE.buzzkill.bountyFrameBonusShots.get(),
-                        seconds(SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDuration.get() + string * SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDurationBonusPerString.get()));
+                        BeeHiveSwarmManager.beeCountFor(upgrades),
+                        num(SimplyBowsConfig.INSTANCE.buzzkill.baseDamage.get() * (1.35 + frame * 0.35)),
+                        Math.min(3, 1 + Math.min(2, frame)));
                 case CHAOS -> t("tooltip.simplybows.rune_stat.bee.chaos",
-                        seconds(SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDurationTicks.get() + string * SimplyBowsConfig.INSTANCE.buzzkill.chaosDurationPerStringTicks.get()),
+                        seconds(Math.max(100, SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDurationTicks.get())),
                         num(SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseRadius.get() + string * SimplyBowsConfig.INSTANCE.buzzkill.chaosRadiusPerString.get()),
                         num(SimplyBowsConfig.INSTANCE.buzzkill.chaosDiveDamage.get()));
                 default -> null;
@@ -289,12 +394,13 @@ public final class BowUpgradeTooltip {
                 default -> null;
             };
             case "earth" -> switch (rune) {
-                case PAIN -> t("tooltip.simplybows.rune_stat.earth.pain", num(SimplyBowsConfig.INSTANCE.tremorstrike.painWaveMaxDistance.get() + string * SimplyBowsConfig.INSTANCE.tremorstrike.painStringWaveDistanceBonusPerLevel.get()));
-                case GRACE -> t("tooltip.simplybows.rune_stat.earth.grace", seconds(SimplyBowsConfig.INSTANCE.tremorstrike.graceResistanceDuration.get()), seconds(SimplyBowsConfig.INSTANCE.tremorstrike.graceSlowFallingDuration.get()));
-                case BOUNTY -> t("tooltip.simplybows.rune_stat.earth.bounty", num(SimplyBowsConfig.INSTANCE.tremorstrike.bountyCenterDamageBaseMultiplier.get()));
+                case PAIN -> t("tooltip.simplybows.rune_stat.earth.pain");
+                case GRACE -> t("tooltip.simplybows.rune_stat.earth.grace",
+                        num(2.75 + string * 0.28),
+                        seconds(120 + frame * 20));
+                case BOUNTY -> t("tooltip.simplybows.rune_stat.earth.bounty");
                 case CHAOS -> t("tooltip.simplybows.rune_stat.earth.chaos",
-                        seconds(SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get() + string * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get()),
-                        num(SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderAcquisitionRange.get() + frame * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderAcquisitionRangePerFrame.get()));
+                        seconds(SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get() + string * SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get()));
                 default -> null;
             };
             default -> null;

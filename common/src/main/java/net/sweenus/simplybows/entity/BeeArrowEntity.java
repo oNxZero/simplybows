@@ -56,6 +56,7 @@ public class BeeArrowEntity extends ArrowEntity {
     private boolean chaosDiveBomb;
     private float chaosDiveBombDamage;
     private double chaosDiveBombRadius;
+    private boolean hiveBee;
     private static final ThreadLocal<Boolean> ENABLE_PAIN_HOMING = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Float> PAIN_DAMAGE_SCALE = ThreadLocal.withInitial(() -> 1.0F);
     private final boolean painHoming;
@@ -102,6 +103,9 @@ public class BeeArrowEntity extends ArrowEntity {
 
         if (!this.getWorld().isClient() && this.painHoming && !this.inGround) {
             updatePainHoming();
+            if (this.hiveBee) {
+                tryHiveSplashDetonate();
+            }
         }
 
         Vec3d velocity = this.getVelocity();
@@ -136,12 +140,30 @@ public class BeeArrowEntity extends ArrowEntity {
         if (this.age < 2) {
             return;
         }
+        // Hard lifetime so missed bees cannot orbit forever / spam particles.
+        int maxAge = this.hiveBee ? 100 : 45;
+        if (this.age > maxAge) {
+            if (this.getWorld() instanceof ServerWorld serverWorld) {
+                if (this.hiveBee) {
+                    performHiveSplash(serverWorld, this.getPos());
+                } else {
+                    spawnPoofAndDiscard(serverWorld);
+                }
+            } else {
+                this.discard();
+            }
+            return;
+        }
 
         if (this.homingTarget == null || !this.homingTarget.isAlive()) {
             this.homingTarget = findNearestPainTarget();
         }
         if (this.homingTarget == null) {
-            this.setNoGravity(false);
+            if (this.hiveBee) {
+                wanderHiveBee();
+            } else {
+                this.setNoGravity(false);
+            }
             return;
         }
 
@@ -152,12 +174,37 @@ public class BeeArrowEntity extends ArrowEntity {
             return;
         }
 
-        // Cap preserves Pain's low spawn speed; Bounty hive bees spawn faster and keep ~1.2.
-        double speedCap = 1.2;
-        double speed = MathHelper.clamp(Math.min(this.getVelocity().length(), speedCap), 0.55, speedCap);
+        double speedCap = painMaxSpeed();
+        double speed = MathHelper.clamp(Math.min(this.getVelocity().length(), speedCap), 0.45, speedCap);
         Vec3d desired = direction.normalize().multiply(speed);
-        Vec3d steered = this.getVelocity().lerp(desired, 0.45);
+        Vec3d steered = this.getVelocity().lerp(desired, painHomingAccel());
         this.setVelocity(steered);
+        this.velocityDirty = true;
+    }
+
+    public void lockHiveTarget(LivingEntity target) {
+        this.homingTarget = target;
+    }
+
+    /** No target yet — fly in a lazy curve and keep scanning. */
+    private void wanderHiveBee() {
+        this.setNoGravity(true);
+        Vec3d vel = this.getVelocity();
+        if (vel.lengthSquared() < 0.04) {
+            double ang = this.random.nextDouble() * Math.PI * 2.0;
+            vel = new Vec3d(Math.cos(ang), 0.12, Math.sin(ang)).multiply(0.55);
+        }
+        if (this.age % 8 == 0) {
+            double yaw = (this.random.nextDouble() - 0.5) * 0.9;
+            double pitch = (this.random.nextDouble() - 0.5) * 0.35;
+            Vec3d turn = vel.normalize()
+                    .add(Math.cos(yaw) * 0.35, pitch, Math.sin(yaw) * 0.35)
+                    .normalize()
+                    .multiply(MathHelper.clamp(vel.length(), 0.4, painMaxSpeed() * 0.75));
+            this.setVelocity(turn);
+        } else {
+            this.setVelocity(vel.multiply(0.98).add(0.0, Math.sin(this.age * 0.25) * 0.01, 0.0));
+        }
         this.velocityDirty = true;
     }
 
@@ -166,7 +213,10 @@ public class BeeArrowEntity extends ArrowEntity {
             return null;
         }
 
-        Box searchBox = this.getBoundingBox().expand(painHomingRadius());
+        double radius = this.hiveBee
+                ? SimplyBowsConfig.INSTANCE.buzzkill.bountyTargetRadius.get()
+                : painHomingRadius();
+        Box searchBox = this.getBoundingBox().expand(radius);
         List<LivingEntity> candidates = this.getWorld().getEntitiesByClass(LivingEntity.class, searchBox, entity ->
                 CombatTargeting.isOffensiveTargetCandidate(entity)
                         && entity != ownerLiving
@@ -222,7 +272,17 @@ public class BeeArrowEntity extends ArrowEntity {
             livingEntity.timeUntilRegen = 0;
         }
 
-        if (this.upgrades.runeEtching() != RuneEtching.GRACE && !isFriendlyToOwner(livingEntity)) {
+        if (this.hiveBee) {
+            if (this.getWorld() instanceof ServerWorld serverWorld) {
+                performHiveSplash(serverWorld, livingEntity.getPos().add(0.0, livingEntity.getStandingEyeHeight() * 0.4, 0.0));
+            } else {
+                this.discard();
+            }
+            return;
+        }
+
+        // Full-draw poison stacks.
+        if (this.isCritical() && this.upgrades.runeEtching() != RuneEtching.GRACE && !isFriendlyToOwner(livingEntity)) {
             applyStackingPoison(livingEntity);
         }
         trySpawnChaosHoneyStorm(entityHitResult.getPos());
@@ -275,9 +335,7 @@ public class BeeArrowEntity extends ArrowEntity {
             return;
         }
         BeeHiveSwarmManager.createHive(serverWorld, hitPos, ownerLiving, this.upgrades);
-        int hiveTicks = Math.max(80,
-                SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDuration.get()
-                        + this.upgrades.stringLevel() * SimplyBowsConfig.INSTANCE.buzzkill.bountyHiveDurationBonusPerString.get());
+        int hiveTicks = BeeHiveSwarmManager.hiveDurationTicks(this.upgrades);
         RuneUseCooldown.startForEffect(serverWorld, ownerLiving.getUuid(), "bee-bounty", "bee", hiveTicks);
         this.spawnedBountyHive = true;
     }
@@ -308,6 +366,69 @@ public class BeeArrowEntity extends ArrowEntity {
         this.chaosDiveBomb = true;
         this.chaosDiveBombDamage = Math.max(0.0F, damage);
         this.chaosDiveBombRadius = Math.max(0.25, radius);
+    }
+
+    public void setHiveBee(boolean hiveBee) {
+        this.hiveBee = hiveBee;
+    }
+
+    private void tryHiveSplashDetonate() {
+        if (!(this.getWorld() instanceof ServerWorld serverWorld)) {
+            return;
+        }
+        if (this.homingTarget != null && this.homingTarget.isAlive()
+                && this.squaredDistanceTo(this.homingTarget) <= 1.6 * 1.6) {
+            performHiveSplash(serverWorld, this.homingTarget.getPos().add(0.0, this.homingTarget.getStandingEyeHeight() * 0.4, 0.0));
+            return;
+        }
+        // Proximity splash even without a locked target.
+        Box box = this.getBoundingBox().expand(1.35);
+        for (LivingEntity candidate : serverWorld.getEntitiesByClass(LivingEntity.class, box, entity ->
+                CombatTargeting.isOffensiveTargetCandidate(entity) && !isFriendlyToOwner(entity))) {
+            if (this.squaredDistanceTo(candidate) <= 1.45 * 1.45) {
+                performHiveSplash(serverWorld, candidate.getPos().add(0.0, candidate.getStandingEyeHeight() * 0.4, 0.0));
+                return;
+            }
+        }
+    }
+
+    private void performHiveSplash(ServerWorld world, Vec3d impactPos) {
+        LivingEntity owner = this.getOwner() instanceof LivingEntity living ? living : null;
+        double radius = 1.65;
+        float damage = (float) Math.max(1.0, this.getDamage());
+        Box box = Box.of(impactPos, radius * 2.0, 2.8, radius * 2.0);
+        for (LivingEntity candidate : world.getEntitiesByClass(LivingEntity.class, box, entity ->
+                CombatTargeting.isOffensiveTargetCandidate(entity))) {
+            if (candidate.squaredDistanceTo(impactPos) > radius * radius) {
+                continue;
+            }
+            if (owner != null && !CombatTargeting.checkFriendlyFire(candidate, owner)) {
+                continue;
+            }
+            candidate.hurtTime = 0;
+            candidate.timeUntilRegen = 0;
+            CombatTargeting.applyDamage(world, owner, candidate, damage, true, false);
+            applyHivePoison(candidate);
+        }
+        world.playSound(null, impactPos.x, impactPos.y, impactPos.z, SoundEvents.ENTITY_BEE_STING, SoundCategory.PLAYERS, 0.95F, 0.9F + this.random.nextFloat() * 0.15F);
+        world.playSound(null, impactPos.x, impactPos.y, impactPos.z, SoundEvents.ENTITY_GENERIC_EXPLODE, SoundCategory.PLAYERS, 0.4F, 1.55F);
+        world.spawnParticles(ParticleTypes.EXPLOSION, impactPos.x, impactPos.y, impactPos.z, 1, 0.0, 0.0, 0.0, 0.0);
+        world.spawnParticles(ParticleTypes.POOF, impactPos.x, impactPos.y + 0.1, impactPos.z, 14, radius * 0.35, 0.12, radius * 0.35, 0.02);
+        world.spawnParticles(ParticleTypes.FALLING_HONEY, impactPos.x, impactPos.y + 0.15, impactPos.z, 12, radius * 0.3, 0.12, radius * 0.3, 0.0);
+        world.spawnParticles(ParticleTypes.CRIT, impactPos.x, impactPos.y + 0.1, impactPos.z, 10, radius * 0.25, 0.15, radius * 0.25, 0.02);
+        this.discard();
+    }
+
+    /** Frame sets poison level (I–III). Hits stack the amplifier further. */
+    private void applyHivePoison(LivingEntity target) {
+        int frameAmp = Math.min(2, Math.max(0, this.upgrades.frameLevel())); // Frame 0=I, 1=II, 2+=III
+        int amplifier = frameAmp;
+        StatusEffectInstance existing = target.getStatusEffect(StatusEffects.POISON);
+        if (existing != null) {
+            amplifier = Math.min(MAX_POISON_AMPLIFIER, existing.getAmplifier() + 1 + frameAmp / 2);
+        }
+        int duration = basePoisonDuration() + 20 + this.upgrades.frameLevel() * 15;
+        target.addStatusEffect(new StatusEffectInstance(StatusEffects.POISON, duration, amplifier), this.getOwner());
     }
 
     private void performChaosDiveBombImpact(ServerWorld world, Vec3d impactPos) {

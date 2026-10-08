@@ -16,6 +16,7 @@ import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.CombatTargeting;
+import net.sweenus.simplybows.util.GraceProjectile;
 import net.sweenus.simplybows.world.RuneUseCooldown;
 
 import java.util.ArrayList;
@@ -279,7 +280,7 @@ public final class BlossomStormManager {
         for (LivingEntity candidate : world.getEntitiesByClass(
                 LivingEntity.class,
                 hitBox,
-                entity -> entity instanceof net.minecraft.entity.player.PlayerEntity && entity.isAlive()
+                entity -> entity.isAlive() && GraceProjectile.isSupportTarget(entity)
         )) {
             if (candidate.squaredDistanceTo(storm.center) > radius * radius) {
                 continue;
@@ -578,8 +579,8 @@ public final class BlossomStormManager {
         boolean graceSupportMode = rune == RuneEtching.GRACE;
         boolean bountyTrapMode = rune == RuneEtching.BOUNTY;
         if (painAreaMode) {
-            // AOE only — half the leaping-storm pulse damage.
-            damage *= 0.5F;
+            // AOE only — 35% of leaping-storm pulse damage (30% off the prior half).
+            damage *= 0.35F;
         } else if (bountyTrapMode) {
             // Split across up to 3 locked storms — each hits a bit softer.
             damage *= 0.7F;

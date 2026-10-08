@@ -19,10 +19,9 @@ import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.util.CombatTargeting;
 import net.sweenus.simplybows.util.GraceProjectile;
 import net.sweenus.simplybows.world.IceChaosWallManager;
+import net.sweenus.simplybows.world.IceFrostBloomManager;
 
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
 import java.util.UUID;
 
 public class HomingArrowEntity extends ArrowEntity {
@@ -40,6 +39,11 @@ public class HomingArrowEntity extends ArrowEntity {
     private boolean lockSingleTarget;
     private boolean stackingSlowness;
     private boolean chaosWallOnImpact;
+    private boolean painFrostBloom;
+    private boolean bountyFrostBloom;
+    private int frostStringLevel;
+    private int frostFrameLevel;
+    private boolean spawnedFrostBloom;
     private boolean homingEnabled = true;
     private int chaosWallStringLevel;
     private int chaosWallFrameLevel;
@@ -141,42 +145,17 @@ public class HomingArrowEntity extends ArrowEntity {
                         && (owner == null || CombatTargeting.checkFriendlyFire(entity, owner)));
 
         if (!entities.isEmpty()) {
-            Set<LivingEntity> avoided = new HashSet<>();
-            if (this.getOwner() != null) {
-                for (HomingArrowEntity arrow : getEntityWorld().getEntitiesByClass(
-                        HomingArrowEntity.class, searchBox, arrow -> arrow != this && arrow.getOwner() == this.getOwner())) {
-                    LivingEntity otherTarget = arrow.getTargetEntity();
-                    if (otherTarget != null && otherTarget.isAlive()) {
-                        avoided.add(otherTarget);
-                    }
-                }
-                for (HomingSpectralArrowEntity arrow : getEntityWorld().getEntitiesByClass(
-                        HomingSpectralArrowEntity.class, searchBox, arrow -> arrow.getOwner() == this.getOwner())) {
-                    LivingEntity otherTarget = arrow.getTargetEntity();
-                    if (otherTarget != null && otherTarget.isAlive()) {
-                        avoided.add(otherTarget);
-                    }
-                }
-            }
-
+            // All fan arrows home the nearest hostile — avoid spreading onto empty air.
             LivingEntity best = null;
             double bestDist = Double.MAX_VALUE;
             for (LivingEntity entity : entities) {
-                if (avoided.contains(entity)) {
-                    continue;
-                }
                 double dist = this.squaredDistanceTo(entity);
                 if (dist < bestDist) {
                     bestDist = dist;
                     best = entity;
                 }
             }
-            if (best != null) {
-                return best;
-            }
-
-            // Fallback: allow duplicates if not enough unique targets
-            return entities.getFirst();
+            return best;
         }
 
         return null;
@@ -285,41 +264,92 @@ public class HomingArrowEntity extends ArrowEntity {
     @Override
     protected void onHit(LivingEntity target) {
         if (isGraceSupportProjectile() && GraceProjectile.isSupportTarget(target)) {
-            applyStackingSlow(target);
+            trySpawnGraceSanctuary(target.getPos());
             if (this.getWorld() instanceof ServerWorld serverWorld) {
                 spawnImpactParticles(serverWorld, target);
             }
             this.discard();
             return;
         }
-        // Allow multiple fan arrows to damage in the same tick by clearing invulnerability frames.
-        target.hurtTime = 0;
-        target.timeUntilRegen = 0;
-        applyStackingSlow(target);
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             spawnImpactParticles(serverWorld, target);
         }
         super.onHit(target);
-        target.hurtTime = 0;
-        target.timeUntilRegen = 0;
     }
 
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
-        if (!this.spawnedChaosWall && this.chaosWallOnImpact && this.getWorld() instanceof ServerWorld serverWorld) {
-            IceChaosWallManager.spawnAtImpact(serverWorld, entityHitResult.getPos(), this.getVelocity(), this.getOwner() != null ? this.getOwner().getUuid() : null, this.chaosWallStringLevel, this.chaosWallFrameLevel);
-            this.spawnedChaosWall = true;
+        trySpawnChaosWall(entityHitResult.getPos());
+        trySpawnFrostBloom(entityHitResult.getPos());
+        if (this.isRemoved()) {
+            return;
         }
         super.onEntityHit(entityHitResult);
     }
 
     @Override
     protected void onBlockHit(BlockHitResult blockHitResult) {
-        if (!this.spawnedChaosWall && this.chaosWallOnImpact && this.getWorld() instanceof ServerWorld serverWorld) {
-            IceChaosWallManager.spawnAtImpact(serverWorld, blockHitResult.getPos(), this.getVelocity(), this.getOwner() != null ? this.getOwner().getUuid() : null, this.chaosWallStringLevel, this.chaosWallFrameLevel);
-            this.spawnedChaosWall = true;
+        trySpawnChaosWall(blockHitResult.getPos());
+        trySpawnFrostBloom(blockHitResult.getPos());
+        if (this.isRemoved()) {
+            return;
         }
         super.onBlockHit(blockHitResult);
+    }
+
+    private void trySpawnChaosWall(Vec3d pos) {
+        if (this.spawnedChaosWall || !this.chaosWallOnImpact || !(this.getWorld() instanceof ServerWorld serverWorld)) {
+            return;
+        }
+        IceChaosWallManager.spawnAtImpact(serverWorld, pos, this.getVelocity(),
+                this.getOwner() != null ? this.getOwner().getUuid() : null, this.chaosWallStringLevel, this.chaosWallFrameLevel);
+        this.spawnedChaosWall = true;
+    }
+
+    private void trySpawnFrostBloom(Vec3d pos) {
+        if (this.spawnedFrostBloom || !(this.getWorld() instanceof ServerWorld serverWorld)) {
+            return;
+        }
+        LivingEntity owner = this.getOwner() instanceof LivingEntity living ? living : null;
+        float base = (float) this.getDamage();
+        if (this.painFrostBloom) {
+            IceFrostBloomManager.spawnPainBloom(serverWorld, pos, owner, base, this.frostStringLevel);
+            this.spawnedFrostBloom = true;
+        } else if (this.bountyFrostBloom) {
+            IceFrostBloomManager.spawnBountyBloom(serverWorld, pos, owner, base, this.frostStringLevel, this.frostFrameLevel);
+            this.spawnedFrostBloom = true;
+        } else if (this.stackingSlowness) {
+            trySpawnGraceSanctuary(pos);
+            this.discard();
+        }
+    }
+
+    private void trySpawnGraceSanctuary(Vec3d pos) {
+        if (this.spawnedFrostBloom || !this.stackingSlowness || !(this.getWorld() instanceof ServerWorld serverWorld)) {
+            return;
+        }
+        LivingEntity owner = this.getOwner() instanceof LivingEntity living ? living : null;
+        if (owner == null) {
+            return;
+        }
+        IceFrostBloomManager.spawnGraceSanctuary(serverWorld, pos, owner, this.frostStringLevel);
+        this.spawnedFrostBloom = true;
+        this.discard();
+    }
+
+    public void setPainFrostBloom(boolean painFrostBloom, int stringLevel) {
+        this.painFrostBloom = painFrostBloom;
+        this.frostStringLevel = stringLevel;
+    }
+
+    public void setBountyFrostBloom(boolean bountyFrostBloom, int stringLevel) {
+        setBountyFrostBloom(bountyFrostBloom, stringLevel, 0);
+    }
+
+    public void setBountyFrostBloom(boolean bountyFrostBloom, int stringLevel, int frameLevel) {
+        this.bountyFrostBloom = bountyFrostBloom;
+        this.frostStringLevel = stringLevel;
+        this.frostFrameLevel = Math.max(0, frameLevel);
     }
 
     LivingEntity getTargetEntity() {
@@ -342,6 +372,10 @@ public class HomingArrowEntity extends ArrowEntity {
         this.stackingSlowness = stackingSlowness;
     }
 
+    public void setFrostStringLevel(int stringLevel) {
+        this.frostStringLevel = Math.max(0, stringLevel);
+    }
+
     public void setChaosWallOnImpact(boolean chaosWallOnImpact) {
         this.chaosWallOnImpact = chaosWallOnImpact;
     }
@@ -355,16 +389,10 @@ public class HomingArrowEntity extends ArrowEntity {
         this.chaosWallFrameLevel = Math.max(0, frameLevel);
     }
 
-    private void applyStackingSlow(LivingEntity target) {
-        if (!this.stackingSlowness) {
-            return;
-        }
-        int amplifier = 0;
-        StatusEffectInstance existing = target.getStatusEffect(StatusEffects.SLOWNESS);
-        if (existing != null) {
-            amplifier = Math.min(SimplyBowsConfig.INSTANCE.winterfang.graceMaxSlownessStacks.get(), existing.getAmplifier() + 1);
-        }
-        target.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, SimplyBowsConfig.INSTANCE.winterfang.graceSlownessDuration.get(), amplifier), this.getOwner());
+    @Override
+    public void setCritical(boolean critical) {
+        // Winterfang never uses vanilla crit multiplier.
+        super.setCritical(false);
     }
 
     @Override

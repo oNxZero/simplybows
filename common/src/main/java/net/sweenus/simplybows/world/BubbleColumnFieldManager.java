@@ -39,7 +39,7 @@ public final class BubbleColumnFieldManager {
     private static int gracePulseIntervalTicks() { return SimplyBowsConfig.INSTANCE.bubbleveil.gracePulseIntervalTicks.get(); }
     private static int graceResistanceDurationTicks() { return SimplyBowsConfig.INSTANCE.bubbleveil.graceResistanceDuration.get(); }
     private static int graceSlownessDurationTicks() { return SimplyBowsConfig.INSTANCE.bubbleveil.graceSlownessDuration.get(); }
-    private static final int GRACE_RESISTANCE_AMPLIFIER = 0;
+    private static final int GRACE_RESISTANCE_AMPLIFIER = 1; // Resistance II
     private static final int GRACE_SLOWNESS_AMPLIFIER = 0;
     private static final String BUBBLE_BOUNTY_VISUAL_TAG = "simplybows_bubble_bounty_visual";
     private static final String BUBBLE_GRACE_VISUAL_TAG = "simplybows_bubble_grace_visual";
@@ -347,7 +347,8 @@ public final class BubbleColumnFieldManager {
         int durationTicks = columnDurationTicks() + upgrades.stringLevel() * columnDurationBonusPerString();
         boolean bountyMode = upgrades.runeEtching() == RuneEtching.BOUNTY;
         boolean graceMode = upgrades.runeEtching() == RuneEtching.GRACE;
-        float bountyDotDamage = (float) (bountyBaseDamage() * upgrades.damageMultiplier());
+        // Soft Frame curve — full damageMultiplier made standing in the swarm melt things.
+        float bountyDotDamage = bountyBaseDamage() * (1.0F + upgrades.frameLevel() * 0.12F) * 0.5F;
         return new ColumnTuning(radius, height, durationTicks, bountyMode, graceMode, bountyDotDamage);
     }
 
