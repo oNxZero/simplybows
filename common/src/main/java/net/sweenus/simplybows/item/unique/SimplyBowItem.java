@@ -53,7 +53,11 @@ public class SimplyBowItem extends BowItem {
 
     @Override
     public Text getName(ItemStack stack) {
-        return super.getName(stack).copy().setStyle(BowTooltipHelper.STYLE_UNIQUE_NAME);
+        return super.getName(stack).copy().styled(style -> style.withColor(switch (getTooltipBowKey()) {
+            case "vine" -> 0x85C76B; case "ice" -> 0x8BD4F2; case "bubble" -> 0x55C8E8;
+            case "bee" -> 0xEDC65B; case "blossom" -> 0xF19DBC; case "earth" -> 0xC29A69;
+            default -> 0xFFFFFF;
+        }));
     }
 
     @Override

@@ -29,7 +29,7 @@ public class VineArrowEntity extends ArrowEntity {
     private static double extraDragXZ() { return SimplyBowsConfig.INSTANCE.everbloom.extraDragXZ.get(); }
     private static double extraDragY() { return SimplyBowsConfig.INSTANCE.everbloom.extraDragY.get(); }
     private static final String FIELD_VISUAL_TAG = "simplybows_vine_field_visual";
-    private final BowUpgradeData upgrades;
+    private BowUpgradeData upgrades;
     private boolean spawnedFlowerField;
     private boolean plantsFlowerField;
 
@@ -99,7 +99,8 @@ public class VineArrowEntity extends ArrowEntity {
         }
         trySpawnFlowerField(entityHitResult.getPos());
         // Direct heals only from a fully drawn shot — no tap-spam healing.
-        if (this.isCritical()) {
+        // Ally-hit deflection clears the crit flag; the saved full-draw flag stays intact.
+        if (this.plantsFlowerField) {
             if (playerHit && hit instanceof PlayerEntity player && !player.isSpectator()) {
                 healDirectHit(player);
                 return;
@@ -176,12 +177,16 @@ public class VineArrowEntity extends ArrowEntity {
     public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
         nbt.putBoolean("PlantsFlowerField", this.plantsFlowerField);
+        nbt.put("BowUpgrades", this.upgrades.toProjectileNbt());
+        nbt.putBoolean("AbilitySpawned", this.spawnedFlowerField);
     }
 
     @Override
     public void readCustomDataFromNbt(NbtCompound nbt) {
         super.readCustomDataFromNbt(nbt);
         this.plantsFlowerField = nbt.getBoolean("PlantsFlowerField");
+        this.upgrades = BowUpgradeData.fromProjectileNbt(nbt.getCompound("BowUpgrades"));
+        this.spawnedFlowerField = nbt.getBoolean("AbilitySpawned");
     }
 
     @Override

@@ -196,6 +196,13 @@ public final class CombatTargeting {
     }
 
     public static boolean applyDamage(ServerWorld world, @Nullable Entity attackingEntity, LivingEntity target, float amount, boolean ignoreIframe, boolean applyKnockback) {
+        return applyAbilityDamage(world, attackingEntity, target, amount, ignoreIframe, applyKnockback, 1.0F, false);
+    }
+
+    /** Scales external ability bonuses along with the ability, and optionally uses magic damage. */
+    public static boolean applyAbilityDamage(ServerWorld world, @Nullable Entity attackingEntity, LivingEntity target,
+                                            float amount, boolean ignoreIframe, boolean applyKnockback,
+                                            float bonusScale, boolean magic) {
         if (world == null || target == null || amount <= 0.0F || !target.isAlive()) {
             return false;
         }
@@ -210,10 +217,12 @@ public final class CombatTargeting {
         }
 
         Vec3d velocityBeforeDamage = applyKnockback ? null : target.getVelocity();
-        float adjustedAmount = amount + getRangedWeaponDamageBonus(attackingEntity, "ability");
+        float adjustedAmount = amount + getRangedWeaponDamageBonus(attackingEntity, "ability") * bonusScale;
         adjustedAmount = applyNonPlayerAbilityDamageModifiers(attackingEntity, target, adjustedAmount);
         boolean damaged;
-        if (attackingEntity instanceof PlayerEntity playerEntity) {
+        if (magic) {
+            damaged = target.damage(world.getDamageSources().indirectMagic(attackingEntity, attackingEntity), adjustedAmount);
+        } else if (attackingEntity instanceof PlayerEntity playerEntity) {
             damaged = target.damage(world.getDamageSources().playerAttack(playerEntity), adjustedAmount);
         } else if (attackingEntity instanceof LivingEntity attackerLiving) {
             damaged = target.damage(world.getDamageSources().mobAttack(attackerLiving), adjustedAmount);

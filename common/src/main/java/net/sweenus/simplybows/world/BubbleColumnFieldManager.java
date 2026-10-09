@@ -227,7 +227,7 @@ public final class BubbleColumnFieldManager {
             if (candidate.squaredDistanceTo(column.center.x, candidate.getY(), column.center.z) > radius * radius) {
                 continue;
             }
-            CombatTargeting.applyDamage(world, owner, candidate, column.tuning.bountyDotDamage(), true, false);
+            CombatTargeting.applyAbilityDamage(world, owner, candidate, column.tuning.bountyDotDamage(), true, false, 0.3F, false);
         }
     }
 
@@ -348,7 +348,7 @@ public final class BubbleColumnFieldManager {
         boolean bountyMode = upgrades.runeEtching() == RuneEtching.BOUNTY;
         boolean graceMode = upgrades.runeEtching() == RuneEtching.GRACE;
         // Soft Frame curve — full damageMultiplier made standing in the swarm melt things.
-        float bountyDotDamage = bountyBaseDamage() * (1.0F + upgrades.frameLevel() * 0.12F) * 0.5F;
+        float bountyDotDamage = bountyBaseDamage() * (1.0F + upgrades.frameLevel() * 0.06F) * 0.075F;
         return new ColumnTuning(radius, height, durationTicks, bountyMode, graceMode, bountyDotDamage);
     }
 

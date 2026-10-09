@@ -26,6 +26,27 @@ public final class BowUpgradeTooltip {
         return lines;
     }
 
+    public static List<String> previewLines(String bow, BowUpgradeData current) {
+        List<String> lines = new ArrayList<>();
+        for (boolean string : new boolean[]{true, false}) {
+            int level = string ? current.stringLevel() : current.frameLevel();
+            lines.add((string ? "String" : "Frame") + ": level " + level + ":");
+            lines.add((string ? stringLine(bow, current) : frameLine(bow, current)).replaceFirst("^[^:]+: ", "Current: "));
+            boolean full = current.stringLevel() + current.frameLevel() >= BowUpgradeData.getMaxTotalUpgradeSlots()
+                    || level >= BowUpgradeData.getMaxLevelPerType();
+            if (!full) {
+                BowUpgradeData next = new BowUpgradeData(current.stringLevel() + (string ? 1 : 0),
+                        current.frameLevel() + (string ? 0 : 1), current.runeEtching());
+                lines.add("One more: " + (string ? stringGain(bow, current) : frameGain(bow, current)));
+                lines.add((string ? stringLine(bow, next) : frameLine(bow, next)).replaceFirst("^[^:]+: ", "After upgrade: "));
+            }
+        }
+        if (current.stringLevel() + current.frameLevel() >= BowUpgradeData.getMaxTotalUpgradeSlots()) {
+            lines.add("Upgrade slots: full.");
+        }
+        return lines;
+    }
+
     public static String stringGain(String bowKey) {
         return stringGain(bowKey, new BowUpgradeData(0, 0, RuneEtching.NONE));
     }
@@ -58,6 +79,7 @@ public final class BowUpgradeTooltip {
             case "blossom" -> switch (rune) {
                 case PAIN -> t("tooltip.simplybows.alt.string.blossom.pain", num(SimplyBowsConfig.INSTANCE.petalwind.painAreaRadiusPerString.get()));
                 case GRACE -> t("tooltip.simplybows.alt.string.blossom.grace");
+                case CHAOS -> "+" + num(SimplyBowsConfig.INSTANCE.petalwind.chaosRadiusPerString.get()) + " radius, -" + seconds(SimplyBowsConfig.INSTANCE.petalwind.chaosOrbitPeriodReductionPerStringTicks.get()) + "s circle time";
                 default -> t("tooltip.simplybows.alt.string.blossom", seconds(SimplyBowsConfig.INSTANCE.petalwind.stormDurationBonusPerString.get()));
             };
             case "earth" -> t("tooltip.simplybows.alt.string.earth", num(SimplyBowsConfig.INSTANCE.tremorstrike.stringRadiusBonusPerLevel.get()));
@@ -82,7 +104,7 @@ public final class BowUpgradeTooltip {
             case "ice" -> switch (rune) {
                 case BOUNTY -> t("tooltip.simplybows.alt.frame.ice.bounty");
                 case CHAOS -> t("tooltip.simplybows.alt.frame.ice.chaos", seconds(SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationPerFrameTicks.get()));
-                default -> t("tooltip.simplybows.alt.frame.damage", pct(cfg.damageMultiplierPerFrame.get()));
+                default -> t("tooltip.simplybows.alt.frame.damage", 18);
             };
             case "bee" -> switch (rune) {
                 case GRACE -> t("tooltip.simplybows.alt.frame.bee.grace");
@@ -98,7 +120,7 @@ public final class BowUpgradeTooltip {
                 default -> t("tooltip.simplybows.alt.frame.damage", pct(cfg.damageMultiplierPerFrame.get()));
             };
             case "bubble" -> rune == RuneEtching.CHAOS
-                    ? t("tooltip.simplybows.alt.frame.bubble.chaos", num(SimplyBowsConfig.INSTANCE.bubbleveil.chaosDamagePerFrame.get()))
+                    ? t("tooltip.simplybows.alt.frame.bubble.chaos", num(SimplyBowsConfig.INSTANCE.bubbleveil.chaosDamagePerFrame.get() * 0.5))
                     : t("tooltip.simplybows.alt.frame.bubble", num(SimplyBowsConfig.INSTANCE.bubbleveil.columnRadiusPerFrame.get()));
             default -> t("tooltip.simplybows.alt.frame.generic");
         };
@@ -111,7 +133,7 @@ public final class BowUpgradeTooltip {
             case "ice" -> iceString(upgrades, string);
             case "bubble" -> bubbleString(upgrades, string);
             case "bee" -> beeString(upgrades, string);
-            case "blossom" -> t("tooltip.simplybows.detail.blossom.string", string, seconds(blossomDuration(upgrades)));
+            case "blossom" -> blossomString(upgrades);
             case "earth" -> earthString(upgrades, string);
             default -> t("tooltip.simplybows.detail.generic.string", string);
         };
@@ -124,7 +146,7 @@ public final class BowUpgradeTooltip {
             case "ice" -> iceFrame(upgrades, frame);
             case "bubble" -> bubbleFrame(upgrades, frame);
             case "bee" -> beeFrame(upgrades, frame);
-            case "blossom" -> t("tooltip.simplybows.detail.blossom.frame", frame, num(blossomDamage(upgrades)));
+            case "blossom" -> blossomFrame(upgrades);
             case "earth" -> earthFrame(upgrades, frame);
             default -> t("tooltip.simplybows.detail.generic.frame", frame);
         };
@@ -136,36 +158,56 @@ public final class BowUpgradeTooltip {
             return List.of();
         }
         String stat = runeStat(bowKey, upgrades);
-        return stat == null || stat.isBlank() ? List.of() : List.of(stat);
+        List<String> lines = new ArrayList<>();
+        if (stat != null && !stat.isBlank()) lines.addAll(List.of(stat.split(" — |, ")));
+        var vine = SimplyBowsConfig.INSTANCE.everbloom;
+        var bubble = SimplyBowsConfig.INSTANCE.bubbleveil;
+        int frame = upgrades.frameLevel();
+        if (bowKey.equals("vine") && (rune == RuneEtching.PAIN || rune == RuneEtching.BOUNTY)) {
+            boolean pain = rune == RuneEtching.PAIN;
+            double damage = pain ? vine.hostileDamage.get() * upgrades.damageMultiplier() * BowAbilityBalance.EVERBLOOM_PAIN_DAMAGE_SCALE
+                    : (1.0 + frame * 0.425) * 0.125;
+            double undead = pain ? vine.undeadBonusDamage.get() * upgrades.damageMultiplier() * BowAbilityBalance.EVERBLOOM_PAIN_DAMAGE_SCALE
+                    : (0.3 + frame * 0.1) * 0.125;
+            lines.add(t("tooltip.simplybows.metrics.damage", num(damage), num(damage + undead)));
+            lines.add(t("tooltip.simplybows.metrics.interval", pain ? vine.painAuraInterval.get() : vine.bountyAuraInterval.get(),
+                    seconds(pain ? vine.painAuraInterval.get() : vine.bountyAuraInterval.get())));
+            lines.add(t("tooltip.simplybows.metrics.duration", seconds(vine.fieldDurationTicks.get()), vine.fieldDurationTicks.get()));
+
+        }
+        if (bowKey.equals("bubble") && rune == RuneEtching.BOUNTY) {
+            lines.add(t("tooltip.simplybows.metrics.pulse", num(bubble.bountyBaseDamage.get() * (1 + frame * 0.06) * 0.075)));
+            lines.add(t("tooltip.simplybows.metrics.interval", bubble.bountyDamageIntervalTicks.get(), seconds(bubble.bountyDamageIntervalTicks.get())));
+            int duration = bubble.columnDurationTicks.get() + upgrades.stringLevel() * bubble.columnDurationBonusPerString.get();
+            lines.add(t("tooltip.simplybows.metrics.duration", seconds(duration), duration));
+        }
+        if (bowKey.equals("blossom") && (rune == RuneEtching.PAIN || rune == RuneEtching.BOUNTY)) {
+            var petal = SimplyBowsConfig.INSTANCE.petalwind;
+            int interval = rune == RuneEtching.PAIN ? Math.max(8, petal.damageIntervalTicks.get() - 2) : petal.damageIntervalTicks.get();
+            int duration = blossomDuration(upgrades) + (rune == RuneEtching.PAIN ? 20 : 0);
+            lines.add(t("tooltip.simplybows.metrics.pulse", num(blossomDamage(upgrades))));
+            lines.add(t("tooltip.simplybows.metrics.interval", interval, seconds(interval)));
+            lines.add(t("tooltip.simplybows.metrics.duration", seconds(duration), duration));
+        }
+        if (bowKey.equals("bee")) lines.add(t("tooltip.simplybows.metrics.bee_cooldown"));
+        return lines;
     }
 
     public static void appendComponentTooltip(List<Text> tooltip, BowUpgradeComponentItem.UpgradeKind kind, RuneEtching rune) {
-        tooltip.add(Text.literal(" "));
-        tooltip.add(Text.translatable(componentIntroKey(kind, rune)).setStyle(BowTooltipHelper.STYLE_BODY));
-        tooltip.add(Text.translatable("tooltip.simplybows.upgrade_component.depends").setStyle(BowTooltipHelper.STYLE_SECTION));
-        if (kind == BowUpgradeComponentItem.UpgradeKind.RUNE_ETCHING) {
-            BowUpgradeData sample = new BowUpgradeData(0, 0, rune);
-            for (String bowKey : BOW_KEYS) {
-                String effect = runeStat(bowKey, sample);
-                if (effect == null || effect.isBlank()) {
-                    continue;
-                }
-                tooltip.add(Text.translatable("tooltip.simplybows.rune_for_bow", Text.translatable(bowItemKey(bowKey)), effect)
-                        .setStyle(BowTooltipHelper.STYLE_DIM));
-            }
-        } else if (kind == BowUpgradeComponentItem.UpgradeKind.ENCHANTED_STRING) {
-            for (Text line : stringComponentLines()) {
-                tooltip.add(line.copy().setStyle(BowTooltipHelper.STYLE_DIM));
-            }
-        } else {
-            for (Text line : frameComponentLines()) {
-                tooltip.add(line.copy().setStyle(BowTooltipHelper.STYLE_DIM));
-            }
+        tooltip.add(Text.literal(kind == BowUpgradeComponentItem.UpgradeKind.RUNE_ETCHING
+                ? BowTooltipPages.runeIntro(rune)
+                : kind == BowUpgradeComponentItem.UpgradeKind.ENCHANTED_STRING
+                ? "Improves the reach, duration, or number of your bow's special attacks."
+                : "Improves the strength of your bow's special ability.").setStyle(BowTooltipHelper.STYLE_BODY));
+        tooltip.add(Text.literal("Apply in an anvil: bow first, upgrade second.").setStyle(BowTooltipHelper.STYLE_HINT));
+        BowUpgradeData sample = new BowUpgradeData(0, 0, rune);
+        for (String bow : BOW_KEYS) {
+            tooltip.add(Text.translatable(bowItemKey(bow)).setStyle(BowTooltipHelper.STYLE_SECTION));
+            String description = kind == BowUpgradeComponentItem.UpgradeKind.RUNE_ETCHING ? BowTooltipPages.rune(bow, rune)
+                    : kind == BowUpgradeComponentItem.UpgradeKind.ENCHANTED_STRING ? BowTooltipPages.stringEffect(bow, sample)
+                    : BowTooltipPages.frameEffect(bow, sample);
+            BowTooltipHelper.addWrappedLine(tooltip, Text.literal(description), BowTooltipHelper.STYLE_BODY);
         }
-        tooltip.add(Text.translatable(
-                "tooltip.simplybows.upgrade_component.cap",
-                BowUpgradeData.getMaxTotalUpgradeSlots()
-        ).setStyle(BowTooltipHelper.STYLE_HINT));
     }
 
     private static String vineString(BowUpgradeData upgrades, int string) {
@@ -187,11 +229,12 @@ public final class BowUpgradeTooltip {
         }
         double arrow = SimplyBowsConfig.INSTANCE.everbloom.baseDamage.get() * upgrades.damageMultiplier();
         double field = SimplyBowsConfig.INSTANCE.everbloom.hostileDamage.get() * upgrades.damageMultiplier();
+        if (upgrades.runeEtching() == RuneEtching.PAIN) field *= BowAbilityBalance.EVERBLOOM_PAIN_DAMAGE_SCALE;
         if (upgrades.runeEtching() == RuneEtching.PAIN) {
             return t("tooltip.simplybows.detail.vine.frame.pain", frame, num(arrow), num(field));
         }
         if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
-            return t("tooltip.simplybows.detail.vine.frame.bounty", frame, num(1.0 + frame * 0.425));
+            return t("tooltip.simplybows.detail.vine.frame.bounty", frame, num((1.0 + frame * 0.425) * 0.125));
         }
         if (upgrades.runeEtching() == RuneEtching.GRACE) {
             return t("tooltip.simplybows.detail.vine.frame.grace", frame, hearts(vineHealPerSecond(upgrades)), hearts(2.0 + frame));
@@ -229,14 +272,14 @@ public final class BowUpgradeTooltip {
     }
 
     private static double iceDamage(BowUpgradeData upgrades) {
-        return SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * upgrades.damageMultiplier();
+        return SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * (1 + upgrades.frameLevel() * 0.18) * (upgrades.runeEtching() == RuneEtching.GRACE ? 0.35 : 1);
     }
 
     private static String bubbleString(BowUpgradeData upgrades, int string) {
         if (upgrades.runeEtching() == RuneEtching.CHAOS) {
             var cfg = SimplyBowsConfig.INSTANCE.bubbleveil;
-            int steps = cfg.chaosBaseLengthSteps.get() + string * cfg.chaosLengthStepsPerString.get();
-            return t("tooltip.simplybows.detail.bubble.string.chaos", string, steps);
+            double range = net.sweenus.simplybows.world.BubbleChaosWaveManager.waveTravelDistance(upgrades);
+            return t("tooltip.simplybows.detail.bubble.string.chaos", string, num(range));
         }
         if (upgrades.runeEtching() == RuneEtching.PAIN) {
             return t("tooltip.simplybows.detail.bubble.string.pain", string, Math.max(1, string + 1));
@@ -249,7 +292,7 @@ public final class BowUpgradeTooltip {
     private static String bubbleFrame(BowUpgradeData upgrades, int frame) {
         if (upgrades.runeEtching() == RuneEtching.CHAOS) {
             var cfg = SimplyBowsConfig.INSTANCE.bubbleveil;
-            float damage = cfg.chaosBaseDamage.get() + frame * cfg.chaosDamagePerFrame.get();
+            float damage = cfg.chaosBaseDamage.get() + frame * cfg.chaosDamagePerFrame.get() * 0.5F;
             return t("tooltip.simplybows.detail.bubble.frame.chaos", frame, num(damage));
         }
         var cfg = SimplyBowsConfig.INSTANCE.bubbleveil;
@@ -279,7 +322,7 @@ public final class BowUpgradeTooltip {
             return t("tooltip.simplybows.detail.bee.frame.grace", frame, Math.max(1, 1 + frame));
         }
         if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
-            float dmg = (float) (SimplyBowsConfig.INSTANCE.buzzkill.baseDamage.get() * (1.35 + frame * 0.35));
+            float dmg = (float) (SimplyBowsConfig.INSTANCE.buzzkill.baseDamage.get() * (1.35 + frame * 0.35) * 0.5);
             return t("tooltip.simplybows.detail.bee.frame.bounty", frame, num(dmg), Math.min(3, 1 + Math.min(2, frame)));
         }
         return t("tooltip.simplybows.detail.bee.frame", frame, num(beeDamage(upgrades)));
@@ -308,8 +351,30 @@ public final class BowUpgradeTooltip {
         return cfg.stormDurationTicks.get() + upgrades.stringLevel() * cfg.stormDurationBonusPerString.get();
     }
 
+    private static String blossomString(BowUpgradeData u) {
+        var c = SimplyBowsConfig.INSTANCE.petalwind;
+        int s = u.stringLevel();
+        return "String " + s + ": " + switch (u.runeEtching()) {
+            case PAIN -> "radius " + num(Math.min(4.5, Math.max(3.0, c.painAreaRadius.get() * 0.55)) + s * Math.min(0.45, c.painAreaRadiusPerString.get())) + " blocks, duration " + seconds(blossomDuration(u) + 20) + "s";
+            case GRACE -> "radius " + num(3 + s * 0.45 + (c.graceAuraDamageRadius.get() > 0 ? Math.min(1.5, c.graceAuraRadiusPerString.get() * s * 0.25) : 0)) + " blocks, duration " + seconds(60 + s * 10) + "s";
+            case CHAOS -> "radius " + num(Math.max(1.5, c.chaosRadius.get() + s * c.chaosRadiusPerString.get())) + " blocks, circle time " + seconds(Math.max(c.chaosMinOrbitPeriodTicks.get(), c.chaosBaseOrbitPeriodTicks.get() - s * c.chaosOrbitPeriodReductionPerStringTicks.get())) + "s";
+            default -> "duration " + seconds(blossomDuration(u)) + "s";
+        };
+    }
+
+    private static String blossomFrame(BowUpgradeData u) {
+        var c = SimplyBowsConfig.INSTANCE.petalwind;
+        int f = u.frameLevel();
+        return "Frame " + f + ": " + switch (u.runeEtching()) {
+            case GRACE -> "Strength duration " + seconds(100 + f * 20) + "s";
+            case CHAOS -> Math.max(1, c.chaosBaseFishCount.get() + f * c.chaosFishPerFrame.get()) + " koi, duration " + seconds(Math.max(40, c.chaosDurationTicks.get() + f * c.chaosDurationPerFrameTicks.get())) + "s";
+            default -> "damage per hit " + num(blossomDamage(u));
+        };
+    }
+
     private static double blossomDamage(BowUpgradeData upgrades) {
-        return SimplyBowsConfig.INSTANCE.petalwind.stormDamage.get() * upgrades.damageMultiplier();
+        return SimplyBowsConfig.INSTANCE.petalwind.stormDamage.get() * upgrades.damageMultiplier()
+                * BowAbilityBalance.petalDamageScale(upgrades.runeEtching(), upgrades.frameLevel());
     }
 
     private static double earthRadius(BowUpgradeData upgrades) {
@@ -335,7 +400,7 @@ public final class BowUpgradeTooltip {
                 case PAIN -> t("tooltip.simplybows.rune_stat.vine.pain", seconds(SimplyBowsConfig.INSTANCE.everbloom.painAuraInterval.get()));
                 case GRACE -> t("tooltip.simplybows.rune_stat.vine.grace", seconds(SimplyBowsConfig.INSTANCE.everbloom.fieldDurationTicks.get()));
                 case BOUNTY -> t("tooltip.simplybows.rune_stat.vine.bounty",
-                        num(1.0 + frame * 0.425),
+                        num((1.0 + frame * 0.425) * 0.125),
                         seconds(SimplyBowsConfig.INSTANCE.everbloom.bountyAuraInterval.get()));
                 case CHAOS -> t("tooltip.simplybows.rune_stat.vine.chaos",
                         num(SimplyBowsConfig.INSTANCE.everbloom.chaosBaseRadius.get() + string * SimplyBowsConfig.INSTANCE.everbloom.chaosRadiusPerString.get()),
@@ -357,10 +422,10 @@ public final class BowUpgradeTooltip {
             case "bubble" -> switch (rune) {
                 case PAIN -> t("tooltip.simplybows.rune_stat.bubble.pain", Math.max(1, string + 1));
                 case GRACE -> t("tooltip.simplybows.rune_stat.bubble.grace", seconds(SimplyBowsConfig.INSTANCE.bubbleveil.graceResistanceDuration.get()));
-                case BOUNTY -> t("tooltip.simplybows.rune_stat.bubble.bounty", num(SimplyBowsConfig.INSTANCE.bubbleveil.bountyBaseDamage.get() * upgrades.damageMultiplier()));
+                case BOUNTY -> t("tooltip.simplybows.rune_stat.bubble.bounty", num(SimplyBowsConfig.INSTANCE.bubbleveil.bountyBaseDamage.get() * (1.0 + frame * 0.06) * 0.075));
                 case CHAOS -> t("tooltip.simplybows.rune_stat.bubble.chaos",
-                        num(SimplyBowsConfig.INSTANCE.bubbleveil.chaosBaseDamage.get() + frame * SimplyBowsConfig.INSTANCE.bubbleveil.chaosDamagePerFrame.get()),
-                        SimplyBowsConfig.INSTANCE.bubbleveil.chaosBaseLengthSteps.get() + string * SimplyBowsConfig.INSTANCE.bubbleveil.chaosLengthStepsPerString.get());
+                        num(SimplyBowsConfig.INSTANCE.bubbleveil.chaosBaseDamage.get() + frame * SimplyBowsConfig.INSTANCE.bubbleveil.chaosDamagePerFrame.get() * 0.5),
+                        num(net.sweenus.simplybows.world.BubbleChaosWaveManager.waveTravelDistance(upgrades)));
                 default -> null;
             };
             case "bee" -> switch (rune) {
@@ -370,7 +435,7 @@ public final class BowUpgradeTooltip {
                         Math.max(1, 1 + frame));
                 case BOUNTY -> t("tooltip.simplybows.rune_stat.bee.bounty",
                         BeeHiveSwarmManager.beeCountFor(upgrades),
-                        num(SimplyBowsConfig.INSTANCE.buzzkill.baseDamage.get() * (1.35 + frame * 0.35)),
+                        num(SimplyBowsConfig.INSTANCE.buzzkill.baseDamage.get() * (1.35 + frame * 0.35) * 0.5),
                         Math.min(3, 1 + Math.min(2, frame)));
                 case CHAOS -> t("tooltip.simplybows.rune_stat.bee.chaos",
                         seconds(Math.max(100, SimplyBowsConfig.INSTANCE.buzzkill.chaosBaseDurationTicks.get())),
@@ -379,7 +444,7 @@ public final class BowUpgradeTooltip {
                 default -> null;
             };
             case "blossom" -> switch (rune) {
-                case PAIN -> t("tooltip.simplybows.rune_stat.blossom.pain", num(SimplyBowsConfig.INSTANCE.petalwind.painAreaRadius.get() * upgrades.sizeMultiplier() + string * SimplyBowsConfig.INSTANCE.petalwind.painAreaRadiusPerString.get()));
+                case PAIN -> t("tooltip.simplybows.rune_stat.blossom.pain", num(Math.min(4.5, Math.max(3.0, SimplyBowsConfig.INSTANCE.petalwind.painAreaRadius.get() * 0.55)) + string * Math.min(0.45, SimplyBowsConfig.INSTANCE.petalwind.painAreaRadiusPerString.get())));
                 case GRACE -> t("tooltip.simplybows.rune_stat.blossom.grace",
                         seconds(100 + frame * 20),
                         num(3.0 + string * 0.45));
@@ -464,11 +529,8 @@ public final class BowUpgradeTooltip {
     }
 
     private static String num(double value) {
-        double rounded = Math.round(value * 10.0) / 10.0;
-        if (Math.abs(rounded - Math.rint(rounded)) < 0.001) {
-            return Integer.toString((int) Math.rint(rounded));
-        }
-        return String.format(Locale.ROOT, "%.1f", rounded);
+        return java.math.BigDecimal.valueOf(value).setScale(1, java.math.RoundingMode.HALF_UP)
+                .stripTrailingZeros().toPlainString();
     }
 
     private static String hearts(double health) {

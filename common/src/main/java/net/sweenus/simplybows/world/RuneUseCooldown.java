@@ -83,6 +83,7 @@ public final class RuneUseCooldown {
         if (world == null || ownerId == null || ticks <= 0) {
             return;
         }
+        ticks = cooldownForBow(bowKey, ticks);
         long now = world.getTime();
         long newEnd = now + ticks;
         Long existing = globalEnds(world).get(ownerId);
@@ -97,6 +98,10 @@ public final class RuneUseCooldown {
         if (sync != null && world.getEntity(ownerId) instanceof ServerPlayerEntity player) {
             sync.accept(player, ticks);
         }
+    }
+
+    public static int cooldownForBow(String bowKey, int ticks) {
+        return "bee".equals(bowKey) ? (int) Math.min(Integer.MAX_VALUE, (long) ticks * 3L) : ticks;
     }
 
     private static Map<UUID, Long> globalEnds(ServerWorld world) {

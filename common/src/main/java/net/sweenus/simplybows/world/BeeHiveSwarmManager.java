@@ -76,7 +76,7 @@ public final class BeeHiveSwarmManager {
 
         int beeCount = beeCountFor(swarmUpgrades);
         // Frame = damage. Soft curve so Frame 5 isn't nuclear.
-        float beeDamage = (float) (baseBeeDamage() * (1.35 + swarmUpgrades.frameLevel() * 0.35));
+        float beeDamage = (float) (baseBeeDamage() * (1.35 + swarmUpgrades.frameLevel() * 0.35) * 0.5);
         long now = world.getTime();
         long expiry = now + (long) beeCount * BEE_INTERVAL_TICKS;
 

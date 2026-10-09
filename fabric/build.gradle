@@ -25,6 +25,8 @@ configurations {
 }
 
 dependencies {
+    compileOnly files(rootProject.simplyTooltipsCommonDevJar)
+    compileOnly "io.github.llamalad7:mixinextras-common:0.4.1"
     modImplementation "net.fabricmc:fabric-loader:$rootProject.fabric_loader_version"
 
     modImplementation "net.fabricmc.fabric-api:fabric-api:$rootProject.fabric_api_version"

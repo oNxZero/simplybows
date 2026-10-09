@@ -44,8 +44,7 @@ public class BubbleBowItem extends SimplyBowItem {
         UUID ownerId = shooter != null ? shooter.getUuid() : null;
         if (upgrades.runeEtching() == RuneEtching.CHAOS && critical
                 && RuneUseCooldown.isReady(serverWorld, ownerId, "bubble-chaos")) {
-            int steps = SimplyBowsConfig.INSTANCE.bubbleveil.chaosBaseLengthSteps.get()
-                    + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.bubbleveil.chaosLengthStepsPerString.get();
+            int steps = BubbleChaosWaveManager.waveStepCount(upgrades);
             int stepInterval = Math.max(1, SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveStepIntervalTicks.get());
             BubbleChaosWaveManager.cast(serverWorld, shooter, upgrades);
             int effectTicks = Math.max(1, steps) * stepInterval;
@@ -93,7 +92,8 @@ public class BubbleBowItem extends SimplyBowItem {
             arrowEntity = new BubbleArrowEntity(world, shooter, firedArrowStack, weaponStack);
         }
         if (arrowEntity instanceof net.minecraft.entity.projectile.PersistentProjectileEntity persistent) {
-            double damage = SimplyBowsConfig.INSTANCE.bubbleveil.baseDamage.get() * upgrades.damageMultiplier();
+            double damage = SimplyBowsConfig.INSTANCE.bubbleveil.baseDamage.get()
+                    * (1.0 + upgrades.frameLevel() * SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get() * 0.5);
             if (upgrades.runeEtching() == RuneEtching.PAIN && !FORCE_DEFAULT_BUBBLE_ARROW.get()) {
                 // Line volleys stack hard — keep total Pain damage well under a normal shot.
                 int quantity = Math.max(1, upgrades.stringLevel() + 1);

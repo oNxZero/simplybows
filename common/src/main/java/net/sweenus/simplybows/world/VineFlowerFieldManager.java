@@ -23,6 +23,7 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
+import net.sweenus.simplybows.util.BowAbilityBalance;
 import net.sweenus.simplybows.config.SimplyBowsConfig.VineBowSection;
 import net.sweenus.simplybows.entity.VineFlowerVisualEntity;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
@@ -459,6 +460,13 @@ public final class VineFlowerFieldManager {
         Box box = Box.of(center, tuning.fieldRadius() * 2.0, 4.0, tuning.fieldRadius() * 2.0);
         boolean anyDrained = false;
         for (LivingEntity entity : world.getEntitiesByClass(LivingEntity.class, box, LivingEntity::isAlive)) {
+            if (entity instanceof PlayerEntity) {
+                if (entity.squaredDistanceTo(center) <= tuning.fieldRadius() * tuning.fieldRadius()) {
+                    // All players receive support; players never enter the damage/root path.
+                    entity.addStatusEffect(new StatusEffectInstance(StatusEffects.SPEED, 60, 0), owner);
+                }
+                continue;
+            }
             if (!CombatTargeting.isOffensiveTargetCandidate(entity)) {
                 continue;
             }
@@ -708,7 +716,13 @@ public final class VineFlowerFieldManager {
                     if (entity.getType().isIn(EntityTypeTags.UNDEAD)) {
                         damage += tuning.undeadBonusDamage();
                     }
-                    dealAuraDamage(world, owner, entity, damage);
+                    if (tuning.painMode()) {
+                        // One damage system: rose pulses bypass armor and damage immunity.
+                        // A vanilla Wither effect competes with these frequent low-damage hits.
+                        CombatTargeting.applyAbilityDamage(world, owner, entity, damage, true, false, BowAbilityBalance.EVERBLOOM_PAIN_BONUS_SCALE, true);
+                    } else {
+                        dealAuraDamage(world, owner, entity, damage);
+                    }
                 }
                 continue;
             }
@@ -901,16 +915,17 @@ public final class VineFlowerFieldManager {
         }
         hostiles.sort((a, b) -> Double.compare(a.squaredDistanceTo(center), b.squaredDistanceTo(center)));
 
-        int shots = Math.min(BOUNTY_TREE_COUNT, Math.max(1, hostiles.size()));
+        // An empty field must stay idle until a hostile enters its radius.
+        int shots = Math.min(BOUNTY_TREE_COUNT, hostiles.size());
         for (int i = 0; i < shots; i++) {
-            LivingEntity target = hostiles.get(i % hostiles.size());
-            Vec3d tree = trees.get(i % trees.size());
+            LivingEntity target = hostiles.get(i);
+            Vec3d tree = trees.get(i);
             Vec3d from = tree.add(0.0, 2.4, 0.0);
             Vec3d to = target.getPos().add(0.0, target.getStandingEyeHeight() * 0.6, 0.0);
             spawnBountyTreeBolt(world, from, to);
-            dealAuraDamage(world, owner, target, tuning.hostileDamage());
+            CombatTargeting.applyAbilityDamage(world, owner, target, tuning.hostileDamage(), true, false, 0.5F, false);
             if (target.getType().isIn(EntityTypeTags.UNDEAD)) {
-                dealAuraDamage(world, owner, target, tuning.undeadBonusDamage());
+                CombatTargeting.applyAbilityDamage(world, owner, target, tuning.undeadBonusDamage(), true, false, 0.5F, false);
             }
         }
         if (shots > 0) {
@@ -921,7 +936,7 @@ public final class VineFlowerFieldManager {
 
     private static List<Vec3d> bountyTreeCenters(Vec3d center, double fieldRadius) {
         List<Vec3d> trees = new ArrayList<>(BOUNTY_TREE_COUNT);
-        double ring = Math.max(1.1, fieldRadius * 0.38);
+        double ring = Math.max(1.1, fieldRadius * 0.38) + 3.0 / Math.sqrt(3.0);
         for (int i = 0; i < BOUNTY_TREE_COUNT; i++) {
             double ang = (Math.PI * 2.0 / BOUNTY_TREE_COUNT) * i - Math.PI / 6.0;
             trees.add(new Vec3d(center.x + Math.cos(ang) * ring, center.y, center.z + Math.sin(ang) * ring));
@@ -1084,6 +1099,8 @@ public final class VineFlowerFieldManager {
             healFriendlies = false;
             damageHostiles = true;
             painMode = true;
+            hostileDamage *= BowAbilityBalance.EVERBLOOM_PAIN_DAMAGE_SCALE;
+            undeadBonusDamage *= BowAbilityBalance.EVERBLOOM_PAIN_DAMAGE_SCALE;
             auraInterval = SimplyBowsConfig.INSTANCE.everbloom.painAuraInterval.get();
         } else if (rune == RuneEtching.GRACE) {
             healFriendlies = true;
@@ -1098,8 +1115,8 @@ public final class VineFlowerFieldManager {
             damageHostiles = true;
             friendlyHeal = 0.0F;
             bountyThorns = true;
-            hostileDamage = 1.0F + upgrades.frameLevel() * 0.425F;
-            undeadBonusDamage = 0.3F + upgrades.frameLevel() * 0.1F;
+            hostileDamage = (1.0F + upgrades.frameLevel() * 0.425F) * 0.125F;
+            undeadBonusDamage = (0.3F + upgrades.frameLevel() * 0.1F) * 0.125F;
             auraInterval = SimplyBowsConfig.INSTANCE.everbloom.bountyAuraInterval.get();
         } else if (rune == RuneEtching.CHAOS) {
             healFriendlies = false;
@@ -1386,7 +1403,7 @@ public final class VineFlowerFieldManager {
         field.spawnCursor = field.pendingPoints.size();
         field.springVisuals.clear();
         if (expired && field.tuning().chaosMode()) {
-            triggerChaosExpiryBurst(world, field);
+            playChaosExpiryEffects(world, field);
             // Cooldown already started at cast (3× effect duration).
         }
     }
@@ -1497,25 +1514,9 @@ public final class VineFlowerFieldManager {
         return CooldownStorage.forWorld(CHAOS_FIELD_COOLDOWNS_BY_SERVER, world);
     }
 
-    private static void triggerChaosExpiryBurst(ServerWorld world, ActiveFlowerField field) {
+    private static void playChaosExpiryEffects(ServerWorld world, ActiveFlowerField field) {
         FieldTuning tuning = field.tuning();
         Vec3d center = field.center();
-        LivingEntity owner = getOwnerEntity(world, field.ownerId());
-        int amplifier = Math.min(tuning.chaosBurstMaxAmplifier(), field.energyStacks / Math.max(1, tuning.chaosBurstEnergyPerAmplifier()));
-        int duration = tuning.chaosBurstBaseBuffDuration() + field.energyStacks * tuning.chaosBurstBuffDurationPerEnergy();
-
-        Box box = Box.of(center, tuning.chaosBurstRadius() * 2.0, 5.0, tuning.chaosBurstRadius() * 2.0);
-        for (LivingEntity entity : world.getEntitiesByClass(LivingEntity.class, box, LivingEntity::isAlive)) {
-            if (entity.squaredDistanceTo(center) > tuning.chaosBurstRadius() * tuning.chaosBurstRadius()) {
-                continue;
-            }
-            if (owner == null || CombatTargeting.isFriendlyTo(entity, owner)) {
-                entity.addStatusEffect(new StatusEffectInstance(StatusEffects.STRENGTH, duration, amplifier), owner);
-                entity.addStatusEffect(new StatusEffectInstance(StatusEffects.HASTE, duration, amplifier), owner);
-                entity.addStatusEffect(new StatusEffectInstance(StatusEffects.SPEED, duration, amplifier), owner);
-            }
-        }
-
         world.spawnParticles(ParticleTypes.SPORE_BLOSSOM_AIR, center.x, center.y + 0.7, center.z, 46, tuning.chaosBurstRadius() * 0.35, 0.45, tuning.chaosBurstRadius() * 0.35, 0.0);
         world.spawnParticles(ParticleTypes.GLOW, center.x, center.y + 0.8, center.z, 36, tuning.chaosBurstRadius() * 0.32, 0.4, tuning.chaosBurstRadius() * 0.32, 0.0);
         world.spawnParticles(ParticleTypes.CHERRY_LEAVES, center.x, center.y + 0.9, center.z, 40, tuning.chaosBurstRadius() * 0.36, 0.45, tuning.chaosBurstRadius() * 0.36, 0.0);

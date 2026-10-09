@@ -12,6 +12,7 @@ import net.minecraft.sound.SoundEvents;
 import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
+import net.sweenus.simplybows.util.BowAbilityBalance;
 import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
@@ -153,7 +154,7 @@ public final class BlossomStormManager {
             double z = directTarget != null ? directTarget.getZ() : startPos.z;
             initialCenter = new Vec3d(x, groundY, z);
             initialTargetId = null;
-        } else if (directTarget != null && ownerLiving != null && CombatTargeting.checkFriendlyFire(directTarget, ownerLiving)) {
+        } else if (directTarget != null && directTarget.isAlive() && ownerLiving != null && CombatTargeting.checkFriendlyFire(directTarget, ownerLiving)) {
             initialTargetId = directTarget.getUuid();
         }
 
@@ -222,7 +223,7 @@ public final class BlossomStormManager {
             } else if (storm.tuning.graceSupportMode()) {
                 applyGraceSupportPulse(world, storm, owner);
             } else if (currentTarget != null && currentTarget.isAlive()) {
-                CombatTargeting.applyDamage(world, owner, currentTarget, storm.tuning.damage(), true, false);
+                CombatTargeting.applyAbilityDamage(world, owner, currentTarget, storm.tuning.damage(), true, false, storm.tuning.damageBonusScale(), false);
             }
             int interval = storm.tuning.painAreaMode()
                     ? Math.max(8, damageIntervalTicks() - 2)
@@ -230,7 +231,8 @@ public final class BlossomStormManager {
             storm.nextDamageTick = now + interval;
         }
 
-        if (!storm.tuning.painAreaMode() && !storm.tuning.graceSupportMode() && now >= storm.nextJumpTick) {
+        if (!storm.tuning.painAreaMode() && !storm.tuning.graceSupportMode()
+                && (currentTarget == null || !currentTarget.isAlive() || now >= storm.nextJumpTick)) {
             // Bounty: lock to the initial 3 targets — only hop when that target dies.
             boolean bountyLocked = storm.tuning.bountyTrapMode();
             boolean needsRetarget = currentTarget == null || !currentTarget.isAlive();
@@ -269,7 +271,7 @@ public final class BlossomStormManager {
                 continue;
             }
             // Same DPS as the leaping storm, but AOE.
-            CombatTargeting.applyDamage(world, owner, candidate, storm.tuning.damage(), true, false);
+            CombatTargeting.applyAbilityDamage(world, owner, candidate, storm.tuning.damage(), true, false, storm.tuning.damageBonusScale(), false);
         }
     }
 
@@ -578,13 +580,8 @@ public final class BlossomStormManager {
         boolean painAreaMode = rune == RuneEtching.PAIN;
         boolean graceSupportMode = rune == RuneEtching.GRACE;
         boolean bountyTrapMode = rune == RuneEtching.BOUNTY;
-        if (painAreaMode) {
-            // AOE only — 35% of leaping-storm pulse damage (30% off the prior half).
-            damage *= 0.35F;
-        } else if (bountyTrapMode) {
-            // Split across up to 3 locked storms — each hits a bit softer.
-            damage *= 0.7F;
-        }
+        damage *= BowAbilityBalance.petalDamageScale(rune, upgrades.frameLevel());
+        float damageBonusScale = BowAbilityBalance.petalBonusScale(rune, upgrades.frameLevel());
         double painAreaRadius = Math.min(4.5, Math.max(3.0, painAreaDamageRadius() * 0.55))
                 + upgrades.stringLevel() * Math.min(0.45, painAreaRadiusPerString());
         double graceAuraRadius = GRACE_BASE_RADIUS + upgrades.stringLevel() * GRACE_RADIUS_PER_STRING
@@ -601,7 +598,7 @@ public final class BlossomStormManager {
         } else {
             durationTicks = stormDurationTicks() + upgrades.stringLevel() * stormDurationBonusPerString();
         }
-        return new StormTuning(damage, painAreaMode, graceSupportMode, bountyTrapMode, painAreaRadius, graceAuraRadius,
+        return new StormTuning(damage, damageBonusScale, painAreaMode, graceSupportMode, bountyTrapMode, painAreaRadius, graceAuraRadius,
                 bountyTriggerRadius, maxActiveBountyTraps, bountyTriggerKnockup, durationTicks, graceBuffTicks);
     }
 
@@ -631,6 +628,7 @@ public final class BlossomStormManager {
 
     private record StormTuning(
             float damage,
+            float damageBonusScale,
             boolean painAreaMode,
             boolean graceSupportMode,
             boolean bountyTrapMode,

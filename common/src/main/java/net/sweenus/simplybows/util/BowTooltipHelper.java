@@ -44,11 +44,12 @@ public final class BowTooltipHelper {
         addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.upgrades.string_level", upgrades.stringLevel(), maxString), STYLE_STRING);
         addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.upgrades.frame_level", upgrades.frameLevel(), maxFrame), STYLE_FRAME);
         addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.upgrades.rune", Text.translatable("tooltip.simplybows.rune." + rune.id())), STYLE_RUNE);
-        for (String line : BowUpgradeTooltip.detailLines(bowKey, upgrades)) {
-            addWrappedLine(tooltip, Text.literal(line), STYLE_DIM);
+        if (rune != RuneEtching.NONE) {
+            addWrappedLine(tooltip, Text.literal(BowTooltipPages.rune(bowKey, rune)), STYLE_BODY);
         }
-        if (!altDown) {
-            addWrappedLine(tooltip, Text.translatable("tooltip.simplybows.hold_alt"), STYLE_HINT);
+        if (altDown) {
+            addWrappedLine(tooltip, Text.literal("String: " + BowUpgradeTooltip.stringGain(bowKey, upgrades)), STYLE_STRING);
+            addWrappedLine(tooltip, Text.literal("Frame: " + BowUpgradeTooltip.frameGain(bowKey, upgrades)), STYLE_FRAME);
         }
     }
 

@@ -32,3 +32,6 @@ bin/
 # fabric
 
 run/
+
+# Local binary recovery snapshots
+/dist-recovery/

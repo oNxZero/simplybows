@@ -9,156 +9,195 @@ import net.minecraft.util.Identifier;
 import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
-import net.sweenus.simplybows.util.BowUpgradeTooltip;
+import net.sweenus.simplybows.util.BowTooltipPages;
 import net.sweenus.simplytooltips.api.ModernTooltipModel;
 import net.sweenus.simplytooltips.api.TooltipBorderStyle;
 import net.sweenus.simplytooltips.api.TooltipProvider;
 import net.sweenus.simplytooltips.api.TooltipTheme;
-import net.sweenus.simplytooltips.api.UpgradeRow;
-import net.sweenus.simplytooltips.api.UpgradeRune;
-import net.sweenus.simplytooltips.api.UpgradeSection;
 
 import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
-/**
- * Bridge provider that gives Simply Bows items a rich modern tooltip
- * rendered by the Simply Tooltips engine.
- *
- * <p>This class uses only the ST API types and reads bow data directly
- * from {@link BowUpgradeData} rather than parsing the vanilla tooltip lines.
- *
- * <p>Theme colors are resolved by Simply Tooltips' {@code ThemeRegistry} using
- * {@code themeKey = bowKey} (e.g. {@code "vine"}, {@code "bee"}).  Pip colors
- * (String / Frame / Rune) use the ST default theme's fixed accent colors so
- * they remain legible across all bow themes.
- */
+/** Player-facing pages rendered by Simply Tooltips. */
 public final class SimplyBowsTooltipProvider implements TooltipProvider {
 
     private static final String SLOT_HEADER_PREFIX = "item.modifiers.";
+    private static SimplyBowsTooltipProvider activeProvider;
+
+    public SimplyBowsTooltipProvider() { activeProvider = this; }
+
+    public static void onKeyPress(int keyCode, int scanCode) {
+        if (activeProvider == null) return;
+        var key = activeProvider.cycleKey();
+        boolean matches = key != null ? key.matchesKey(keyCode, scanCode) : keyCode == org.lwjgl.glfw.GLFW.GLFW_KEY_G;
+        if (matches) activeProvider.navigation.keyPressed(System.nanoTime());
+    }
 
     @Override
     public boolean supports(ItemStack stack) {
-        return stack != null && !stack.isEmpty() && stack.getItem() instanceof SimplyBowItem;
+        return stack != null && !stack.isEmpty() && (stack.getItem() instanceof SimplyBowItem || stack.getItem() instanceof net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem);
     }
 
     @Override
     public ModernTooltipModel build(ItemStack stack, List<Text> rawLines, boolean altDown) {
+        List<Page> pages = new ArrayList<>();
         String bowKey = getBowKey(stack);
         BowUpgradeData upgrades = BowUpgradeData.from(stack);
-
-        // Title
-        String title = rawLines.isEmpty()
-                ? stack.getName().getString()
-                : rawLines.get(0).getString();
-
-        // Build ability text directly from translation key so Simply Tooltips can
-        // perform one pixel-width wrap pass (avoids double-wrap artifacts).
-        List<String> abilityLines = getAbilityLines(bowKey, rawLines);
-        appendEnchantmentLines(abilityLines, rawLines);
-
-        // Fixed accent colors — same as ST default theme, consistent across all bow themes
-        TooltipTheme defaults = TooltipTheme.defaultTheme();
-
-        // Build upgrade section from NBT data
-        int maxSlots  = BowUpgradeData.getMaxTotalUpgradeSlots();
-        int maxPerType = BowUpgradeData.getMaxLevelPerType();
-        int usedSlots  = upgrades.stringLevel() + upgrades.frameLevel();
-        int maxString  = Math.max(0, Math.min(maxPerType, maxSlots - upgrades.frameLevel()));
-        int maxFrame   = Math.max(0, Math.min(maxPerType, maxSlots - upgrades.stringLevel()));
-
-        RuneEtching rune = upgrades.runeEtching();
-        boolean isNone = rune == RuneEtching.NONE;
-        String runeName = Text.translatable("tooltip.simplybows.rune." + rune.id()).getString();
-        List<String> runeEffectLines = new ArrayList<>(BowUpgradeTooltip.runeLines(bowKey, upgrades));
-        if (!isNone) {
-            appendRuneDescription(runeEffectLines, bowKey, rune);
+        if (stack.getItem() instanceof net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem component) {
+            var kind = component.getUpgradeKind();
+            RuneEtching rune = component.getRuneEtching();
+            boolean isRune = kind == net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem.UpgradeKind.RUNE_ETCHING;
+            String intro = isRune ? BowTooltipPages.runeIntro(rune)
+                    : kind == net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem.UpgradeKind.ENCHANTED_STRING
+                    ? "Improve your bow's special ability with Enchanted String."
+                    : "Strengthen your bow's special ability with a Reinforced Frame.";
+            pages.add(new Page("Overview", List.of(intro,
+                    "Apply in an anvil: bow in the first slot, upgrade in the second.",
+                    isRune ? "Replaces the bow's current rune. Does not use an upgrade slot."
+                    : "String and Frame share " + BowUpgradeData.getMaxTotalUpgradeSlots() + " upgrade slots.")));
+            BowUpgradeData sample = new BowUpgradeData(0, 0, rune);
+            for (String bow : BowTooltipPages.BOWS) {
+                String name = Text.translatable("item.simplybows." + bow + "_bow." + bow + "_bow").getString();
+                pages.add(new Page(name, List.of(isRune ? BowTooltipPages.rune(bow, rune)
+                        : kind == net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem.UpgradeKind.ENCHANTED_STRING
+                        ? BowTooltipPages.stringEffect(bow, sample) : BowTooltipPages.frameEffect(bow, sample))));
+            }
+        } else {
+            List<String> overview = new ArrayList<>();
+            overview.add(upgrades.runeEtching() == RuneEtching.NONE ? BowTooltipPages.ability(bowKey)
+                    : BowTooltipPages.rune(bowKey, upgrades.runeEtching()));
+            overview.add("Fully draw the bow to use its special ability.");
+            if (upgrades.runeEtching() != RuneEtching.NONE) {
+                pages.add(new Page("Bow Description", overview));
+                pages.add(new Page("Rune Description", List.of(BowTooltipPages.rune(bowKey, upgrades.runeEtching()))));
+            } else {
+                pages.add(new Page("Bow Description", overview));
+            }
+            appendEnchantmentLines(overview, rawLines);
+            pages.add(new Page("Upgrade Description", net.sweenus.simplybows.util.BowUpgradeTooltip.previewLines(bowKey, upgrades)));
+            var player = net.minecraft.client.MinecraftClient.getInstance().player;
+            pages.add(new Page("Combat Stats", net.sweenus.simplybows.util.BowCombatStats.lines(bowKey, upgrades,
+                    net.sweenus.simplybows.util.CombatTargeting.getRangedWeaponDamageBonus(player, "projectile"),
+                    net.sweenus.simplybows.util.CombatTargeting.getRangedWeaponDamageBonus(player, "ability"))));
         }
-
-        UpgradeRune upgradeRune = new UpgradeRune(runeName, isNone, defaults.runeColor(), runeEffectLines);
-
-        List<UpgradeRow> rows = List.of(
-                new UpgradeRow("◇", "String", defaults.stringColor(), upgrades.stringLevel(), maxString,
-                        BowUpgradeTooltip.stringGain(bowKey, upgrades)),
-                new UpgradeRow("◇", "Frame", defaults.frameColor(), upgrades.frameLevel(), maxFrame,
-                        BowUpgradeTooltip.frameGain(bowKey, upgrades))
-        );
-
-        UpgradeSection upgradeSection = new UpgradeSection(maxSlots, usedSlots, rows, upgradeRune);
-
-        // STATS tab: numeric string/frame/rune breakdown (more detail than LORE).
-        List<String> detailLines = new ArrayList<>(BowUpgradeTooltip.detailLines(bowKey, upgrades));
-
-        String animKeyExtra = "|s:" + upgrades.stringLevel()
-                + "|f:" + upgrades.frameLevel()
-                + "|r:" + rune.id();
-
-        // themeKey = bowKey: TooltipRenderer looks up the full ThemeDefinition (colors + motif)
-        // in ThemeRegistry, so vine bows get the vine theme, bee bows get bee, etc.
-        return new ModernTooltipModel(
-                title,
-                List.of("UNIQUE", "BOW"),
-                TooltipBorderStyle.DEFAULT,
-                abilityLines,
-                detailLines,
-                List.of(),
-                TooltipTheme.defaultTheme(),
-                upgradeSection,
-                animKeyExtra,
-                bowKey,
-                null  // hint=null
-        );
-    }
-
-    // --- Ability section parsing ---
-
-    private static List<String> getAbilityLines(String bowKey, List<Text> rawLines) {
-        String abilityKey = "tooltip.simplybows.bow." + bowKey + ".ability";
-        String translated = Text.translatable(abilityKey).getString();
-
-        // Missing keys resolve back to the key string; use raw tooltip parsing as fallback.
-        if (translated == null || translated.isBlank() || abilityKey.equals(translated)) {
-            return parseAbilityLinesFromRaw(rawLines);
-        }
-
+        Page active = pages.get(selectPage(stack, pages.size()));
         List<String> lines = new ArrayList<>();
-        for (String line : translated.split("\\R")) {
-            if (!line.isBlank()) {
-                lines.add(line.trim());
+        lines.add(ModernTooltipModel.SECTION_MARKER + active.name());
+        for (String line : active.lines()) {
+            if (line.isBlank()) continue;
+            if (line.endsWith(":")) {
+                if (lines.size() > 1 && !lines.getLast().isBlank()) lines.add("");
+                lines.add(ModernTooltipModel.SECTION_MARKER + line.substring(0, line.length() - 1));
+            } else if (active.name().equals("Upgrade Description") || active.name().equals("Combat Stats")) {
+                lines.add(line);
+            } else {
+                String[] sentences = line.split("(?<=[.!?])\\s+(?=[A-Z])");
+                for (String sentence : sentences) {
+                    if (lines.size() > 1 && !lines.getLast().isBlank()) lines.add("");
+                    lines.add(sentence);
+                }
             }
         }
-        return lines.isEmpty() ? parseAbilityLinesFromRaw(rawLines) : lines;
+        net.sweenus.simplytooltips.api.UpgradeSection upgradeSection = null;
+        if (stack.getItem() instanceof SimplyBowItem && pageIndex == 0) {
+            var theme = TooltipTheme.defaultTheme();
+            int maxSlots = BowUpgradeData.getMaxTotalUpgradeSlots();
+            int maxLevel = BowUpgradeData.getMaxLevelPerType();
+            var rows = List.of(
+                    new net.sweenus.simplytooltips.api.UpgradeRow("◇", "String", theme.stringColor(), upgrades.stringLevel(),
+                            Math.max(0, Math.min(maxLevel, maxSlots - upgrades.frameLevel())), altDown ? net.sweenus.simplybows.util.BowUpgradeTooltip.stringGain(bowKey, upgrades) : ""),
+                    new net.sweenus.simplytooltips.api.UpgradeRow("◇", "Frame", theme.frameColor(), upgrades.frameLevel(),
+                            Math.max(0, Math.min(maxLevel, maxSlots - upgrades.stringLevel())), altDown ? net.sweenus.simplybows.util.BowUpgradeTooltip.frameGain(bowKey, upgrades) : ""));
+            var rune = new net.sweenus.simplytooltips.api.UpgradeRune(
+                    Text.translatable("tooltip.simplybows.rune." + upgrades.runeEtching().id()).getString(),
+                    upgrades.runeEtching() == RuneEtching.NONE, theme.runeColor(), List.of());
+            upgradeSection = new net.sweenus.simplytooltips.api.UpgradeSection(maxSlots,
+                    upgrades.stringLevel() + upgrades.frameLevel(), rows, rune);
+        }
+        return new ModernTooltipModel(stack.getName().getString(), List.of(stack.getItem() instanceof SimplyBowItem ? "UNIQUE BOW" : "BOW UPGRADE"), TooltipBorderStyle.DEFAULT,
+                lines, List.of(), List.of(), TooltipTheme.defaultTheme(), upgradeSection,
+                "|page:" + pageIndex + "|" + upgrades, bowKey,
+                null);
     }
 
-    private static List<String> parseAbilityLinesFromRaw(List<Text> rawLines) {
-        if (rawLines.size() < 2) return List.of();
+    private record Page(String name, List<String> lines) {}
+    private int pageIndex;
+    private final TooltipPageState navigation = new TooltipPageState();
+    private net.minecraft.client.option.KeyBinding cycleKey;
 
-        // BowTooltipHelper adds: blank → abilityHeader → ability lines → blank → upgradesHeader → ...
-        // We look for the ability section using known translation keys.
-        String abilityHeaderText  = Text.translatable("tooltip.simplybows.section.ability").getString().trim();
-        String upgradesHeaderText = Text.translatable("tooltip.simplybows.section.upgrades").getString().trim();
-
-        List<String> result = new ArrayList<>();
-        boolean inAbilitySection = false;
-
-        for (int i = 1; i < rawLines.size(); i++) {
-            String s       = rawLines.get(i).getString();
-            String trimmed = s.trim();
-
-            if (trimmed.equals(abilityHeaderText)) {
-                inAbilitySection = true;
-                continue;
-            }
-            if (trimmed.equals(upgradesHeaderText)) {
-                break; // stop at upgrades section
-            }
-            if (inAbilitySection && !trimmed.isEmpty()) {
-                result.add(s);
-            }
+    private net.minecraft.client.option.KeyBinding cycleKey() {
+        if (cycleKey == null) {
+            try {
+                // Optional client integration: the compile-only API jar contains no keybind classes.
+                cycleKey = (net.minecraft.client.option.KeyBinding) Class.forName("net.sweenus.simplytooltips.client.TooltipKeybinds")
+                        .getField("CYCLE_TAB").get(null);
+            } catch (ReflectiveOperationException ignored) { }
         }
+        return cycleKey;
+    }
 
-        return result;
+    public void drawPageFooter(net.minecraft.client.gui.DrawContext context, int centerX, int y, ItemStack stack) {
+        var font = net.minecraft.client.MinecraftClient.getInstance().textRenderer;
+        int count = stack.getItem() instanceof net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem
+                ? 7 : BowUpgradeData.from(stack).runeEtching() == RuneEtching.NONE ? 3 : 4;
+        int markerWidth = font.getWidth("+ ");
+        var key = cycleKey();
+        Text keyLabel = key == null ? Text.literal("G") : key.getBoundKeyLocalizedText();
+        int keyWidth = font.getWidth(keyLabel);
+        int x = centerX - (count * markerWidth + keyWidth + 4) / 2;
+        boolean component = stack.getItem() instanceof net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem;
+        for (int i = 0; i < count; i++) {
+            String bow = component && i > 0 ? BowTooltipPages.BOWS.get(i - 1) : getBowKey(stack);
+            int color = i == pageIndex ? 0xFFFFFF : bowColor(bow);
+            context.drawText(font, Text.literal("+"), x, y - 4, color, false);
+            x += markerWidth;
+        }
+        context.drawText(font, keyLabel, x + 4, y - 4, 0xFFFFFF, false);
+    }
+
+    private static int bowColor(String bow) {
+        return switch (bow) {
+            case "vine" -> 0x85C76B;
+            case "ice" -> 0x8BD4F2;
+            case "bubble" -> 0x55C8E8;
+            case "bee" -> 0xEDC65B;
+            case "blossom" -> 0xF19DBC;
+            case "earth" -> 0xC29A69;
+            default -> 0xDB5E71;
+        };
+    }
+
+    public boolean isOverviewRuneRow(ItemStack stack, Text text) {
+        if (pageIndex != 0 || !(stack.getItem() instanceof SimplyBowItem)) return false;
+        String value = text.getString();
+        return value.equals("◎") || value.equals("Rune: ")
+                || value.equals(Text.translatable("tooltip.simplybows.rune." + BowUpgradeData.from(stack).runeEtching().id()).getString());
+    }
+
+    /** Put the current page in the raw tooltip cache key, without adding visible text. */
+    public List<Text> withPageCacheKey(ItemStack stack, List<Text> rawLines) {
+        int count = stack.getItem() instanceof net.sweenus.simplybows.item.upgrade.BowUpgradeComponentItem
+                ? 7 : BowUpgradeData.from(stack).runeEtching() == RuneEtching.NONE ? 3 : 4;
+        selectPage(stack, count);
+        List<Text> keyed = new ArrayList<>(rawLines);
+        keyed.add(Text.empty().setStyle(net.minecraft.text.Style.EMPTY.withInsertion("simplybows:page:" + pageIndex)));
+        return keyed;
+    }
+
+    private int selectPage(ItemStack stack, int count) {
+        long now = System.nanoTime();
+        String item = Registries.ITEM.getId(stack.getItem()) + "|" + BowUpgradeData.from(stack);
+        var key = cycleKey();
+        var bound = net.minecraft.client.util.InputUtil.fromTranslationKey(
+                key == null ? "key.keyboard.g" : key.getBoundKeyTranslationKey());
+        long window = net.minecraft.client.MinecraftClient.getInstance().getWindow().getHandle();
+        // Keyboard events are queued, so even taps between rendered frames are retained.
+        // Mouse-bound navigation uses a held-button edge because it has no keyboard event.
+        boolean held = bound.getCategory() == net.minecraft.client.util.InputUtil.Type.MOUSE
+                && org.lwjgl.glfw.GLFW.glfwGetMouseButton(window, bound.getCode()) == org.lwjgl.glfw.GLFW.GLFW_PRESS;
+        pageIndex = navigation.update(item, count, held, now);
+        return pageIndex;
     }
 
     private static void appendEnchantmentLines(List<String> abilityLines, List<Text> rawLines) {
@@ -259,55 +298,4 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
         return name.endsWith("_bow") ? name.substring(0, name.length() - 4) : "generic";
     }
 
-    // --- Translation key helpers ---
-
-    private static String getStringEffectKey(String bowKey) {
-        return switch (bowKey) {
-            case "vine"    -> "tooltip.simplybows.bow.vine.string_effect";
-            case "earth"   -> "tooltip.simplybows.bow.earth.string_effect";
-            case "ice"     -> "tooltip.simplybows.bow.ice.string_effect";
-            case "bee"     -> "tooltip.simplybows.bow.bee.string_effect";
-            case "bubble"  -> "tooltip.simplybows.bow.bubble.string_effect";
-            case "blossom" -> "tooltip.simplybows.bow.blossom.string_effect";
-            default        -> "tooltip.simplybows.bow.generic.string_effect";
-        };
-    }
-
-    private static String getFrameEffectKey(String bowKey) {
-        return switch (bowKey) {
-            case "vine"    -> "tooltip.simplybows.bow.vine.frame_effect";
-            case "earth"   -> "tooltip.simplybows.bow.earth.frame_effect";
-            case "ice"     -> "tooltip.simplybows.bow.ice.frame_effect";
-            case "bee"     -> "tooltip.simplybows.bow.bee.frame_effect";
-            case "bubble"  -> "tooltip.simplybows.bow.bubble.frame_effect";
-            case "blossom" -> "tooltip.simplybows.bow.blossom.frame_effect";
-            default        -> "tooltip.simplybows.bow.generic.frame_effect";
-        };
-    }
-
-    private static void appendRuneDescription(List<String> lines, String bowKey, RuneEtching rune) {
-        String key = getRuneEffectKey(bowKey, rune);
-        String translated = Text.translatable(key).getString();
-        if (translated == null || translated.isBlank() || key.equals(translated)) {
-            return;
-        }
-        String trimmed = translated.replace('\u00A0', ' ').trim();
-        if (trimmed.isEmpty()) {
-            return;
-        }
-        for (String part : trimmed.split("\\R")) {
-            String line = part.trim();
-            if (!line.isEmpty()) {
-                lines.add(line);
-            }
-        }
-    }
-
-    private static String getRuneEffectKey(String bowKey, RuneEtching rune) {
-        return switch (bowKey) {
-            case "bee", "vine", "earth", "ice", "bubble", "blossom" ->
-                "tooltip.simplybows.bow." + bowKey + ".rune." + rune.id();
-            default -> "tooltip.simplybows.bow.generic.rune." + rune.id();
-        };
-    }
 }

@@ -11,6 +11,7 @@ import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.ItemStack;
 import net.minecraft.item.Items;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
 import net.minecraft.util.hit.BlockHitResult;
@@ -48,7 +49,7 @@ public class BeeArrowEntity extends ArrowEntity {
     private static double painHomingAccel() { return SimplyBowsConfig.INSTANCE.buzzkill.painHomingAccel.get(); }
     private static double painMaxSpeed() { return SimplyBowsConfig.INSTANCE.buzzkill.painMaxSpeed.get(); }
     private static final String HIVE_VISUAL_TAG = "simplybows_bee_hive_visual";
-    private final BowUpgradeData upgrades;
+    private BowUpgradeData upgrades;
     private boolean spawnSoundPlayed;
     private boolean spawnedBountyHive;
     private boolean chaosHoneyStormOnImpact;
@@ -57,9 +58,46 @@ public class BeeArrowEntity extends ArrowEntity {
     private float chaosDiveBombDamage;
     private double chaosDiveBombRadius;
     private boolean hiveBee;
+    private boolean fullyDrawnShot;
+
+    public void setFullyDrawnShot(boolean fullyDrawnShot) {
+        this.fullyDrawnShot = fullyDrawnShot;
+    }
+
+    @Override
+    public void writeCustomDataToNbt(NbtCompound nbt) {
+        super.writeCustomDataToNbt(nbt);
+        nbt.putBoolean("FullyDrawnShot", this.fullyDrawnShot);
+        nbt.put("BowUpgrades", this.upgrades.toProjectileNbt());
+        nbt.putBoolean("spawnSoundPlayed", this.spawnSoundPlayed);
+        nbt.putBoolean("spawnedBountyHive", this.spawnedBountyHive);
+        nbt.putBoolean("chaosHoneyStormOnImpact", this.chaosHoneyStormOnImpact);
+        nbt.putBoolean("spawnedChaosHoneyStorm", this.spawnedChaosHoneyStorm);
+        nbt.putBoolean("chaosDiveBomb", this.chaosDiveBomb);
+        nbt.putFloat("chaosDiveBombDamage", this.chaosDiveBombDamage);
+        nbt.putDouble("chaosDiveBombRadius", this.chaosDiveBombRadius);
+        nbt.putBoolean("hiveBee", this.hiveBee);
+        nbt.putBoolean("painHoming", this.painHoming);
+    }
+
+    @Override
+    public void readCustomDataFromNbt(NbtCompound nbt) {
+        super.readCustomDataFromNbt(nbt);
+        this.fullyDrawnShot = nbt.getBoolean("FullyDrawnShot");
+        this.upgrades = BowUpgradeData.fromProjectileNbt(nbt.getCompound("BowUpgrades"));
+        this.spawnSoundPlayed = nbt.getBoolean("spawnSoundPlayed");
+        this.spawnedBountyHive = nbt.getBoolean("spawnedBountyHive");
+        this.chaosHoneyStormOnImpact = nbt.getBoolean("chaosHoneyStormOnImpact");
+        this.spawnedChaosHoneyStorm = nbt.getBoolean("spawnedChaosHoneyStorm");
+        this.chaosDiveBomb = nbt.getBoolean("chaosDiveBomb");
+        this.chaosDiveBombDamage = nbt.getFloat("chaosDiveBombDamage");
+        this.chaosDiveBombRadius = nbt.getDouble("chaosDiveBombRadius");
+        this.hiveBee = nbt.getBoolean("hiveBee");
+        this.painHoming = nbt.getBoolean("painHoming");
+    }
     private static final ThreadLocal<Boolean> ENABLE_PAIN_HOMING = ThreadLocal.withInitial(() -> false);
     private static final ThreadLocal<Float> PAIN_DAMAGE_SCALE = ThreadLocal.withInitial(() -> 1.0F);
-    private final boolean painHoming;
+    private boolean painHoming;
     private LivingEntity homingTarget;
 
     public static void setPainHoming(boolean enabled) {
@@ -247,6 +285,7 @@ public class BeeArrowEntity extends ArrowEntity {
 
         if (!(entityHitResult.getEntity() instanceof LivingEntity livingEntity)) {
             trySpawnChaosHoneyStorm(entityHitResult.getPos());
+            trySpawnBountyHive(entityHitResult.getPos());
             return;
         }
 
@@ -262,6 +301,11 @@ public class BeeArrowEntity extends ArrowEntity {
             return;
         }
 
+        // Create the impact ability before vanilla damage can kill the target.
+        if (!this.hiveBee) {
+            trySpawnChaosHoneyStorm(entityHitResult.getPos());
+            trySpawnBountyHive(entityHitResult.getPos());
+        }
         if (!this.painHoming) {
             livingEntity.hurtTime = 0;
             livingEntity.timeUntilRegen = 0;
@@ -282,11 +326,10 @@ public class BeeArrowEntity extends ArrowEntity {
         }
 
         // Full-draw poison stacks.
-        if (this.isCritical() && this.upgrades.runeEtching() != RuneEtching.GRACE && !isFriendlyToOwner(livingEntity)) {
+        if ((this.fullyDrawnShot || this.isCritical()) && livingEntity.isAlive()
+                && this.upgrades.runeEtching() != RuneEtching.GRACE && !isFriendlyToOwner(livingEntity)) {
             applyStackingPoison(livingEntity);
         }
-        trySpawnChaosHoneyStorm(entityHitResult.getPos());
-        trySpawnBountyHive(entityHitResult.getPos());
 
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             serverWorld.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), SoundEvents.ENTITY_BEE_HURT, SoundCategory.PLAYERS, 0.9F, 0.95F + this.random.nextFloat() * 0.2F);

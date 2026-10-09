@@ -4,6 +4,7 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.item.Items;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
@@ -122,6 +123,22 @@ public class BubbleArrowEntity extends ArrowEntity {
     private void spawnImpactParticles(ServerWorld world, Vec3d pos) {
         world.spawnParticles(ParticleTypes.BUBBLE, pos.x, pos.y + 0.2, pos.z, 14, 0.35, 0.2, 0.35, 0.0);
         world.spawnParticles(ParticleTypes.SPLASH, pos.x, pos.y + 0.1, pos.z, 10, 0.25, 0.12, 0.25, 0.0);
+    }
+
+    @Override
+    public void writeCustomDataToNbt(NbtCompound nbt) {
+        super.writeCustomDataToNbt(nbt);
+        nbt.put("BowUpgrades", this.columnUpgrades.toProjectileNbt());
+        nbt.putBoolean("AbilitySpawned", this.spawnedBubbleColumn);
+        if (this.columnOwnerId != null) nbt.putUuid("ColumnOwner", this.columnOwnerId);
+    }
+
+    @Override
+    public void readCustomDataFromNbt(NbtCompound nbt) {
+        super.readCustomDataFromNbt(nbt);
+        this.columnUpgrades = BowUpgradeData.fromProjectileNbt(nbt.getCompound("BowUpgrades"));
+        this.spawnedBubbleColumn = nbt.getBoolean("AbilitySpawned");
+        this.columnOwnerId = nbt.containsUuid("ColumnOwner") ? nbt.getUuid("ColumnOwner") : null;
     }
 
     @Override

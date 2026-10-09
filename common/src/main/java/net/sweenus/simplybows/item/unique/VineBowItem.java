@@ -52,7 +52,11 @@ public class VineBowItem extends SimplyBowItem {
 
         BowUpgradeData upgrades = BowUpgradeData.from(weaponStack);
         VineArrowEntity arrowEntity = new VineArrowEntity(world, shooter, firedArrowStack, weaponStack);
-        arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.everbloom.baseDamage.get() * upgrades.damageMultiplier());
+        double damage = SimplyBowsConfig.INSTANCE.everbloom.baseDamage.get() * upgrades.damageMultiplier();
+        if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
+            damage *= 0.5;
+        }
+        arrowEntity.setDamage(damage);
         arrowEntity.setPlantsFlowerField(critical);
         arrowEntity.setCritical(critical);
         return arrowEntity;

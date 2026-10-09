@@ -4,6 +4,7 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.item.Items;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
@@ -23,7 +24,7 @@ import net.sweenus.simplybows.world.BlossomStormManager;
 public class BlossomArrowEntity extends ArrowEntity {
 
     private boolean spawnedStorm;
-    private final BowUpgradeData upgrades;
+    private BowUpgradeData upgrades;
 
     public BlossomArrowEntity(EntityType<? extends BlossomArrowEntity> type, World world) {
         super(type, world);
@@ -66,6 +67,9 @@ public class BlossomArrowEntity extends ArrowEntity {
             living.hurtTime = 0;
             living.timeUntilRegen = 0;
         }
+        if (entityHitResult.getEntity() instanceof LivingEntity livingEntity) {
+            trySpawnStorm(entityHitResult.getPos(), livingEntity);
+        }
         super.onEntityHit(entityHitResult);
         if (entityHitResult.getEntity() instanceof LivingEntity living) {
             living.hurtTime = 0;
@@ -73,9 +77,6 @@ public class BlossomArrowEntity extends ArrowEntity {
         }
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             serverWorld.playSound(null, entityHitResult.getPos().x, entityHitResult.getPos().y, entityHitResult.getPos().z, SoundEvents.BLOCK_SPORE_BLOSSOM_PLACE, SoundCategory.PLAYERS, 0.85F, 1.0F + this.random.nextFloat() * 0.2F);
-        }
-        if (entityHitResult.getEntity() instanceof LivingEntity livingEntity) {
-            trySpawnStorm(entityHitResult.getPos(), livingEntity);
         }
     }
 
@@ -113,6 +114,20 @@ public class BlossomArrowEntity extends ArrowEntity {
             }
             this.spawnedStorm = true;
         }
+    }
+
+    @Override
+    public void writeCustomDataToNbt(NbtCompound nbt) {
+        super.writeCustomDataToNbt(nbt);
+        nbt.put("BowUpgrades", this.upgrades.toProjectileNbt());
+        nbt.putBoolean("AbilitySpawned", this.spawnedStorm);
+    }
+
+    @Override
+    public void readCustomDataFromNbt(NbtCompound nbt) {
+        super.readCustomDataFromNbt(nbt);
+        this.upgrades = BowUpgradeData.fromProjectileNbt(nbt.getCompound("BowUpgrades"));
+        this.spawnedStorm = nbt.getBoolean("AbilitySpawned");
     }
 
     @Override

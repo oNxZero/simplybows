@@ -6,6 +6,7 @@ import net.minecraft.entity.effect.StatusEffectInstance;
 import net.minecraft.entity.effect.StatusEffects;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.item.Items;
 import net.minecraft.particle.ParticleTypes;
 import net.minecraft.server.world.ServerWorld;
@@ -66,6 +67,47 @@ public class HomingArrowEntity extends ArrowEntity {
         this.prevX = owner.getX();
         this.prevY = owner.getEyeY() - 0.1;
         this.prevZ = owner.getZ();
+    }
+
+    @Override
+    public void writeCustomDataToNbt(NbtCompound nbt) {
+        super.writeCustomDataToNbt(nbt);
+        nbt.putBoolean("initialSpreadApplied", this.initialSpreadApplied);
+        nbt.putBoolean("lockSingleTarget", this.lockSingleTarget);
+        nbt.putBoolean("stackingSlowness", this.stackingSlowness);
+        nbt.putBoolean("chaosWallOnImpact", this.chaosWallOnImpact);
+        nbt.putBoolean("painFrostBloom", this.painFrostBloom);
+        nbt.putBoolean("bountyFrostBloom", this.bountyFrostBloom);
+        nbt.putInt("frostStringLevel", this.frostStringLevel);
+        nbt.putInt("frostFrameLevel", this.frostFrameLevel);
+        nbt.putBoolean("spawnedFrostBloom", this.spawnedFrostBloom);
+        nbt.putBoolean("homingEnabled", this.homingEnabled);
+        nbt.putInt("chaosWallStringLevel", this.chaosWallStringLevel);
+        nbt.putInt("chaosWallFrameLevel", this.chaosWallFrameLevel);
+        nbt.putBoolean("spawnedChaosWall", this.spawnedChaosWall);
+        nbt.putInt("HomingFlightAge", this.age);
+        if (this.lockedTargetUuid != null) nbt.putUuid("LockedTarget", this.lockedTargetUuid);
+    }
+
+    @Override
+    public void readCustomDataFromNbt(NbtCompound nbt) {
+        super.readCustomDataFromNbt(nbt);
+        this.initialSpreadApplied = nbt.getBoolean("initialSpreadApplied");
+        this.lockSingleTarget = nbt.getBoolean("lockSingleTarget");
+        this.stackingSlowness = nbt.getBoolean("stackingSlowness");
+        this.chaosWallOnImpact = nbt.getBoolean("chaosWallOnImpact");
+        this.painFrostBloom = nbt.getBoolean("painFrostBloom");
+        this.bountyFrostBloom = nbt.getBoolean("bountyFrostBloom");
+        this.frostStringLevel = nbt.getInt("frostStringLevel");
+        this.frostFrameLevel = nbt.getInt("frostFrameLevel");
+        this.spawnedFrostBloom = nbt.getBoolean("spawnedFrostBloom");
+        this.homingEnabled = !nbt.contains("homingEnabled") || nbt.getBoolean("homingEnabled");
+        this.chaosWallStringLevel = nbt.getInt("chaosWallStringLevel");
+        this.chaosWallFrameLevel = nbt.getInt("chaosWallFrameLevel");
+        this.spawnedChaosWall = nbt.getBoolean("spawnedChaosWall");
+        this.age = Math.max(0, nbt.getInt("HomingFlightAge"));
+        this.lockedTargetUuid = nbt.containsUuid("LockedTarget") ? nbt.getUuid("LockedTarget") : null;
+        this.target = null; // Resolve a locked entity from its UUID on the next server tick.
     }
 
     @Override

@@ -196,16 +196,16 @@ public class SimplyBowsConfig extends Config {
         public ValidatedInt chaosNodesPerTendrilMin = new ValidatedInt(3, 20, 1);
         @Comment("Maximum glow lichen nodes generated along each tendril.")
         public ValidatedInt chaosNodesPerTendrilMax = new ValidatedInt(7, 30, 1);
-        @Comment("Radius of the final ally buff burst when the blossom expires.")
+        @Comment("Radius of the visual burst when the Chaos blossom expires. Speed uses the active field radius.")
         public ValidatedDouble chaosBurstRadius = new ValidatedDouble(6.0, 30.0, 1.0);
-        @Comment("Base duration of Strength, Haste, and Speed from Chaos expiry burst.")
+        @Comment("Legacy key: unused. The active Chaos field refreshes Speed I for 60 ticks.")
         public ValidatedInt chaosBurstBaseBuffDuration = new ValidatedInt(120, 2400, 1);
-        @Comment("Additional burst buff duration gained per stored energy stack.")
+        @Comment("Legacy key: unused. Energy does not increase Speed I duration.")
         public ValidatedInt chaosBurstBuffDurationPerEnergy = new ValidatedInt(8, 300, 0);
-        @Comment("Energy required to increase burst buff amplifier by 1.")
+        @Comment("Legacy key: unused. The active Chaos field grants only Speed I.")
         public ValidatedInt chaosBurstEnergyPerAmplifier = new ValidatedInt(5, 100, 1);
         @ConfigGroup.Pop
-        @Comment("Maximum amplifier level for Chaos expiry burst buffs.")
+        @Comment("Legacy key: unused. The active Chaos field grants only Speed I.")
         public ValidatedInt chaosBurstMaxAmplifier = new ValidatedInt(2, 5, 0);
     }
 
@@ -566,9 +566,9 @@ public class SimplyBowsConfig extends Config {
         public ValidatedFloat baseFrameChance = new ValidatedFloat(20.0F, CHANCE_SCALE, 0.0F);
         @Comment("Base chest drop chance for rune upgrade items. Example: 3 = 0.3%.")
         public ValidatedFloat baseRuneChance = new ValidatedFloat(3.0F, CHANCE_SCALE, 0.0F);
-        @Comment("Base chest drop chance for unique bows. Example: 2 = 0.2%.")
+        @Comment("Chance for one random unique bow in vanilla and modded loot chests. Example: 50 = 5.0%.")
         @ConfigGroup.Pop
-        public ValidatedFloat baseUniqueBowChance = new ValidatedFloat(2.0F, CHANCE_SCALE, 0.0F);
+        public ValidatedFloat baseUniqueBowChance = new ValidatedFloat(50.0F, CHANCE_SCALE, 0.0F);
 
         // Biome Boosts
         public ConfigGroup biomeGroup = new ConfigGroup("biomeBoosts");

@@ -26,6 +26,9 @@ public abstract class AnvilScreenHandlerMixin {
     @Shadow
     private int repairItemUsage;
 
+    @Shadow
+    private String newItemName;
+
     @Inject(method = "updateResult", at = @At("HEAD"), cancellable = true)
     private void simplybows$applyUpgradeRecipe(CallbackInfo ci) {
         AnvilScreenHandler handler = (AnvilScreenHandler) (Object) this;
@@ -37,7 +40,7 @@ public abstract class AnvilScreenHandlerMixin {
 
         // Upgrade parts contain "bow" in their item id (enchanted_bow_string, etc.).
         // Never treat them as upgradeable bows, or Frame+String becomes a fake anvil craft.
-        if (isUpgradeComponent(left) && isUpgradeComponent(right)) {
+        if (isUpgradeComponent(left) && (isUpgradeComponent(right) || isUpgradeableBow(right))) {
             handler.getSlot(2).setStack(ItemStack.EMPTY);
             this.levelCost.set(0);
             this.repairItemUsage = 0;
@@ -48,15 +51,9 @@ public abstract class AnvilScreenHandlerMixin {
 
         ItemStack bowStack;
         ItemStack componentStack;
-        boolean componentOnRight;
         if (isUpgradeableBow(left) && isUpgradeComponent(right)) {
             bowStack = left;
             componentStack = right;
-            componentOnRight = true;
-        } else if (isUpgradeableBow(right) && isUpgradeComponent(left)) {
-            bowStack = right;
-            componentStack = left;
-            componentOnRight = false;
         } else {
             return;
         }
@@ -77,9 +74,20 @@ public abstract class AnvilScreenHandlerMixin {
 
         ItemStack result = bowStack.copy();
         updated.write(result);
+        int renameCost = 0;
+        if (this.newItemName == null || this.newItemName.isBlank()) {
+            if (result.contains(net.minecraft.component.DataComponentTypes.CUSTOM_NAME)) {
+                result.remove(net.minecraft.component.DataComponentTypes.CUSTOM_NAME);
+                renameCost = 1;
+            }
+        } else if (!this.newItemName.equals(bowStack.getName().getString())) {
+            result.set(net.minecraft.component.DataComponentTypes.CUSTOM_NAME, net.minecraft.text.Text.literal(this.newItemName));
+            renameCost = 1;
+        }
         handler.getSlot(2).setStack(result);
-        this.levelCost.set(upgradeComponent.getAnvilCost(current, updated));
-        this.repairItemUsage = componentOnRight ? 1 : 0;
+        this.levelCost.set(upgradeComponent.getAnvilCost(current, updated) + renameCost);
+        // Vanilla clears the left input and subtracts this count from the right input.
+        this.repairItemUsage = 1;
         ((ScreenHandler) (Object) this).sendContentUpdates();
         ci.cancel();
     }

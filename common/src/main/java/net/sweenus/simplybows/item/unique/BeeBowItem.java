@@ -81,9 +81,14 @@ public class BeeBowItem extends SimplyBowItem {
         BeeArrowEntity arrowEntity = new BeeArrowEntity(world, shooter, firedArrowStack, weaponStack);
         double damage = SimplyBowsConfig.INSTANCE.buzzkill.baseDamage.get() * upgrades.damageMultiplier();
         damage *= BeeArrowEntity.getPainDamageScale();
+        if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
+            damage *= 0.5;
+        }
         arrowEntity.setDamage(damage);
         arrowEntity.setChaosHoneyStormOnImpact(CHAOS_HONEY_STORM_ON_IMPACT.get());
-        arrowEntity.setCritical(critical);
+        // Full draw still enables poison; Bounty does not get vanilla crit damage.
+        arrowEntity.setFullyDrawnShot(critical);
+        arrowEntity.setCritical(critical && upgrades.runeEtching() != RuneEtching.BOUNTY);
         return arrowEntity;
     }
 }

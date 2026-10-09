@@ -4,9 +4,11 @@
   "compatibilityLevel": "JAVA_21",
   "minVersion": "0.8",
   "client": [
+    "client.BowAttributeTooltipMixin",
     "client.DrawContextMixin",
     "client.ItemRendererMixin",
-    "client.TooltipRendererMixin"
+    "client.TooltipRendererMixin",
+    "client.KeyboardMixin"
   ],
   "mixins": [
     "AbstractSkeletonEntityMixin",

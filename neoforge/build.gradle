@@ -32,6 +32,8 @@ repositories {
 }
 
 dependencies {
+    compileOnly files(rootProject.simplyTooltipsCommonDevJar)
+    compileOnly "io.github.llamalad7:mixinextras-common:0.4.1"
     neoForge "net.neoforged:neoforge:$rootProject.neoforge_version"
 
     modImplementation "dev.architectury:architectury-neoforge:$rootProject.architectury_api_version"

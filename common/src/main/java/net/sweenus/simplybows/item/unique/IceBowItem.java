@@ -128,27 +128,12 @@ public class IceBowItem extends SimplyBowItem {
     public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
         ItemStack itemStack = user.getStackInHand(hand);
         if (simplybows$hasInfiniteAmmo(user, itemStack, user.getProjectileType(itemStack))) {
-            //return super.use(world, user, hand);
+            return super.use(world, user, hand);
         }
-
         BowUpgradeData upgrades = BowUpgradeData.from(itemStack);
-        int quantity = getArrowQuantity(upgrades);
-        Map<ItemStack, Integer> arrowStacks = HelperMethods.findArrowStacks(user);
-
-        if (upgrades.runeEtching() == RuneEtching.CHAOS) {
-            for (Map.Entry<ItemStack, Integer> entry : arrowStacks.entrySet()) {
-                if (entry.getValue() > 0) {
-                    return super.use(world, user, hand);
-                }
-            }
-            return TypedActionResult.fail(itemStack);
-        }
-        for (Map.Entry<ItemStack, Integer> entry : arrowStacks.entrySet()) {
-            ItemStack arrowStack = entry.getKey();
-            int arrowCount = entry.getValue();
-            if (arrowCount > quantity - 1)
-                return super.use(world, user, hand);
-        }
+        int quantity = getArrowQuantity(upgrades, user);
+        int arrows = HelperMethods.findArrowStacks(user).values().stream().mapToInt(Integer::intValue).sum();
+        if (arrows >= quantity) return super.use(world, user, hand);
         return TypedActionResult.fail(itemStack);
     }
 
@@ -230,7 +215,19 @@ public class IceBowItem extends SimplyBowItem {
         return arrowEntity;
     }
 
-    private int getArrowQuantity(BowUpgradeData upgrades) {
+    private int getArrowQuantity(BowUpgradeData upgrades, PlayerEntity player) {
+        RuneEtching rune = upgrades.runeEtching();
+        // Client input must allow the server to decide cooldown readiness.
+        // On cooldown the actual shot falls back to the normal fan.
+        if (player.getWorld().isClient() && rune != RuneEtching.NONE) return 1;
+        if (player.getWorld() instanceof ServerWorld world) {
+            if (rune == RuneEtching.CHAOS && IceChaosWallManager.isWallReady(world, player.getUuid())) return 1;
+            String key = switch (rune) {
+                case PAIN -> "ice-pain"; case GRACE -> "ice-grace"; case BOUNTY -> "ice-bounty";
+                default -> null;
+            };
+            if (key != null && RuneUseCooldown.isReady(world, player.getUuid(), key)) return 1;
+        }
         return baseQuantity() + upgrades.stringLevel();
     }
 

@@ -1,19 +1,11 @@
 package net.sweenus.simplybows.item.upgrade;
 
-import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
-import net.minecraft.sound.SoundCategory;
-import net.minecraft.sound.SoundEvents;
 import net.minecraft.text.Text;
-import net.minecraft.util.Hand;
-import net.minecraft.util.TypedActionResult;
 import net.minecraft.item.tooltip.TooltipType;
-import net.minecraft.world.World;
-import net.sweenus.simplybows.item.unique.SimplyBowItem;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
-import net.sweenus.simplybows.util.BowTooltipHelper;
 import net.sweenus.simplybows.util.BowUpgradeTooltip;
 
 import java.util.List;
@@ -29,42 +21,9 @@ public class BowUpgradeComponentItem extends Item {
         this.runeEtching = runeEtching == null ? RuneEtching.NONE : runeEtching;
     }
 
-    @Override
-    public TypedActionResult<ItemStack> use(World world, PlayerEntity user, Hand hand) {
-        ItemStack componentStack = user.getStackInHand(hand);
-        ItemStack bowStack = resolveBowTarget(user, hand);
-        if (bowStack.isEmpty()) {
-            return TypedActionResult.pass(componentStack);
-        }
+    public UpgradeKind getUpgradeKind() { return upgradeKind; }
 
-        BowUpgradeData current = BowUpgradeData.from(bowStack);
-        BowUpgradeData updated = this.applyTo(current);
-
-        if (current.equals(updated)) {
-            if (!world.isClient()) {
-                user.sendMessage(
-                        Text.translatable(
-                                "message.simplybows.upgrade.cap_reached",
-                                BowUpgradeData.getMaxLevelPerType(),
-                                BowUpgradeData.getMaxTotalUpgradeSlots()
-                        ),
-                        true
-                );
-            }
-            return TypedActionResult.fail(componentStack);
-        }
-
-        updated.write(bowStack);
-        if (!user.getAbilities().creativeMode) {
-            componentStack.decrement(1);
-        }
-
-        world.playSound(null, user.getX(), user.getY(), user.getZ(), SoundEvents.BLOCK_ENCHANTMENT_TABLE_USE, SoundCategory.PLAYERS, 0.75F, 1.0F);
-        if (!world.isClient()) {
-            user.sendMessage(Text.translatable("message.simplybows.upgrade.applied", this.upgradeKind.displayName(this.runeEtching)), true);
-        }
-        return TypedActionResult.success(componentStack, world.isClient());
-    }
+    public RuneEtching getRuneEtching() { return runeEtching; }
 
     @Override
     public void appendTooltip(ItemStack stack, Item.TooltipContext context, List<Text> tooltip, TooltipType type) {
@@ -89,28 +48,6 @@ public class BowUpgradeComponentItem extends Item {
             case REINFORCED_FRAME -> 2 + after.frameLevel();
             case RUNE_ETCHING -> 5;
         };
-    }
-
-    private static ItemStack resolveBowTarget(PlayerEntity user, Hand usedHand) {
-        ItemStack main = user.getMainHandStack();
-        ItemStack off = user.getOffHandStack();
-        if (usedHand == Hand.MAIN_HAND) {
-            if (off.getItem() instanceof SimplyBowItem) {
-                return off;
-            }
-            if (main.getItem() instanceof SimplyBowItem) {
-                return main;
-            }
-            return ItemStack.EMPTY;
-        }
-
-        if (main.getItem() instanceof SimplyBowItem) {
-            return main;
-        }
-        if (off.getItem() instanceof SimplyBowItem) {
-            return off;
-        }
-        return ItemStack.EMPTY;
     }
 
     public enum UpgradeKind {

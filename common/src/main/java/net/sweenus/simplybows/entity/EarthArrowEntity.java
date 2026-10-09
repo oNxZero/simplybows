@@ -5,6 +5,7 @@ import net.minecraft.entity.EntityType;
 import net.minecraft.entity.LivingEntity;
 import net.minecraft.entity.projectile.ArrowEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.nbt.NbtCompound;
 import net.minecraft.item.Items;
 import net.minecraft.particle.BlockStateParticleEffect;
 import net.minecraft.particle.ParticleTypes;
@@ -25,7 +26,7 @@ import net.sweenus.simplybows.world.EarthSpikeFieldManager;
 public class EarthArrowEntity extends ArrowEntity {
 
     private static final String EARTH_VISUAL_TAG = "simplybows_earth_spike_visual";
-    private final BowUpgradeData upgrades;
+    private BowUpgradeData upgrades;
     private boolean spawnedField;
     private boolean chaosSunderOnImpact;
 
@@ -71,6 +72,8 @@ public class EarthArrowEntity extends ArrowEntity {
             struck.hurtTime = 0;
             struck.timeUntilRegen = 0;
         }
+        // Preserve the impact direction and create the effect even on lethal hits.
+        trySpawnField(entityHitResult.getPos(), struck);
         super.onEntityHit(entityHitResult);
         if (struck != null) {
             struck.hurtTime = 0;
@@ -81,7 +84,6 @@ public class EarthArrowEntity extends ArrowEntity {
             serverWorld.playSound(null, pos.x, pos.y, pos.z, SoundEvents.BLOCK_POINTED_DRIPSTONE_LAND, SoundCategory.PLAYERS, 0.9F, 0.95F + this.random.nextFloat() * 0.2F);
             serverWorld.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.DRIPSTONE_BLOCK.getDefaultState()), pos.x, pos.y + 0.1, pos.z, 12, 0.3, 0.1, 0.3, 0.01);
         }
-        trySpawnField(entityHitResult.getPos(), struck);
     }
 
     public boolean isGraceSupportProjectile() {
@@ -134,6 +136,22 @@ public class EarthArrowEntity extends ArrowEntity {
 
     public void setChaosSunderOnImpact(boolean chaosSunderOnImpact) {
         this.chaosSunderOnImpact = chaosSunderOnImpact;
+    }
+
+    @Override
+    public void writeCustomDataToNbt(NbtCompound nbt) {
+        super.writeCustomDataToNbt(nbt);
+        nbt.put("BowUpgrades", this.upgrades.toProjectileNbt());
+        nbt.putBoolean("SpawnedField", this.spawnedField);
+        nbt.putBoolean("ChaosSunderOnImpact", this.chaosSunderOnImpact);
+    }
+
+    @Override
+    public void readCustomDataFromNbt(NbtCompound nbt) {
+        super.readCustomDataFromNbt(nbt);
+        this.upgrades = BowUpgradeData.fromProjectileNbt(nbt.getCompound("BowUpgrades"));
+        this.spawnedField = nbt.getBoolean("SpawnedField");
+        this.chaosSunderOnImpact = nbt.getBoolean("ChaosSunderOnImpact");
     }
 
     @Override

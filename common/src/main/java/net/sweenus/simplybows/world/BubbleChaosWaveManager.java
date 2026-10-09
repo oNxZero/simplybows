@@ -13,6 +13,7 @@ import net.minecraft.util.math.Direction;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.Vec3d;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
+import net.sweenus.simplybows.util.BowAbilityBalance;
 import net.sweenus.simplybows.entity.BubbleChaosWaveVisualEntity;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.util.CombatTargeting;
@@ -64,12 +65,14 @@ public final class BubbleChaosWaveManager {
 
         Vec3d right = new Vec3d(-horizontalForward.z, 0.0, horizontalForward.x).normalize();
         Vec3d start = caster.getPos().add(horizontalForward.multiply(waveForwardStartOffset()));
-        int maxSteps = baseLengthSteps() + Math.max(0, upgrades.stringLevel()) * lengthStepsPerString();
-        float damage = chaosBaseDamage() + Math.max(0, upgrades.frameLevel()) * chaosDamagePerFrame();
-        double knockback = chaosBaseKnockback() + Math.max(0, upgrades.frameLevel()) * chaosKnockbackPerFrame();
+        double maxTravel = waveTravelDistance(upgrades);
+        int maxSteps = waveStepCount(upgrades);
+        float damage = chaosBaseDamage() + Math.max(0, upgrades.frameLevel()) * chaosDamagePerFrame() * 0.5F;
+        double knockback = (chaosBaseKnockback() + Math.max(0, upgrades.frameLevel()) * chaosKnockbackPerFrame())
+                * BowAbilityBalance.waveKnockbackScale(upgrades.frameLevel());
         UUID ownerId = caster.getUuid();
 
-        ActiveWave wave = new ActiveWave(start, horizontalForward, right, ownerId, world.getTime(), maxSteps, damage, knockback, Math.max(0, upgrades.frameLevel()));
+        ActiveWave wave = new ActiveWave(start, horizontalForward, right, ownerId, world.getTime(), maxSteps, maxTravel, damage, knockback, Math.max(0, upgrades.frameLevel()));
         ACTIVE_WAVES.computeIfAbsent(world, w -> new ArrayList<>()).add(wave);
 
         world.playSound(null, start.x, start.y, start.z, SoundEvents.ENTITY_DOLPHIN_SPLASH, SoundCategory.PLAYERS, 0.85F, 0.9F + world.random.nextFloat() * 0.15F);
@@ -103,7 +106,7 @@ public final class BubbleChaosWaveManager {
             return true;
         }
 
-        double travel = step * waveStepDistance();
+        double travel = Math.min(step * waveStepDistance(), wave.maxTravel);
         Vec3d center = wave.start.add(wave.forward.multiply(travel));
         spawnWaveParticles(world, center, wave, step);
         spawnWaveVisualSegments(world, center, wave, step);
@@ -137,7 +140,7 @@ public final class BubbleChaosWaveManager {
                 continue;
             }
             Vec3d push = wave.forward.multiply(wave.knockback);
-            candidate.addVelocity(push.x, chaosKnockUp(), push.z);
+            candidate.addVelocity(push.x, chaosKnockUp() * BowAbilityBalance.waveKnockbackScale(wave.frameLevel), push.z);
             candidate.velocityDirty = true;
             if (candidate instanceof ServerPlayerEntity serverPlayer) {
                 NetworkCompat.sendVelocityUpdate(serverPlayer);
@@ -282,6 +285,14 @@ public final class BubbleChaosWaveManager {
         return SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveSegmentThickness.get();
     }
 
+    public static double waveTravelDistance(BowUpgradeData upgrades) {
+        return BowAbilityBalance.waveTravelDistance(baseLengthSteps(), lengthStepsPerString(), upgrades.stringLevel(), waveStepDistance());
+    }
+
+    public static int waveStepCount(BowUpgradeData upgrades) {
+        return BowAbilityBalance.waveStepCount(baseLengthSteps(), lengthStepsPerString(), upgrades.stringLevel(), waveStepDistance());
+    }
+
     private static double waveStepDistance() {
         return SimplyBowsConfig.INSTANCE.bubbleveil.chaosWaveStepDistance.get();
     }
@@ -355,6 +366,7 @@ public final class BubbleChaosWaveManager {
         private final UUID ownerId;
         private final long spawnTick;
         private final int maxSteps;
+        private final double maxTravel;
         private final float damage;
         private final double knockback;
         private final int frameLevel;
@@ -362,13 +374,14 @@ public final class BubbleChaosWaveManager {
         private final List<WaveVisual> visuals = new ArrayList<>();
         private int currentStep;
 
-        private ActiveWave(Vec3d start, Vec3d forward, Vec3d right, UUID ownerId, long spawnTick, int maxSteps, float damage, double knockback, int frameLevel) {
+        private ActiveWave(Vec3d start, Vec3d forward, Vec3d right, UUID ownerId, long spawnTick, int maxSteps, double maxTravel, float damage, double knockback, int frameLevel) {
             this.start = start;
             this.forward = forward;
             this.right = right;
             this.ownerId = ownerId;
             this.spawnTick = spawnTick;
             this.maxSteps = maxSteps;
+            this.maxTravel = maxTravel;
             this.damage = damage;
             this.knockback = knockback;
             this.frameLevel = frameLevel;

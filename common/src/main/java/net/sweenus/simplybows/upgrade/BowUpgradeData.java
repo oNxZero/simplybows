@@ -27,6 +27,19 @@ public record BowUpgradeData(int stringLevel, int frameLevel, RuneEtching runeEt
             Codec.STRING.xmap(RuneEtching::fromId, RuneEtching::id).fieldOf(RUNE_KEY).orElse(RuneEtching.NONE).forGetter(BowUpgradeData::runeEtching)
     ).apply(instance, BowUpgradeData::new));
 
+    public NbtCompound toProjectileNbt() {
+        NbtCompound nbt = new NbtCompound();
+        nbt.putInt(STRING_KEY, stringLevel);
+        nbt.putInt(FRAME_KEY, frameLevel);
+        nbt.putString(RUNE_KEY, runeEtching == null ? RuneEtching.NONE.id() : runeEtching.id());
+        return nbt;
+    }
+
+    public static BowUpgradeData fromProjectileNbt(NbtCompound nbt) {
+        return new BowUpgradeData(nbt.getInt(STRING_KEY), nbt.getInt(FRAME_KEY),
+                RuneEtching.fromId(nbt.getString(RUNE_KEY))).clamped();
+    }
+
     public static BowUpgradeData none() {
         return new BowUpgradeData(0, 0, RuneEtching.NONE);
     }
