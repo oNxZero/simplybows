@@ -129,6 +129,8 @@ public class SimplyBowItem extends BowItem {
 
         int i = this.getMaxUseTime(stack, user) - remainingUseTicks;
         float f = getPullProgress(i);
+        if (this instanceof IceBowItem && net.sweenus.simplybows.upgrade.BowUpgradeData.from(stack).runeEtching()
+                == net.sweenus.simplybows.upgrade.RuneEtching.GRACE && f < 1.0F) return;
         if (!((double)f < 0.1)) {
             List<ItemStack> list;
             if (hasInfiniteAmmo) {
@@ -381,6 +383,8 @@ public class SimplyBowItem extends BowItem {
     }
 
     protected void simplybows$applyRangedWeaponProjectileBonus(@Nullable LivingEntity shooter, ProjectileEntity projectileEntity) {
+        if ((projectileEntity instanceof net.sweenus.simplybows.entity.HomingArrowEntity arrow && arrow.isGraceSupportProjectile())
+                || (projectileEntity instanceof net.sweenus.simplybows.entity.HomingSpectralArrowEntity spectral && spectral.isGraceSupportProjectile())) return;
         if (projectileEntity instanceof PersistentProjectileEntity persistentProjectile) {
             persistentProjectile.setDamage(persistentProjectile.getDamage() + CombatTargeting.getRangedWeaponDamageBonus(shooter));
         }

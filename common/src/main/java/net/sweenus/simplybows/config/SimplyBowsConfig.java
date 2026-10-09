@@ -19,7 +19,7 @@ public class SimplyBowsConfig extends Config {
         super(Identifier.of("simplybows", "config"));
     }
 
-    @Comment("In-game name: Winterfang. Enchanted String adds arrows and widens the Chaos frost wall. Reinforced Frame increases arrow damage and lengthens the Chaos wall. 20 ticks = 1 second.")
+    @Comment("In-game name: Winterfang. Pain: distinct-target homing volleys with five-second Frost. Bounty: straight arrow, three-second ice prison. Grace: harmless straight sanctuary shot. String and Frame bonuses depend on the rune. 20 ticks = 1 second.")
     public IceBowSection winterfang = new IceBowSection();
     @Comment("In-game name: Everbloom. The flower field heals every player and every animal inside it, and damages only monsters. Enchanted String increases field radius. Reinforced Frame multiplies heal and monster damage. Pain disables healing but still only damages monsters. Grace heals and cleanses instead of damaging. 20 ticks = 1 second.")
     public VineBowSection everbloom = new VineBowSection();
@@ -66,32 +66,32 @@ public class SimplyBowsConfig extends Config {
 
         // Rune: Pain
         public ConfigGroup painGroup = new ConfigGroup("pain");
-        @Comment("Frost bloom radius on Pain impact.")
-        public ValidatedDouble painFrostRadius = new ValidatedDouble(3.25, 12.0, 1.0);
-        @Comment("Extra frost bloom radius per Enchanted String level.")
+        @Comment("Pain impact splash radius in blocks. Effective radius is clamped to 0.5–3 blocks.")
+        public ValidatedDouble painFrostRadius = new ValidatedDouble(1.75, 12.0, 1.0);
+        @Comment("Legacy key: unused. Pain String now adds one distinct-target homing arrow per level.")
         public ValidatedDouble painFrostRadiusPerString = new ValidatedDouble(0.35, 3.0, 0.0);
         @ConfigGroup.Pop
-        @Comment("Unused legacy — Pain frost bloom is Slowness-only now.")
+        @Comment("Pain impact splash damage multiplier. Frost applies Slowness III for five seconds.")
         public ValidatedDouble painFrostDamageMultiplier = new ValidatedDouble(0.175, 10.0, 0.0);
 
         // Rune: Grace
         public ConfigGroup graceGroup = new ConfigGroup("grace");
-        @Comment("Duration of Slowness stacks applied by Grace hits.")
+        @Comment("Legacy key: unused. Grace is a harmless support sanctuary.")
         public ValidatedInt graceSlownessDuration = new ValidatedInt(200, 600, 1);
         @ConfigGroup.Pop
-        @Comment("Maximum Slowness stack count from Grace arrows.")
+        @Comment("Legacy key: unused. Grace no longer applies enemy debuffs.")
         public ValidatedInt graceMaxSlownessStacks = new ValidatedInt(4, 10, 0);
 
         // Rune: Bounty
         public ConfigGroup bountyGroup = new ConfigGroup("bounty");
-        @Comment("Frost bloom zone radius on Bounty impact.")
+        @Comment("Legacy key: unused. Bounty now freezes the struck target for exactly three seconds.")
         public ValidatedDouble bountyFrostRadius = new ValidatedDouble(3.75, 14.0, 1.0);
-        @Comment("Extra Bounty frost radius per Enchanted String level.")
+        @Comment("Legacy key: unused. Bounty String now adds 5% base shot speed per level.")
         public ValidatedDouble bountyFrostRadiusPerString = new ValidatedDouble(0.4, 3.0, 0.0);
-        @Comment("Damage per Bounty frost pulse vs base arrow damage.")
+        @Comment("Legacy key: unused. Bounty no longer produces frost damage pulses.")
         public ValidatedDouble bountyFrostDamageMultiplier = new ValidatedDouble(0.14, 5.0, 0.05);
         @ConfigGroup.Pop
-        @Comment("How many frost pulses a Bounty bloom fires.")
+        @Comment("Legacy key: unused. Bounty no longer emits frost pulses.")
         public ValidatedInt bountyFrostPulseCount = new ValidatedInt(3, 8, 1);
 
         // Rune: Chaos

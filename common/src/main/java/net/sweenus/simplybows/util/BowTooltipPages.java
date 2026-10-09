@@ -35,6 +35,8 @@ public final class BowTooltipPages {
             case "ice" -> switch (r) {
                 case NONE -> "Adds another frost arrow to each shot.";
                 case CHAOS -> "Makes the frost wall wider.";
+                case PAIN -> "Adds another homing arrow that seeks a different enemy.";
+                case BOUNTY -> "Makes the straight prison arrow travel faster.";
                 default -> "Makes the frost area larger.";
             };
             case "bubble" -> switch (r) {
@@ -76,9 +78,9 @@ public final class BowTooltipPages {
                 case CHAOS -> "Makes the spore field last longer.";
             };
             case "ice" -> switch (r) {
-                case BOUNTY -> "Adds another frost pulse.";
+                case BOUNTY -> "Increases arrow damage. The freeze stays at 3 seconds.";
                 case CHAOS -> "Makes the frost wall last longer.";
-                case GRACE -> "Increases arrow damage against enemies. Sanctuary buffs stay the same.";
+                case GRACE -> "Makes sanctuary buffs last longer after leaving.";
                 default -> "Increases arrow damage.";
             };
             case "bubble" -> switch (r) {

@@ -33,6 +33,7 @@ import java.util.Map;
 import java.util.UUID;
 
 public class IceBowItem extends SimplyBowItem {
+    private static final ThreadLocal<net.sweenus.simplybows.world.IcePainVolley> PAIN_VOLLEY = new ThreadLocal<>();
     private static int baseQuantity() { return SimplyBowsConfig.INSTANCE.winterfang.baseQuantity.get(); }
     private static final String NBT_DAMAGE_MULTIPLIER = "simplybows_ice_damage_multiplier";
     private static final String NBT_SLOW_STACK = "simplybows_ice_stacking_slow";
@@ -81,15 +82,17 @@ public class IceBowItem extends SimplyBowItem {
 
         int quantity = baseQuantity() + upgrades.stringLevel();
         // One arrow for rune AOEs — String must not multiply frost blooms.
-        if (painReady || bountyReady || graceReady) {
+        if (rune == RuneEtching.BOUNTY || rune == RuneEtching.GRACE) {
             quantity = 1;
         }
+        if (painReady) quantity = net.sweenus.simplybows.util.WinterfangAbilityRules.painArrowCount(upgrades.stringLevel());
         // Soft Frame curve — global 0.55/level made headshots nuclear vs abilities.
         double damageMultiplier = 1.0 + upgrades.frameLevel() * 0.18;
 
         NbtCompound customData = getOrCreateCustomData(stack);
         customData.putDouble(NBT_DAMAGE_MULTIPLIER, damageMultiplier);
-        customData.putBoolean(NBT_SLOW_STACK, graceReady);
+        customData.putBoolean(NBT_SLOW_STACK, rune == RuneEtching.GRACE);
+        customData.putBoolean("simplybows_ice_grace_ready", graceReady);
         customData.putBoolean(NBT_PAIN_FROST, painReady);
         customData.putBoolean(NBT_BOUNTY_FROST, bountyReady);
         customData.putInt(NBT_STRING_LEVEL, upgrades.stringLevel());
@@ -114,12 +117,18 @@ public class IceBowItem extends SimplyBowItem {
             RuneUseCooldown.start(serverWorld, ownerId, "ice-bounty", "ice");
         }
 
+        if (painReady) PAIN_VOLLEY.set(new net.sweenus.simplybows.world.IcePainVolley(serverWorld, shooter));
+        try {
         // Never pass vanilla crit — multi-arrow + crit was nuking targets ("headshot" spikes).
         if (chaosWallReady) {
             this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.chaosWallArrowDivergence.get() * 0.01F, false, livingEntity);
+        } else if (rune == RuneEtching.BOUNTY || rune == RuneEtching.GRACE) {
+            this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get()
+                    * (rune == RuneEtching.BOUNTY ? 1 + upgrades.stringLevel() * 0.05F : 1), 0.0F, false, livingEntity);
         } else {
             this.shootFan(this, serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.arrowDivergence.get(), false, livingEntity, quantity);
         }
+        } finally { PAIN_VOLLEY.remove(); }
         HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, shooter, ParticleTypes.SNOWFLAKE, 6);
         HelperMethods.spawnParticlesInFrontOfPlayer(serverWorld, shooter, ParticleTypes.WHITE_ASH, 8);
     }
@@ -174,7 +183,7 @@ public class IceBowItem extends SimplyBowItem {
             HomingSpectralArrowEntity spectralArrow = new HomingSpectralArrowEntity(world, shooter, arrowStack, weaponStack);
             double damage = SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * damageMultiplier;
             if (stackSlow) {
-                damage *= 0.35; // Grace is support — soft tips, sanctuary does the work.
+                damage = 0;
             }
             spectralArrow.setDamage(damage);
             spectralArrow.setStackingSlowness(stackSlow);
@@ -185,8 +194,13 @@ public class IceBowItem extends SimplyBowItem {
             if (chaosWallOnImpact) {
                 spectralArrow.setChaosWallUpgradeLevels(chaosWallStringLevel, chaosWallFrameLevel);
             }
-            if (stackSlow) {
-                spectralArrow.setHomingEnabled(false);
+            if (stackSlow || BowUpgradeData.from(weaponStack).runeEtching() == RuneEtching.BOUNTY) spectralArrow.setHomingEnabled(false);
+            if (stackSlow) spectralArrow.setGraceSanctuaryEnabled(customData != null && customData.copyNbt().getBoolean("simplybows_ice_grace_ready"), frameLevel);
+            var volley = PAIN_VOLLEY.get();
+            if (painFrost && volley != null) {
+                spectralArrow.setLockSingleTarget(true);
+                spectralArrow.setLockedTargetUuid(volley.nextTarget());
+                spectralArrow.setPainVolleyId(volley.id);
             }
             // No vanilla crit multiplier — multi-arrow + crit was nuking targets.
             spectralArrow.setCritical(false);
@@ -195,7 +209,7 @@ public class IceBowItem extends SimplyBowItem {
             HomingArrowEntity homingArrow = new HomingArrowEntity(world, shooter, arrowStack, weaponStack);
             double damage = SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * damageMultiplier;
             if (stackSlow) {
-                damage *= 0.35;
+                damage = 0;
             }
             homingArrow.setDamage(damage);
             homingArrow.setStackingSlowness(stackSlow);
@@ -206,8 +220,13 @@ public class IceBowItem extends SimplyBowItem {
             if (chaosWallOnImpact) {
                 homingArrow.setChaosWallUpgradeLevels(chaosWallStringLevel, chaosWallFrameLevel);
             }
-            if (stackSlow) {
-                homingArrow.setHomingEnabled(false);
+            if (stackSlow || BowUpgradeData.from(weaponStack).runeEtching() == RuneEtching.BOUNTY) homingArrow.setHomingEnabled(false);
+            if (stackSlow) homingArrow.setGraceSanctuaryEnabled(customData != null && customData.copyNbt().getBoolean("simplybows_ice_grace_ready"), frameLevel);
+            var volley = PAIN_VOLLEY.get();
+            if (painFrost && volley != null) {
+                homingArrow.setLockSingleTarget(true);
+                homingArrow.setLockedTargetUuid(volley.nextTarget());
+                homingArrow.setPainVolleyId(volley.id);
             }
             homingArrow.setCritical(false);
             arrowEntity = homingArrow;
@@ -219,6 +238,8 @@ public class IceBowItem extends SimplyBowItem {
         RuneEtching rune = upgrades.runeEtching();
         // Client input must allow the server to decide cooldown readiness.
         // On cooldown the actual shot falls back to the normal fan.
+        if (rune == RuneEtching.GRACE || rune == RuneEtching.BOUNTY) return 1;
+        if (player.getWorld().isClient() && rune == RuneEtching.PAIN) return net.sweenus.simplybows.util.WinterfangAbilityRules.painArrowCount(upgrades.stringLevel());
         if (player.getWorld().isClient() && rune != RuneEtching.NONE) return 1;
         if (player.getWorld() instanceof ServerWorld world) {
             if (rune == RuneEtching.CHAOS && IceChaosWallManager.isWallReady(world, player.getUuid())) return 1;
@@ -226,7 +247,7 @@ public class IceBowItem extends SimplyBowItem {
                 case PAIN -> "ice-pain"; case GRACE -> "ice-grace"; case BOUNTY -> "ice-bounty";
                 default -> null;
             };
-            if (key != null && RuneUseCooldown.isReady(world, player.getUuid(), key)) return 1;
+            if (key != null && RuneUseCooldown.isReady(world, player.getUuid(), key)) return rune == RuneEtching.PAIN ? net.sweenus.simplybows.util.WinterfangAbilityRules.painArrowCount(upgrades.stringLevel()) : 1;
         }
         return baseQuantity() + upgrades.stringLevel();
     }

@@ -31,9 +31,19 @@ public abstract class ServerPlayerEntityMixin {
     @Shadow
     public abstract ServerWorld getServerWorld();
 
+    @Inject(at = @At("HEAD"), method = {"tick", "playerTick"}, cancellable = true)
+    private void simplybows$freezePlayer(CallbackInfo ci) {
+        ServerPlayerEntity player = (ServerPlayerEntity) (Object) this;
+        if (net.sweenus.simplybows.world.IcePrisonManager.isFrozen(player)) {
+            net.sweenus.simplybows.world.IcePrisonManager.hold(player);
+            ci.cancel();
+        }
+    }
+
     @Inject(at = @At("HEAD"), method = "tick")
     public void simplybows$tick(CallbackInfo ci) {
         PlayerEntity player = (PlayerEntity) (Object) this;
+        if (net.sweenus.simplybows.world.IcePrisonManager.isFrozen(player)) return;
         if (player instanceof ServerPlayerEntity serverPlayer) {
             BowPassiveParticleManager.tick(serverPlayer, getServerWorld());
             simplybows$debugLogLookedEntity(serverPlayer);

@@ -10,7 +10,7 @@ The ability cooldown belongs to the **player**, shared across all six bows. Swit
 
 For effects up to 5 seconds, the shared cooldown is three times the effect duration. Beyond 5 seconds, each extra second adds two seconds of cooldown. The general calculation is clamped between 2 and 30 seconds. Buzzkill multiplies the resulting cooldown by three, so its ceiling from this calculation is 90 seconds. Some abilities also have their own field or wall lockouts.
 
-Winterfang normally fires `baseQuantity + String level` arrows. When a Pain, Grace, Bounty, or Chaos ability shot is ready, it fires one arrow. During cooldown it can return to the normal fan. Finite ammo is counted across separate inventory stacks. Creative mode and the supported Infinity path bypass the ordinary finite-ammo check; Infinity uses normal arrows, not a blanket exemption for every special ammunition type.
+Winterfang normally fires `baseQuantity + String level` arrows. Pain fires one arrow plus one per String, seeking separate targets when ready. Grace, Bounty, and ready Chaos shots use one arrow. Grace and Bounty remain straight single shots during cooldown; Grace remains harmless, while Bounty does not create a prison. Pain can return to the normal fan during cooldown. Finite ammo is counted across separate inventory stacks. Creative mode and the supported Infinity path bypass the ordinary finite-ammo check; Infinity uses normal arrows, not a blanket exemption for every special ammunition type.
 
 ## Strings, Frames, and runes
 

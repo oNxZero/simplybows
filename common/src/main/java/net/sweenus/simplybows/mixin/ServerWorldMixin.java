@@ -24,9 +24,26 @@ import java.util.function.BooleanSupplier;
 @Mixin(ServerWorld.class)
 public abstract class ServerWorldMixin {
 
+    @Inject(method = "tickEntity", at = @At("HEAD"), cancellable = true)
+    private void simplybows$freezeEntity(net.minecraft.entity.Entity entity, CallbackInfo ci) {
+        if (net.sweenus.simplybows.world.IcePrisonManager.isFrozen(entity)) {
+            net.sweenus.simplybows.world.IcePrisonManager.hold(entity);
+            ci.cancel();
+            return;
+        }
+        net.sweenus.simplybows.world.IceFrostSlowManager.beforeTick((ServerWorld) (Object) this, entity);
+    }
+
+    @Inject(method = "tickEntity", at = @At("TAIL"))
+    private void simplybows$frostSlow(net.minecraft.entity.Entity entity, CallbackInfo ci) {
+        net.sweenus.simplybows.world.IceFrostSlowManager.afterTick((ServerWorld) (Object) this, entity);
+    }
+
     @Inject(method = "tick(Ljava/util/function/BooleanSupplier;)V", at = @At("HEAD"))
     private void simplybows$tickVineFields(BooleanSupplier shouldKeepTicking, CallbackInfo ci) {
         ServerWorld world = (ServerWorld) (Object) this;
+        net.sweenus.simplybows.world.IcePrisonManager.tick(world);
+        net.sweenus.simplybows.world.IceFrostSlowManager.tick(world);
         if (VineFlowerFieldManager.hasActive(world)) {
             VineFlowerFieldManager.tick(world);
         }

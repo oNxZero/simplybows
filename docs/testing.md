@@ -16,7 +16,7 @@ Automated build, standalone regressions, and release-jar renderer target inspect
 | Shortcut removal | Right-click a component with a bow in the other hand: no upgrade or item consumption. |
 | Tooltip controls | Tap and hold the page binding; switch hovered items; rebind the key; inspect all rune-item pages. |
 | Tooltip layout | No duplicated headings, no numeric page counter, active plus white, no attribute lore; Alt gives compact bonuses. |
-| Ammo | Split Winterfang arrows across stacks; test ready rune single-shot and cooldown fan; test creative, Infinity, and special ammo separately. |
+| Ammo | Split Winterfang arrows across stacks; test Pain multi-target volley, Grace/Bounty single shots, and rune-specific cooldown fallback; test creative, Infinity, and special ammo separately. |
 | Persistence | Save/unload each of the seven projectile classes before impact with String/Frame/rune settings; reload and verify flight and exactly one impact ability. Include spectral Winterfang arrows. |
 | Balance | Compare Everbloom rose/tree damage, Petalwind normal/Bounty pulses, Bubbleveil Bounty damage, and Chaos wave range/knockback. |
 | Support | Check direct ally hits, area buffs/healing, hostile targets, teams, and friendly fire for every Grace bow. |
@@ -41,3 +41,12 @@ Config comments include historical descriptions: effective behavior may use hard
 The modern-tooltip-disabled Alt fallback has not received equivalent loader integration validation. Active fields/swarms and shared cooldowns are not comprehensively persisted through server restarts. Existing projectiles saved before the new state tags cannot recover unsaved settings. Other mods that replace anvil or tooltip behavior still need integration testing.
 
 When reporting an issue, include loader/version, exact jar filenames, relevant config, bow/rune/String/Frame levels, reproduction steps, and the complete log. Mention whether the issue also happens with only the required dependencies.
+
+
+## Winterfang redesign checks
+
+Test Pain with zero and five Strings against spaced enemies, overlapping groups, a hostile player, a wither, and an ender dragon. Confirm distinct assignments, five-second slowing, no lingering damage zone, and no repeated splash damage to a single victim within one volley. Test an arrow unloading before impact.
+
+Test Bounty against a moving player and bosses: three seconds of no movement, jumping, punching, item use, block breaking, or inventory actions, followed by normal control. Confirm it does not extend when another arrow hits during the freeze and that the frozen target can still take follow-up damage. Check shields, dragon body parts, mounts, death, disconnect, chunk unload, and restart cleanup. Confirm the crystal shell matches the target's size and never places real blocks.
+
+Test Grace against hostile mobs and players, allies, and the caster, with normal, tipped, and spectral arrows and external damage attributes. Health must never decrease because of the shot; enemies must receive no debuffs. Partial shots consume no ammo. Fully drawn cooldown shots remain harmless and do not place another sanctuary. Verify String radius and Frame buff duration in tooltips and gameplay.

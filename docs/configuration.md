@@ -10,7 +10,7 @@ Config file: `config/simplybows/config.toml`. Back up changes and restart to ver
 
 Durations use ticks unless stated otherwise: 20 ticks = 1 second. Distances usually use blocks. Damage uses health points: 2 = 1 heart. Effect amplifiers are zero-based: 0 = level I, 1 = level II. Launch damage coefficients are not necessarily final hit damage.
 
-A field's allowed range is not a promise of the final effective value: managers also apply fixed multipliers, minimums, maximums, and rune-specific formulas. Some source comments are historical. In particular, `winterfang.painFrostDamageMultiplier` is still read by the damage-producing frost zone despite its “unused” comment; `petalwind.graceBuffDuration` does not alone describe the current Strength puddle tuning. See [balance formulas](bows.md#balance-formulas) and the managers before tuning these keys.
+A field's allowed range is not a promise of the final effective value: managers also apply fixed multipliers, minimums, maximums, and rune-specific formulas. Some source comments are historical. In particular, `petalwind.graceBuffDuration` does not alone describe the current Strength puddle tuning. Winterfang legacy Grace slow-stack and Bounty bloom keys remain loadable but unused after the rune redesign. See [balance formulas](bows.md#balance-formulas) and the managers before tuning these keys.
 
 All loot values use the same per-thousand scale: 0 disables, 1 = 0.1%, 20 = 2%, 1000 = 100%. Fractional values also divide by 1000: 0.5 = 0.05%. Old raw-probability configs must be converted: multiply the old probability by 1000 to preserve its chance.
 
@@ -32,15 +32,15 @@ Shared upgrade formulas: size = `1 + String × sizeMultiplierPerString`; damage 
 | `winterfang.startSpeed` | `0.45` | `0.01` | `2.0` | Starting speed used by homing speed ramp logic. |
 | `winterfang.maxSpeed` | `1.0` | `0.1` | `3.0` | Maximum speed homing arrows can ramp up to. |
 | `winterfang.speedRampTicks` | `18` | `1` | `200` | Ticks taken to ramp from start speed to max speed. |
-| `winterfang.painFrostRadius` | `3.25` | `1.0` | `12.0` | Frost bloom radius on Pain impact. |
-| `winterfang.painFrostRadiusPerString` | `0.35` | `0.0` | `3.0` | Extra frost bloom radius per Enchanted String level. |
-| `winterfang.painFrostDamageMultiplier` | `0.175` | `0.0` | `10.0` | Unused legacy : Pain frost bloom is Slowness-only now. |
-| `winterfang.graceSlownessDuration` | `200` | `1` | `600` | Duration of Slowness stacks applied by Grace hits. |
-| `winterfang.graceMaxSlownessStacks` | `4` | `0` | `10` | Maximum Slowness stack count from Grace arrows. |
-| `winterfang.bountyFrostRadius` | `3.75` | `1.0` | `14.0` | Frost bloom zone radius on Bounty impact. |
-| `winterfang.bountyFrostRadiusPerString` | `0.4` | `0.0` | `3.0` | Extra Bounty frost radius per Enchanted String level. |
-| `winterfang.bountyFrostDamageMultiplier` | `0.14` | `0.05` | `5.0` | Damage per Bounty frost pulse vs base arrow damage. |
-| `winterfang.bountyFrostPulseCount` | `3` | `1` | `8` | How many frost pulses a Bounty bloom fires. |
+| `winterfang.painFrostRadius` | `1.75` | `1.0` | `12.0` | Pain impact splash radius in blocks. Effective radius is clamped to 0.5–3 blocks. |
+| `winterfang.painFrostRadiusPerString` | `0.35` | `0.0` | `3.0` | Legacy key: unused. Pain String now adds one distinct-target homing arrow per level. |
+| `winterfang.painFrostDamageMultiplier` | `0.175` | `0.0` | `10.0` | Pain impact splash damage multiplier. Frost applies Slowness III for five seconds. |
+| `winterfang.graceSlownessDuration` | `200` | `1` | `600` | Legacy key: unused. Grace is a harmless support sanctuary. |
+| `winterfang.graceMaxSlownessStacks` | `4` | `0` | `10` | Legacy key: unused. Grace no longer applies enemy debuffs. |
+| `winterfang.bountyFrostRadius` | `3.75` | `1.0` | `14.0` | Legacy key: unused. Bounty now freezes the struck target for exactly three seconds. |
+| `winterfang.bountyFrostRadiusPerString` | `0.4` | `0.0` | `3.0` | Legacy key: unused. Bounty String now adds 5% base shot speed per level. |
+| `winterfang.bountyFrostDamageMultiplier` | `0.14` | `0.05` | `5.0` | Legacy key: unused. Bounty no longer produces frost damage pulses. |
+| `winterfang.bountyFrostPulseCount` | `3` | `1` | `8` | Legacy key: unused. Bounty no longer emits frost pulses. |
 | `winterfang.chaosWallDurationTicks` | `160` | `20` | `1200` | How long the Chaos ice wall remains active before melting. |
 | `winterfang.chaosWallCooldownTicks` | `240` | `20` | `2400` | Cooldown between Chaos wall casts. |
 | `winterfang.chaosWallWidth` | `5` | `1` | `15` | Horizontal width of the Chaos ice wall. |

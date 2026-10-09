@@ -18,7 +18,8 @@
     "LivingEntityMixin",
     "MobEntityMixin",
     "ServerPlayerEntityMixin",
-    "ServerWorldMixin"
+    "ServerWorldMixin",
+    "FrozenPlayerNetworkMixin"
   ],
   "injectors": {
     "defaultRequire": 1

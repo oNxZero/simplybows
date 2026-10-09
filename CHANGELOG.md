@@ -2,6 +2,10 @@
 
 ## 0.1.4: current fork updates
 
+### Winterfang rune redesign
+
+Pain fires distinct-target homing arrows, one plus String level, with Slowness III for five seconds and one small impact splash per victim per volley. Bounty fires a non-homing single arrow that traps the struck target in a spiky packed-ice shell for exactly three seconds, with server-enforced movement and action restrictions. Grace fires non-homing, harmless sanctuary arrows without enemy damage or debuffs, including during cooldown; partial Grace draws do not fire. Frame extends Grace buff duration instead of arrow damage. Update upgrade previews, stats, config comments, save tags, and documentation.
+
 ### Conservative Bubbleveil Pain buff
 
 Increase the base volley damage coefficient from 0.28 to 0.35 (+25%). String adds 5% of base volley damage per level, capped at 25%, while still dividing total damage across the shots. Update combat estimates and upgrade descriptions. Keep cooldown, ammunition costs, and Frame scaling; do not add Slowness. Add scaling-cap and five-slot budget checks. In-game PvP balance is not yet measured.

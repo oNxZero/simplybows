@@ -15,6 +15,15 @@ public abstract class LivingEntityMixin {
 
     @Inject(method = "damage", at = @At("HEAD"), cancellable = true)
     private void simplybows$graceAndShield(DamageSource source, float amount, CallbackInfoReturnable<Boolean> cir) {
+        if (source != null && net.sweenus.simplybows.world.IcePrisonManager.isFrozen(source.getAttacker())) {
+            cir.setReturnValue(false);
+            return;
+        }
+        if (source != null && ((source.getSource() instanceof net.sweenus.simplybows.entity.HomingArrowEntity h && h.isGraceSupportProjectile())
+                || (source.getSource() instanceof net.sweenus.simplybows.entity.HomingSpectralArrowEntity spectral && spectral.isGraceSupportProjectile()))) {
+            cir.setReturnValue(false);
+            return;
+        }
         if (source == null || amount <= 0.0F) {
             return;
         }

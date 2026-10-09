@@ -50,6 +50,8 @@ public class HomingArrowEntity extends ArrowEntity {
     private int chaosWallFrameLevel;
     private boolean spawnedChaosWall;
     private UUID lockedTargetUuid;
+    private UUID painVolleyId;
+    private boolean graceSanctuaryEnabled = true;
     public HomingArrowEntity(EntityType<? extends HomingArrowEntity> type, World world) {
         super(type, world);
     }
@@ -72,6 +74,8 @@ public class HomingArrowEntity extends ArrowEntity {
     @Override
     public void writeCustomDataToNbt(NbtCompound nbt) {
         super.writeCustomDataToNbt(nbt);
+        nbt.putBoolean("GraceSanctuaryEnabled", this.graceSanctuaryEnabled);
+        if (this.painVolleyId != null) nbt.putUuid("PainVolley", this.painVolleyId);
         nbt.putBoolean("initialSpreadApplied", this.initialSpreadApplied);
         nbt.putBoolean("lockSingleTarget", this.lockSingleTarget);
         nbt.putBoolean("stackingSlowness", this.stackingSlowness);
@@ -92,6 +96,8 @@ public class HomingArrowEntity extends ArrowEntity {
     @Override
     public void readCustomDataFromNbt(NbtCompound nbt) {
         super.readCustomDataFromNbt(nbt);
+        this.graceSanctuaryEnabled = !nbt.contains("GraceSanctuaryEnabled") || nbt.getBoolean("GraceSanctuaryEnabled");
+        this.painVolleyId = nbt.containsUuid("PainVolley") ? nbt.getUuid("PainVolley") : null;
         this.initialSpreadApplied = nbt.getBoolean("initialSpreadApplied");
         this.lockSingleTarget = nbt.getBoolean("lockSingleTarget");
         this.stackingSlowness = nbt.getBoolean("stackingSlowness");
@@ -294,9 +300,12 @@ public class HomingArrowEntity extends ArrowEntity {
 
     @Override
     public boolean canHit(net.minecraft.entity.Entity entity) {
-        if (!(entity instanceof LivingEntity living)) {
-            return super.canHit(entity);
-        }
+        LivingEntity living = entity instanceof LivingEntity l ? l
+                : entity instanceof net.minecraft.entity.boss.dragon.EnderDragonPart part ? part.owner : null;
+        if (this.stackingSlowness) return super.canHit(entity);
+        if (this.painFrostBloom && this.lockSingleTarget
+                && (living == null || this.lockedTargetUuid == null || !living.getUuid().equals(this.lockedTargetUuid))) return false;
+        if (living == null) return super.canHit(entity);
         if (this.getOwner() instanceof LivingEntity owner && !CombatTargeting.checkFriendlyFire(living, owner)) {
             return false;
         }
@@ -321,10 +330,23 @@ public class HomingArrowEntity extends ArrowEntity {
 
     @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
+        if (this.stackingSlowness) {
+            trySpawnGraceSanctuary(entityHitResult.getPos());
+            this.discard();
+            return; // No vanilla damage, tipped effects, fire or spectral glowing.
+        }
         trySpawnChaosWall(entityHitResult.getPos());
-        trySpawnFrostBloom(entityHitResult.getPos());
-        if (this.isRemoved()) {
-            return;
+        LivingEntity victim = entityHitResult.getEntity() instanceof LivingEntity l ? l
+                : entityHitResult.getEntity() instanceof net.minecraft.entity.boss.dragon.EnderDragonPart part ? part.owner : null;
+        if (!this.spawnedFrostBloom && victim != null && this.getWorld() instanceof ServerWorld world) {
+            LivingEntity owner = this.getOwner() instanceof LivingEntity l ? l : null;
+            if (this.painFrostBloom) {
+                IceFrostBloomManager.spawnPainImpact(world, victim, owner, (float) this.getDamage(), this.painVolleyId);
+                this.spawnedFrostBloom = true;
+            } else if (this.bountyFrostBloom) {
+                net.sweenus.simplybows.world.IcePrisonManager.freeze(world, owner, victim);
+                this.spawnedFrostBloom = true;
+            }
         }
         super.onEntityHit(entityHitResult);
     }
@@ -352,31 +374,29 @@ public class HomingArrowEntity extends ArrowEntity {
         if (this.spawnedFrostBloom || !(this.getWorld() instanceof ServerWorld serverWorld)) {
             return;
         }
-        LivingEntity owner = this.getOwner() instanceof LivingEntity living ? living : null;
-        float base = (float) this.getDamage();
-        if (this.painFrostBloom) {
-            IceFrostBloomManager.spawnPainBloom(serverWorld, pos, owner, base, this.frostStringLevel);
-            this.spawnedFrostBloom = true;
-        } else if (this.bountyFrostBloom) {
-            IceFrostBloomManager.spawnBountyBloom(serverWorld, pos, owner, base, this.frostStringLevel, this.frostFrameLevel);
-            this.spawnedFrostBloom = true;
-        } else if (this.stackingSlowness) {
+        if (this.stackingSlowness) {
             trySpawnGraceSanctuary(pos);
             this.discard();
         }
     }
 
     private void trySpawnGraceSanctuary(Vec3d pos) {
-        if (this.spawnedFrostBloom || !this.stackingSlowness || !(this.getWorld() instanceof ServerWorld serverWorld)) {
+        if (this.spawnedFrostBloom || !this.stackingSlowness || !this.graceSanctuaryEnabled || !(this.getWorld() instanceof ServerWorld serverWorld)) {
             return;
         }
         LivingEntity owner = this.getOwner() instanceof LivingEntity living ? living : null;
         if (owner == null) {
             return;
         }
-        IceFrostBloomManager.spawnGraceSanctuary(serverWorld, pos, owner, this.frostStringLevel);
+        IceFrostBloomManager.spawnGraceSanctuary(serverWorld, pos, owner, this.frostStringLevel, this.frostFrameLevel);
         this.spawnedFrostBloom = true;
         this.discard();
+    }
+
+    public void setPainVolleyId(UUID id) { this.painVolleyId = id; }
+    public void setGraceSanctuaryEnabled(boolean enabled, int frameLevel) {
+        this.graceSanctuaryEnabled = enabled;
+        this.frostFrameLevel = Math.max(0, frameLevel);
     }
 
     public void setPainFrostBloom(boolean painFrostBloom, int stringLevel) {

@@ -58,9 +58,9 @@ public final class BowUpgradeTooltip {
                     ? t("tooltip.simplybows.alt.string.vine.chaos", num(SimplyBowsConfig.INSTANCE.everbloom.chaosRadiusPerString.get()))
                     : t("tooltip.simplybows.alt.string.vine", num(VineFlowerFieldManager.flowerPatchRadiusPerString()));
             case "ice" -> switch (rune) {
-                case PAIN -> t("tooltip.simplybows.alt.string.ice.pain", num(SimplyBowsConfig.INSTANCE.winterfang.painFrostRadiusPerString.get()));
+                case PAIN -> "+1 homing arrow, different target";
                 case GRACE -> t("tooltip.simplybows.alt.string.ice.grace");
-                case BOUNTY -> t("tooltip.simplybows.alt.string.ice.bounty", num(SimplyBowsConfig.INSTANCE.winterfang.bountyFrostRadiusPerString.get()));
+                case BOUNTY -> "+5% base arrow speed";
                 case CHAOS -> t("tooltip.simplybows.alt.string.ice.chaos");
                 default -> t("tooltip.simplybows.alt.string.ice");
             };
@@ -102,7 +102,8 @@ public final class BowUpgradeTooltip {
                 default -> t("tooltip.simplybows.alt.frame.vine", hearts(SimplyBowsConfig.INSTANCE.everbloom.friendlyHeal.get() * 0.6F * 0.5F));
             };
             case "ice" -> switch (rune) {
-                case BOUNTY -> t("tooltip.simplybows.alt.frame.ice.bounty");
+                case BOUNTY -> "+18% base arrow damage";
+                case GRACE -> "+1s buff duration";
                 case CHAOS -> t("tooltip.simplybows.alt.frame.ice.chaos", seconds(SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationPerFrameTicks.get()));
                 default -> t("tooltip.simplybows.alt.frame.damage", 18);
             };
@@ -249,11 +250,9 @@ public final class BowUpgradeTooltip {
     private static String iceString(BowUpgradeData upgrades, int string) {
         var cfg = SimplyBowsConfig.INSTANCE.winterfang;
         return switch (upgrades.runeEtching()) {
-            case PAIN -> t("tooltip.simplybows.detail.ice.string.pain", string,
-                    num(cfg.painFrostRadius.get() + string * cfg.painFrostRadiusPerString.get()));
+            case PAIN -> "String " + string + ": " + (1 + string) + " homing arrows, different targets";
             case GRACE -> t("tooltip.simplybows.detail.ice.string.grace", string, num(3.25 + string * 0.35));
-            case BOUNTY -> t("tooltip.simplybows.detail.ice.string.bounty", string,
-                    num(cfg.bountyFrostRadius.get() + string * cfg.bountyFrostRadiusPerString.get()));
+            case BOUNTY -> "String " + string + ": +" + string * 5 + "% base arrow speed";
             case CHAOS -> t("tooltip.simplybows.detail.ice.string.chaos", string,
                     cfg.chaosWallWidth.get() + string * cfg.chaosWallWidthPerString.get());
             default -> t("tooltip.simplybows.detail.ice.string", string, cfg.baseQuantity.get() + string);
@@ -263,8 +262,8 @@ public final class BowUpgradeTooltip {
     private static String iceFrame(BowUpgradeData upgrades, int frame) {
         var cfg = SimplyBowsConfig.INSTANCE.winterfang;
         return switch (upgrades.runeEtching()) {
-            case BOUNTY -> t("tooltip.simplybows.detail.ice.frame.bounty", frame,
-                    Math.max(2, cfg.bountyFrostPulseCount.get() + frame));
+            case BOUNTY -> "Frame " + frame + ": +" + frame * 18 + "% base arrow damage, freeze 3s";
+            case GRACE -> "Frame " + frame + ": buffs last " + seconds(100 + frame * 20) + "s after refresh";
             case CHAOS -> t("tooltip.simplybows.detail.ice.frame.chaos", frame,
                     seconds(cfg.chaosWallDurationTicks.get() + frame * cfg.chaosWallDurationPerFrameTicks.get()));
             default -> t("tooltip.simplybows.detail.ice.frame", frame, num(iceDamage(upgrades)));
@@ -272,7 +271,7 @@ public final class BowUpgradeTooltip {
     }
 
     private static double iceDamage(BowUpgradeData upgrades) {
-        return SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * (1 + upgrades.frameLevel() * 0.18) * (upgrades.runeEtching() == RuneEtching.GRACE ? 0.35 : 1);
+        return SimplyBowsConfig.INSTANCE.winterfang.baseDamage.get() * (1 + upgrades.frameLevel() * 0.18) * (upgrades.runeEtching() == RuneEtching.GRACE ? 0 : 1);
     }
 
     private static String bubbleString(BowUpgradeData upgrades, int string) {
@@ -409,12 +408,9 @@ public final class BowUpgradeTooltip {
                 default -> null;
             };
             case "ice" -> switch (rune) {
-                case PAIN -> t("tooltip.simplybows.rune_stat.ice.pain",
-                        num(SimplyBowsConfig.INSTANCE.winterfang.painFrostRadius.get() + string * SimplyBowsConfig.INSTANCE.winterfang.painFrostRadiusPerString.get()));
-                case GRACE -> t("tooltip.simplybows.rune_stat.ice.grace", seconds(120), seconds(100));
-                case BOUNTY -> t("tooltip.simplybows.rune_stat.ice.bounty",
-                        Math.max(2, SimplyBowsConfig.INSTANCE.winterfang.bountyFrostPulseCount.get() + frame),
-                        num(SimplyBowsConfig.INSTANCE.winterfang.bountyFrostRadius.get() + string * SimplyBowsConfig.INSTANCE.winterfang.bountyFrostRadiusPerString.get()));
+                case PAIN -> (1 + string) + " homing arrows: different targets, Slowness III for 5s, one frost splash";
+                case GRACE -> "Sanctuary 7s: Resistance I, Speed I, Regeneration I, buffs " + seconds(100 + frame * 20) + "s";
+                case BOUNTY -> "Straight arrow: freezes the struck enemy in an ice prison for 3s";
                 case CHAOS -> t("tooltip.simplybows.rune_stat.ice.chaos",
                         SimplyBowsConfig.INSTANCE.winterfang.chaosWallWidth.get() + string * SimplyBowsConfig.INSTANCE.winterfang.chaosWallWidthPerString.get(),
                         seconds(SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationTicks.get() + frame * SimplyBowsConfig.INSTANCE.winterfang.chaosWallDurationPerFrameTicks.get()));

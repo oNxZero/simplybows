@@ -32,7 +32,7 @@ Install the production jars listed in [installation](installation.md), not `sour
 | :--- | :--- |
 | `common/.../item/unique` | Charge/release behavior, ammunition, rune activation, launch damage |
 | `common/.../entity` | Projectile flight, impact effects, visual entities, saved projectile state |
-| `common/.../world` | Ticking fields, swarms, storms, walls, target selection, cooldowns |
+| `common/.../world` | Ticking fields, swarms, storms, walls, target selection, cooldowns; IcePrisonManager enforces freeze, IcePainVolley reserves targets, IceFrostSlowManager handles status-immune bosses |
 | `common/.../upgrade` | Rune enum, String/Frame levels, item data codecs and caps |
 | `common/.../item/upgrade` | Upgrade component application rules and XP costs |
 | `common/.../mixin/AnvilScreenHandlerMixin.java` | Slot order, one-item consumption, renaming while upgrading |
@@ -89,3 +89,21 @@ python3 tests/tooltip-navigation/check_renderer_target.py fabric/build/libs/Simp
 ```
 
 Balance checks cover damage ratios, external bonuses, knockback, and exact wave endpoints. Navigation checks cover quick taps, wraparound, nested rendering, item changes, and hover resets. Loot checks cover fractional inputs, the former boundary at 1, unchanged defaults, clamps, and invalid numeric inputs. Renderer checks inspect packaged target descriptors and invocation sites with `javap`; they do not launch the game or prove compatibility with every other mixin.
+
+
+Winterfang's arrow NBT also stores the Pain volley UUID and Grace sanctuary enablement. The locked-target UUID is reserved at launch and retained across unloading. Grace cooldown shots persist as harmless without becoming an active sanctuary on reload. Ice prison visuals save their remaining lifetime so orphan shells expire. Freeze state itself is temporary server runtime state.
+
+Additional rune regression:
+
+```bash
+javac -d /tmp/simplybows-winterfang-check common/src/main/java/net/sweenus/simplybows/util/WinterfangAbilityRules.java tests/winterfang/WinterfangRegression.java
+java -cp /tmp/simplybows-winterfang-check WinterfangRegression
+```
+
+Packaged freeze hook inspection (supply the corresponding Loom mapped Minecraft jar for each loader):
+
+```bash
+python3 tests/winterfang/check_freeze_hooks.py /path/to/production-bows.jar /path/to/mapped-minecraft.jar
+```
+
+This verifies every new freeze/action hook names a method in the runtime namespace. It does not execute the injection or validate other mods' overrides.

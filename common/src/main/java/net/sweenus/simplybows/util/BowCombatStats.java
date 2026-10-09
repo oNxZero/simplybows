@@ -26,9 +26,10 @@ public final class BowCombatStats {
                 speed = 3 * cfg.everbloom.arrowSpeedMultiplier.get() * (1 + s * 0.05);
             }
             case "ice" -> {
-                power = cfg.winterfang.baseDamage.get() * (1 + f * 0.18) * (r == RuneEtching.GRACE ? 0.35 : 1);
+                power = cfg.winterfang.baseDamage.get() * (1 + f * 0.18) * (r == RuneEtching.GRACE ? 0 : 1);
                 speed = 3 * cfg.winterfang.arrowSpeed.get();
-                count = r == RuneEtching.NONE ? cfg.winterfang.baseQuantity.get() + s : 1;
+                count = r == RuneEtching.NONE ? cfg.winterfang.baseQuantity.get() + s : r == RuneEtching.PAIN ? 1 + s : 1;
+                if (r == RuneEtching.BOUNTY) speed *= 1 + s * 0.05;
             }
             case "bubble" -> {
                 power = cfg.bubbleveil.baseDamage.get() * (1 + f * cfg.upgrades.damageMultiplierPerFrame.get() * 0.5);
@@ -54,7 +55,10 @@ public final class BowCombatStats {
             default -> { return List.of(); }
         }
         out.add("Fully drawn shot • 2 damage = 1 heart");
-        if (bow.equals("bubble") && r == RuneEtching.CHAOS) {
+        if (bow.equals("ice") && r == RuneEtching.GRACE) {
+            out.add("Direct hit damage: 0. No harmful arrow effects.");
+            out.add("Homing: none. Fully draw to shoot.");
+        } else if (bow.equals("bubble") && r == RuneEtching.CHAOS) {
             out.add("Direct hit: water wave replaces the arrow.");
             out.add("Critical hits: none on the wave.");
         } else {
@@ -134,20 +138,21 @@ public final class BowCombatStats {
         var c = SimplyBowsConfig.INSTANCE.winterfang;
         switch (u.runeEtching()) {
             case PAIN -> {
-                damage(out, power * Math.max(0.12, c.painFrostDamageMultiplier.get()) + bonus);
-                interval(out, 10); duration(out, 80);
-                out.add("Enemies: Slowness II and Mining Fatigue I.");
+                out.add("Different targets: up to " + (1 + u.stringLevel()));
+                out.add("Splash damage: " + num(power * c.painFrostDamageMultiplier.get() + bonus));
+                out.add("Splash radius: " + num(Math.max(0.5, Math.min(3, c.painFrostRadius.get()))) + " blocks.");
+                out.add("Each enemy takes at most one splash per volley.");
+                out.add("Frost: Slowness III for 5s. No lasting damage field.");
             }
             case BOUNTY -> {
-                damage(out, power * c.bountyFrostDamageMultiplier.get() + bonus);
-                out.add("Frost pulses: " + Math.max(2, c.bountyFrostPulseCount.get() + u.frameLevel()));
-                interval(out, 20); out.add("Enemies: Slowness I.");
+                out.add("Ice prison: 3s. No homing, no repeated damage.");
+                out.add("Struck enemy cannot move, attack, or use items while frozen.");
             }
             case GRACE -> {
                 out.add("Sanctuary lasts: 7s");
-                out.add("Resistance I, Speed I, Regeneration I: refreshed for 5s while inside.");
+                out.add("Resistance I, Speed I, Regeneration I: refreshed for " + seconds(100 + u.frameLevel() * 20) + " while inside.");
                 out.add("Regeneration I heals half a heart every 2.5s.");
-                out.add("Enemies inside are slowed.");
+                out.add("No damage or harmful effects against enemies.");
             }
             case CHAOS -> {
                 out.add("Wall damage: none");

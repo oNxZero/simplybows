@@ -15,6 +15,25 @@ public class IceChaosWallVisualEntity extends Entity {
     private static final TrackedData<Float> HEIGHT_SCALE = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.FLOAT);
     private static final TrackedData<Boolean> DRIPSTONE_STYLE = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
 
+    private static final TrackedData<Boolean> PRISON_STYLE = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.BOOLEAN);
+    private static final TrackedData<Float> PRISON_WIDTH = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.FLOAT);
+    private static final TrackedData<Float> PRISON_DEPTH = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.FLOAT);
+    private int prisonLifetime;
+
+    public void setPrisonStyle(float width, float depth) {
+        dataTracker.set(PRISON_STYLE, true);
+        dataTracker.set(PRISON_WIDTH, width);
+        dataTracker.set(PRISON_DEPTH, depth);
+    }
+    public boolean isPrisonStyle() { return dataTracker.get(PRISON_STYLE); }
+    public float getPrisonWidth() { return dataTracker.get(PRISON_WIDTH); }
+    public float getPrisonDepth() { return dataTracker.get(PRISON_DEPTH); }
+    public void setPrisonLifetime(int ticks) { prisonLifetime = ticks; }
+    @Override public void tick() {
+        super.tick();
+        if (!getWorld().isClient() && isPrisonStyle() && --prisonLifetime <= 0) discard();
+    }
+
     public IceChaosWallVisualEntity(EntityType<? extends IceChaosWallVisualEntity> type, World world) {
         super(type, world);
         this.noClip = true;
@@ -33,6 +52,9 @@ public class IceChaosWallVisualEntity extends Entity {
         builder.add(TARGET_HEIGHT, 1.0F);
         builder.add(HEIGHT_SCALE, 0.0F);
         builder.add(DRIPSTONE_STYLE, false);
+        builder.add(PRISON_STYLE, false);
+        builder.add(PRISON_WIDTH, 1.0F);
+        builder.add(PRISON_DEPTH, 1.0F);
     }
 
     public void setDripstoneStyle(boolean dripstoneStyle) {
@@ -66,6 +88,8 @@ public class IceChaosWallVisualEntity extends Entity {
 
     @Override
     protected void readCustomDataFromNbt(NbtCompound nbt) {
+        if (nbt.getBoolean("prison_style")) setPrisonStyle(nbt.getFloat("prison_width"), nbt.getFloat("prison_depth"));
+        prisonLifetime = nbt.getInt("prison_lifetime");
         if (nbt.contains("target_height")) {
             this.setTargetHeight(nbt.getFloat("target_height"));
         }
@@ -79,6 +103,10 @@ public class IceChaosWallVisualEntity extends Entity {
 
     @Override
     protected void writeCustomDataToNbt(NbtCompound nbt) {
+        nbt.putBoolean("prison_style", isPrisonStyle());
+        nbt.putFloat("prison_width", getPrisonWidth());
+        nbt.putFloat("prison_depth", getPrisonDepth());
+        nbt.putInt("prison_lifetime", prisonLifetime);
         nbt.putFloat("target_height", this.getTargetHeight());
         nbt.putFloat("height_scale", this.getHeightScale());
         nbt.putBoolean("dripstone_style", this.isDripstoneStyle());

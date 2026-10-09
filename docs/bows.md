@@ -23,9 +23,9 @@ This catalog covers all six normal abilities and all 24 rune variants. Upgrade d
 | Build | Ability | String | Frame |
 | :--- | :--- | :--- | :--- |
 | Normal | Fire a spread of frost arrows that home in on enemies. | One more arrow per normal fan. | More arrow damage. |
-| Pain | Fire one frost arrow that leaves a freezing area for 4 seconds. Enemies inside take damage and receive Slowness and Mining Fatigue. | Larger frost area. | More arrow damage. |
-| Grace | Create a frost sanctuary. Allies inside gain Resistance, Speed, and Regeneration. Monsters are slowed. | Larger sanctuary. | More enemy arrow damage; sanctuary buffs unchanged. |
-| Bounty | Fire one arrow that creates repeated frost bursts. Each burst damages and slows nearby enemies. | Larger frost area. | Another frost pulse. |
+| Pain | Fire 1 + String homing arrows, each assigned a different visible enemy. Hits apply Slowness III for 5 seconds and a small frost splash. | +1 arrow per level; extra arrows do not reuse targets. | +18% base arrow damage per level; splash scales with arrow damage. |
+| Grace | Straight, harmless arrow creates a sanctuary with Resistance I, Speed I, and Regeneration I. No damage or enemy debuffs. | +0.35 blocks sanctuary radius per level. | +1 second buff duration per level after each refresh. |
+| Bounty | Straight arrow freezes the struck enemy in a spiky ice prison for exactly 3 seconds. Blocks movement, attacks, and item use. | +5% base projectile speed per level. | +18% base arrow damage per level. Freeze duration stays 3 seconds. |
 | Chaos | Raise a wall of ice where your arrow lands. It blocks movement and incoming projectiles. | Wider ice wall. | Longer ice wall. |
 
 ## Bubbleveil
@@ -92,9 +92,9 @@ These are implementation formulas for this fork, not promises of damage through 
 | Petalwind Grace | Storm damage contribution is zero; grants Strength support. |
 | Bubbleveil Chaos range | `(baseSteps + S × stepsPerString) × stepDistance + 4` blocks; endpoint clips to the exact distance. |
 | Bubbleveil Chaos knockback | Both horizontal and vertical force multiply by `1 − 0.04 × clamp(F, 0, 5)`: Frame 5 uses 0.8 of the previous force. |
-| Winterfang arrow Frame multiplier | `1 + 0.18 × F`; Grace arrow damage additionally uses 0.35. |
+| Winterfang arrow Frame multiplier | `1 + 0.18 × F`; Grace deals zero direct damage. |
 
-Petalwind Chaos String changes area and orbit speed, rather than extending lifetime. Its Frame changes duration, fish count, and orbit size. Winterfang Pain currently produces a four-second zone with damage, Slowness, and Mining Fatigue; the older config comment describing Slowness-only behavior is stale.
+Petalwind Chaos String changes area and orbit speed, rather than extending lifetime. Its Frame changes duration, fish count, and orbit size. Winterfang Pain now uses a one-time splash, not a lasting damage zone. Bounty traps the struck target rather than producing repeated frost bursts.
 
 ## Choosing a build
 
@@ -105,3 +105,13 @@ There is no verified universal DPS ordering in this repository. Combat stats are
 ### Bubbleveil Pain buff
 
 Pain now uses a total base damage coefficient of `0.35 × (1 + 0.05 × clamp(String, 0, 5))`, divided across the volley. This is a 25% base buff over the former 0.28 coefficient, with up to 25% additional String scaling. Frame retains its existing multiplier; cooldown, ammo costs, speeds, and critical behavior stay unchanged. No extra Slowness is added. Impact rounding, invulnerability frames, armor, and external attributes still affect realized damage: this coefficient is not guaranteed total health loss.
+
+### Winterfang control rules
+
+Pain assigns visible hostile targets in front of the shooter within the configured homing radius. Players, monsters, and bosses are eligible subject to friendly-fire rules. Each target is reserved once across the volley; unassigned extra arrows fly without acquiring an already reserved target. Each enemy can receive at most one splash from that volley, excluding the enemy directly struck by that particular arrow. Default splash radius is 1.75 blocks, clamped to 0.5–3 blocks; old configs may retain larger values. Frost means Slowness III for 5 seconds. Status-immune bosses receive a server-side ordinary-movement penalty instead; long teleports are retained.
+
+Bounty's non-homing arrow traps one struck enemy for 60 ticks, with a packed-ice cube and stepped crystal spikes scaled to the target. It changes no terrain. The frozen target cannot move, attack, mine, interact, or use items. Server-enforced ticking and action restrictions also apply to bosses and players; incoming damage immunity timers continue counting down. Re-hitting an already frozen target does not extend its current prison. Creative/spectator and friendly-fire protections still apply.
+
+Grace always fires without homing and does zero damage, including spectral/tipped arrow effects and external projectile damage bonuses. Partial draws do not fire or consume ammunition. The sanctuary lasts 7 seconds, has radius `3.25 + 0.35 × String`, and refreshes buffs for `5 + Frame` seconds. It has no enemy damage or debuffs. Players must be the caster or friendly according to the targeting rules to receive buffs. During cooldown a fully drawn shot is still harmless, but creates no additional sanctuary.
+
+Pain ability cooldown is 12 seconds under the current launch rule; Bounty uses the shared 6-second burst rule; Grace uses twice the shared calculation for its 7-second sanctuary (38 seconds). During cooldown Pain uses the normal frost-arrow fan without the Frost splash. Bounty remains a single straight damage arrow without a prison. Neither the prison nor the status-immune boss movement fallback is persisted through server restart.
