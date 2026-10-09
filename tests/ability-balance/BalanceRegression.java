@@ -29,6 +29,15 @@ public class BalanceRegression {
                 if ((steps - 1) * distance >= newRange) throw new AssertionError("unnecessary extra wave step");
             }
         }
+        close(BowAbilityBalance.bubblePainVolleyScale(0) / 0.28, 1.25);
+        close(BowAbilityBalance.bubblePainVolleyScale(5), 0.4375);
+        close(BowAbilityBalance.bubblePainVolleyScale(20), 0.4375);
+        close(BowAbilityBalance.bubblePainVolleyScale(-1), 0.35);
+        for (int string = 0; string <= 5; string++) {
+            int frame = 5 - string;
+            double budget = BowAbilityBalance.bubblePainVolleyScale(string) * (1 + frame * 0.55 * 0.5);
+            if (budget > 0.831251) throw new AssertionError("Pain exceeds bounded five-slot volley budget");
+        }
         System.out.println("Passed: requested damage ratios including external bonuses, unchanged Bounty Frame 0 / Petalwind Pain, Frame 5 knockback, and exact +4-block wave endpoints across configs.");
     }
     private static void close(double actual, double expected) {

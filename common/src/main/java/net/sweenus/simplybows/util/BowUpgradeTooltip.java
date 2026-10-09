@@ -65,7 +65,7 @@ public final class BowUpgradeTooltip {
                 default -> t("tooltip.simplybows.alt.string.ice");
             };
             case "bubble" -> switch (rune) {
-                case PAIN -> t("tooltip.simplybows.alt.string.bubble.pain");
+                case PAIN -> upgrades.stringLevel() < 5 ? "+1 axolotl, +5% base volley damage" : "+1 axolotl, volley damage capped";
                 case CHAOS -> t("tooltip.simplybows.alt.string.bubble.chaos");
                 default -> t("tooltip.simplybows.alt.string.bubble", seconds(SimplyBowsConfig.INSTANCE.bubbleveil.columnDurationBonusPerString.get()));
             };
@@ -282,7 +282,8 @@ public final class BowUpgradeTooltip {
             return t("tooltip.simplybows.detail.bubble.string.chaos", string, num(range));
         }
         if (upgrades.runeEtching() == RuneEtching.PAIN) {
-            return t("tooltip.simplybows.detail.bubble.string.pain", string, Math.max(1, string + 1));
+            return t("tooltip.simplybows.detail.bubble.string.pain", string, Math.max(1, string + 1))
+                    + ": +" + Math.min(5, string) * 5 + "% base volley damage";
         }
         var cfg = SimplyBowsConfig.INSTANCE.bubbleveil;
         int ticks = cfg.columnDurationTicks.get() + string * cfg.columnDurationBonusPerString.get();

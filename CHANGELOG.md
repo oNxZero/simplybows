@@ -2,6 +2,10 @@
 
 ## 0.1.4: current fork updates
 
+### Conservative Bubbleveil Pain buff
+
+Increase the base volley damage coefficient from 0.28 to 0.35 (+25%). String adds 5% of base volley damage per level, capped at 25%, while still dividing total damage across the shots. Update combat estimates and upgrade descriptions. Keep cooldown, ammunition costs, and Frame scaling; do not add Slowness. Add scaling-cap and five-slot budget checks. In-game PvP balance is not yet measured.
+
 ### Loot probability fix
 
 All loot chances now use one per-thousand scale, including values at or below 1. `1` means 0.1%, `0.5` means 0.05%, and `1000` means 100%. The former raw-probability compatibility branch is removed. Existing defaults retain their chances; legacy raw-probability configurations must multiply their old values by 1000 to preserve the intended rate. Added boundary and fractional-chance regression coverage.

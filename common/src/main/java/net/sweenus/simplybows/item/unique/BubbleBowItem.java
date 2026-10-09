@@ -95,9 +95,9 @@ public class BubbleBowItem extends SimplyBowItem {
             double damage = SimplyBowsConfig.INSTANCE.bubbleveil.baseDamage.get()
                     * (1.0 + upgrades.frameLevel() * SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get() * 0.5);
             if (upgrades.runeEtching() == RuneEtching.PAIN && !FORCE_DEFAULT_BUBBLE_ARROW.get()) {
-                // Line volleys stack hard — keep total Pain damage well under a normal shot.
+                // Divide a bounded total volley budget across its projectiles.
                 int quantity = Math.max(1, upgrades.stringLevel() + 1);
-                damage *= 0.28 / quantity;
+                damage *= net.sweenus.simplybows.util.BowAbilityBalance.bubblePainVolleyScale(upgrades.stringLevel()) / quantity;
             }
             persistent.setDamage(damage);
             persistent.setCritical(critical);

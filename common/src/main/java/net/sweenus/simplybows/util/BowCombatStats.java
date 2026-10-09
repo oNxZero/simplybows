@@ -35,7 +35,7 @@ public final class BowCombatStats {
                 speed = 3 * cfg.bubbleveil.arrowSpeedMultiplier.get();
                 if (r == RuneEtching.PAIN) {
                     count = Math.max(1, s + 1);
-                    power *= 0.28 / count;
+                    power *= BowAbilityBalance.bubblePainVolleyScale(s) / count;
                     // Pain uses different speeds on land and in water; show both below.
                     speed = 3 * cfg.bubbleveil.painShotSpeedLand.get();
                 }

@@ -8,6 +8,11 @@ public final class BowAbilityBalance {
     public static final float EVERBLOOM_PAIN_BONUS_SCALE = 0.5F;
     private BowAbilityBalance() {}
 
+    /** Modest volley buff; String damage gain is capped at five levels. */
+    public static double bubblePainVolleyScale(int string) {
+        return 0.35 * (1.0 + 0.05 * Math.max(0, Math.min(5, string)));
+    }
+
     public static float petalDamageScale(RuneEtching rune, int frame) {
         return switch (rune) {
             case NONE -> 0.5F;

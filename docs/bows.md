@@ -35,7 +35,7 @@ This catalog covers all six normal abilities and all 24 rune variants. Upgrade d
 | Build | Ability | String | Frame |
 | :--- | :--- | :--- | :--- |
 | Normal | Fire arrows that travel freely through water and create bubble columns on impact. | Longer column duration. | Wider and taller column. |
-| Pain | Fire a row of axolotl shots. They damage enemies on impact without creating bubble columns. | Another axolotl; volley damage is spread across shots. | More axolotl shot damage. |
+| Pain | Fire a row of axolotl shots. They damage enemies on impact without creating bubble columns. | Another axolotl and +5% of base volley damage, capped at +25%. | More axolotl shot damage. |
 | Grace | Create a protective bubble column with a guardian axolotl. Allies gain Resistance, enemies are slowed, and incoming shots are blocked. | Longer column duration. | Wider and taller column. |
 | Bounty | Create a bubble column filled with axolotls. The swarm repeatedly damages enemies inside. | Longer column duration. | Wider/taller column and slightly more swarm damage. |
 | Chaos | Send a water wave forward that damages enemies and knocks them back. | Longer wave travel. | More wave damage; tuned knockback. |
@@ -101,3 +101,7 @@ Petalwind Chaos String changes area and orbit speed, rather than extending lifet
 For repeated area damage, compare Everbloom Pain/Bounty, Petalwind Pain/Bounty, and Bubbleveil Bounty with the expected number of targets and time in the field. For a single activation, include every pulse or swarm hit that actually lands. Winterfang offers homing and control; Tremorstrike trades sustained uptime for eruptions and displacement. Grace variants primarily provide team utility.
 
 There is no verified universal DPS ordering in this repository. Combat stats are estimates and cooldowns are shared: test the configured build against your intended target, with armor and the same external attributes.
+
+### Bubbleveil Pain buff
+
+Pain now uses a total base damage coefficient of `0.35 × (1 + 0.05 × clamp(String, 0, 5))`, divided across the volley. This is a 25% base buff over the former 0.28 coefficient, with up to 25% additional String scaling. Frame retains its existing multiplier; cooldown, ammo costs, speeds, and critical behavior stay unchanged. No extra Slowness is added. Impact rounding, invulnerability frames, armor, and external attributes still affect realized damage: this coefficient is not guaranteed total health loss.

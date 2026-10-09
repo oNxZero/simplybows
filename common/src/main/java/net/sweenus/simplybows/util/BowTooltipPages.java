@@ -38,7 +38,7 @@ public final class BowTooltipPages {
                 default -> "Makes the frost area larger.";
             };
             case "bubble" -> switch (r) {
-                case PAIN -> "Adds another axolotl to the volley. Spreads the volley’s damage across more shots.";
+                case PAIN -> "Adds another axolotl and +5% of base volley damage, up to +25%.";
                 case CHAOS -> "Makes the water wave travel farther.";
                 default -> "Makes the bubble column last longer.";
             };
