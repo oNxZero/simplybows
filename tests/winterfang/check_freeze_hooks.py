@@ -20,7 +20,7 @@ for simple in ['ServerWorldMixin', 'ServerPlayerEntityMixin', 'FrozenPlayerNetwo
     target = re.search(r'org.spongepowered.asm.mixin.Mixin\(\s*value=\[class L([^;]+);\]', mix)
     assert target, simple + ': missing target class'
     methods = inspect(sys.argv[2], target[1].replace('/', '.'), '-s')
-    for annotation in re.findall(r'org.spongepowered.asm.mixin.injection.Inject\(\s*method=\[([^\]]+)\]', mix):
+    for annotation in re.findall(r'org.spongepowered.asm.mixin.injection.Inject\([\s\S]*?method=\[([^\]]+)\]', mix):
         for selector in re.findall(r'"([^"]+)"', annotation):
             lookup = refmap.get('net/sweenus/simplybows/mixin/' + simple, {}).get(selector)
             if lookup and target[1].startswith('net/minecraft/class_'):
@@ -33,4 +33,5 @@ for simple in ['ServerWorldMixin', 'ServerPlayerEntityMixin', 'FrozenPlayerNetwo
                 descriptor = '(' + selector.split('(', 1)[1]
                 assert any('descriptor: ' + descriptor in b for b in matches), selector
             count += 1
+assert count >= 20, 'Expected player tick hooks as well as world, network and damage hooks'
 print('PASS:', count, 'freeze and damage hook selectors resolve against the matching loader Minecraft classes')
