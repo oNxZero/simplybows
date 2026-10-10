@@ -30,8 +30,8 @@ public final class IceChaosWallManager {
     private static final String WALL_VISUAL_TAG = "simplybows_ice_chaos_wall_visual";
     private static final double WALL_THICKNESS = 0.9;
     private static final double SEGMENT_SPACING = 0.85;
-    private static final int RISE_TICKS = 4;
-    private static final int SINK_TICKS = 10;
+    private static final int RISE_TICKS = 12;
+    private static final int SINK_TICKS = 16;
 
     private IceChaosWallManager() {
     }
@@ -87,7 +87,7 @@ public final class IceChaosWallManager {
 
         spawnVisuals(world, wall);
 
-        world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 0.9F, 0.7F + world.random.nextFloat() * 0.08F);
+        world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_GLASS_PLACE, SoundCategory.PLAYERS, 0.9F, 0.7F + world.random.nextFloat() * 0.08F);
         world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_AMETHYST_BLOCK_CHIME, SoundCategory.PLAYERS, 0.65F, 1.35F + world.random.nextFloat() * 0.1F);
         world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK, net.minecraft.block.Blocks.PACKED_ICE.getDefaultState()), center.x, center.y + 1.0, center.z, 24, halfLength * 0.5, 0.8, halfLength * 0.3, 0.01);
         world.spawnParticles(ParticleTypes.SNOWFLAKE, center.x, center.y + 1.0, center.z, 18, halfLength * 0.5, 0.8, halfLength * 0.3, 0.0);
@@ -111,10 +111,19 @@ public final class IceChaosWallManager {
         while (iterator.hasNext()) {
             ActiveWall wall = iterator.next();
             if (world.getTime() >= wall.expiryTick) {
+                BowEffectSounds.splash(world,wall.center);
+                world.spawnParticles(net.minecraft.particle.ParticleTypes.SPLASH,wall.center.x,wall.center.y+.8,wall.center.z,40,2,.8,2,.08);
                 discardWallVisuals(world, wall);
                 iterator.remove();
                 continue;
             }
+            if(wall.expiryTick-world.getTime()==SINK_TICKS) {
+                world.playSound(null,wall.center.x,wall.center.y+1,wall.center.z,SoundEvents.BLOCK_GLASS_BREAK,SoundCategory.PLAYERS,1.2F,.7F);
+                world.playSound(null,wall.center.x,wall.center.y+1,wall.center.z,SoundEvents.ENTITY_GENERIC_EXPLODE,SoundCategory.PLAYERS,.45F,1.4F);
+                for(VisualRef ref:wall.visuals) world.spawnParticles(new BlockStateParticleEffect(ParticleTypes.BLOCK,net.minecraft.block.Blocks.ICE.getDefaultState()),ref.x,ref.y+wall.height*.5,ref.z,12,.4,wall.height*.35,.4,.15);
+            }
+            if(wall.expiryTick-world.getTime()<12) world.spawnParticles(net.minecraft.particle.ParticleTypes.FALLING_WATER,
+                    wall.center.x,wall.center.y+1.8,wall.center.z,8,2,.5,2,.01);
             animateVisuals(world, wall);
             blockProjectiles(world, wall);
             blockEntities(world, wall);
@@ -124,6 +133,24 @@ public final class IceChaosWallManager {
             ACTIVE_WALLS.remove(world);
             purgeOrphanWallVisuals(world);
         }
+    }
+
+    public static boolean blockFormationProjectile(ServerWorld world, Entity projectile, Vec3d next) {
+        List<ActiveWall> walls = ACTIVE_WALLS.get(world);
+        if (walls == null) return false;
+        Vec3d from = projectile.getPos();
+        for (ActiveWall wall : walls) {
+            if (world.getTime() >= wall.expiryTick) continue;
+            double a = from.subtract(wall.center).dotProduct(wall.normal);
+            double b = next.subtract(wall.center).dotProduct(wall.normal);
+            Vec3d crossing = a * b <= 0 && Math.abs(a-b) > 1.0E-7 ? from.lerp(next, a/(a-b)) : next;
+            if (isInsideWallPlane(next, wall) || isInsideWallPlane(crossing, wall)) {
+                world.spawnParticles(ParticleTypes.SNOWFLAKE, crossing.x, crossing.y, crossing.z, 8, .15, .15, .15, .01);
+                projectile.discard();
+                return true;
+            }
+        }
+        return false;
     }
 
     private static void blockProjectiles(ServerWorld world, ActiveWall wall) {

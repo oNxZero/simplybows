@@ -15,7 +15,6 @@ import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
-import net.sweenus.simplybows.world.BubbleColumnFieldManager;
 
 import java.util.UUID;
 
@@ -41,6 +40,7 @@ public class BubblePainArrowEntity extends net.minecraft.entity.projectile.Arrow
         this.prevX = owner.getX();
         this.prevY = owner.getEyeY() - 0.1;
         this.prevZ = owner.getZ();
+        net.sweenus.simplybows.util.BowProjectileEnchantments.initialize(this, weaponStack, arrowStack);
     }
 
     @Override
@@ -52,7 +52,7 @@ public class BubblePainArrowEntity extends net.minecraft.entity.projectile.Arrow
 
         if (!this.firedSoundPlayed) {
             this.firedSoundPlayed = true;
-            serverWorld.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.ENTITY_AXOLOTL_IDLE_AIR, SoundCategory.PLAYERS, 0.65F, 1.0F + this.random.nextFloat() * 0.15F);
+            serverWorld.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.BLOCK_BUBBLE_COLUMN_BUBBLE_POP, SoundCategory.PLAYERS, 0.65F, 1.0F + this.random.nextFloat() * 0.15F);
         }
 
         if (!this.inGround) {
@@ -73,7 +73,7 @@ public class BubblePainArrowEntity extends net.minecraft.entity.projectile.Arrow
         if (this.getWorld() instanceof ServerWorld serverWorld) {
             spawnImpact(serverWorld, blockHitResult.getPos());
         }
-        // Pain axolotls are projectiles only — no bubble column spam.
+        // Ground impacts also create the area raincloud.
         this.spawnedBubbleColumn = true;
         super.onBlockHit(blockHitResult);
         if (this.getWorld() instanceof ServerWorld serverWorld) {
@@ -81,6 +81,23 @@ public class BubblePainArrowEntity extends net.minecraft.entity.projectile.Arrow
         } else {
             this.discard();
         }
+    }
+
+    @Override
+    protected void onHit(LivingEntity target) {
+        super.onHit(target);
+
+    }
+
+    @Override
+    public void writeCustomDataToNbt(net.minecraft.nbt.NbtCompound nbt) {
+        super.writeCustomDataToNbt(nbt); nbt.put("BowUpgrades", columnUpgrades.toProjectileNbt());
+        nbt.putBoolean("ImpactUsed", spawnedBubbleColumn); nbt.putBoolean("FiredSound", firedSoundPlayed);
+    }
+    @Override
+    public void readCustomDataFromNbt(net.minecraft.nbt.NbtCompound nbt) {
+        super.readCustomDataFromNbt(nbt); columnUpgrades = BowUpgradeData.fromProjectileNbt(nbt.getCompound("BowUpgrades"));
+        spawnedBubbleColumn = nbt.getBoolean("ImpactUsed"); firedSoundPlayed = nbt.getBoolean("FiredSound");
     }
 
     @Override
@@ -104,19 +121,13 @@ public class BubblePainArrowEntity extends net.minecraft.entity.projectile.Arrow
 
     @Override
     protected SoundEvent getHitSound() {
-        return SoundEvents.ENTITY_AXOLOTL_IDLE_AIR;
-    }
-
-    private void trySpawnBubbleColumn(Vec3d hitPos) {
-        if (this.spawnedBubbleColumn) {
-            return;
-        }
-        if (this.getWorld() instanceof ServerWorld serverWorld) {
-            this.spawnedBubbleColumn = BubbleColumnFieldManager.createOrReplaceColumn(serverWorld, hitPos, this.columnOwnerId, this.columnUpgrades);
-        }
+        return SoundEvents.BLOCK_BUBBLE_COLUMN_BUBBLE_POP;
     }
 
     private void spawnImpact(ServerWorld world, Vec3d pos) {
+        if (!spawnedBubbleColumn) net.sweenus.simplybows.world.RuneEffectManager.cast(world,
+                net.sweenus.simplybows.util.RuneEffectRules.VORTEX,pos,getOwner(),null,columnUpgrades,false);
+        spawnedBubbleColumn = true;
         world.spawnParticles(ParticleTypes.BUBBLE, pos.x, pos.y + 0.2, pos.z, 14, 0.35, 0.2, 0.35, 0.0);
         world.spawnParticles(ParticleTypes.SPLASH, pos.x, pos.y + 0.1, pos.z, 10, 0.25, 0.12, 0.25, 0.0);
     }

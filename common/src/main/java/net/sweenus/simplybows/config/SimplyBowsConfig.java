@@ -84,9 +84,9 @@ public class SimplyBowsConfig extends Config {
 
         // Rune: Bounty
         public ConfigGroup bountyGroup = new ConfigGroup("bounty");
-        @Comment("Legacy key: unused. Bounty now freezes the struck target for exactly three seconds.")
+        @Comment("Legacy key: unused. Bounty freezes the struck target for 3 seconds plus 0.5 seconds per String.")
         public ValidatedDouble bountyFrostRadius = new ValidatedDouble(3.75, 14.0, 1.0);
-        @Comment("Legacy key: unused. Bounty String now adds 5% base shot speed per level.")
+        @Comment("Legacy key: unused. Bounty String now adds 0.5 seconds of freeze duration per level.")
         public ValidatedDouble bountyFrostRadiusPerString = new ValidatedDouble(0.4, 3.0, 0.0);
         @Comment("Legacy key: unused. Bounty no longer produces frost damage pulses.")
         public ValidatedDouble bountyFrostDamageMultiplier = new ValidatedDouble(0.14, 5.0, 0.05);
@@ -564,8 +564,8 @@ public class SimplyBowsConfig extends Config {
         public ValidatedFloat baseStringChance = new ValidatedFloat(20.0F, CHANCE_SCALE, 0.0F);
         @Comment("Base chest drop chance for Reinforced Frame upgrades. Example: 20 = 2.0%.")
         public ValidatedFloat baseFrameChance = new ValidatedFloat(20.0F, CHANCE_SCALE, 0.0F);
-        @Comment("Base chest drop chance for rune upgrade items. Example: 3 = 0.3%.")
-        public ValidatedFloat baseRuneChance = new ValidatedFloat(3.0F, CHANCE_SCALE, 0.0F);
+        @Comment("Base chest drop chance for rune upgrade items. Example: 30 = 3.0%.")
+        public ValidatedFloat baseRuneChance = new ValidatedFloat(30.0F, CHANCE_SCALE, 0.0F);
         @Comment("Chance for one random unique bow in vanilla and modded loot chests. Example: 50 = 5.0%.")
         @ConfigGroup.Pop
         public ValidatedFloat baseUniqueBowChance = new ValidatedFloat(50.0F, CHANCE_SCALE, 0.0F);
@@ -574,9 +574,9 @@ public class SimplyBowsConfig extends Config {
         public ConfigGroup biomeGroup = new ConfigGroup("biomeBoosts");
         @Comment("Structure-specific boosted drop chance for selected bows. Example: 15 = 1.5%.")
         public ValidatedFloat boostedBowChance = new ValidatedFloat(15.0F, CHANCE_SCALE, 0.0F);
-        @Comment("Boosted rune drop chance in Ancient City chests. Example: 20 = 2.0%.")
+        @Comment("Additional independent rune drop chance in Ancient City chests. Example: 30 = 3.0%.")
         @ConfigGroup.Pop
-        public ValidatedFloat boostedRuneChanceAncientCity = new ValidatedFloat(20.0F, CHANCE_SCALE, 0.0F);
+        public ValidatedFloat boostedRuneChanceAncientCity = new ValidatedFloat(30.0F, CHANCE_SCALE, 0.0F);
     }
 
     // ── Upgrades ─────────────────────────────────────────────

@@ -36,22 +36,23 @@ public final class BowTooltipPages {
                 case NONE -> "Adds another frost arrow to each shot.";
                 case CHAOS -> "Makes the frost wall wider.";
                 case PAIN -> "Adds another homing arrow that seeks a different enemy.";
-                case BOUNTY -> "Makes the straight prison arrow travel faster.";
+                case BOUNTY -> "Makes the ice prison last longer.";
                 default -> "Makes the frost area larger.";
             };
             case "bubble" -> switch (r) {
-                case PAIN -> "Adds another axolotl and +5% of base volley damage, up to +25%.";
+                case PAIN -> "Makes the raincloud wider and last longer.";
                 case CHAOS -> "Makes the water wave travel farther.";
                 default -> "Makes the bubble column last longer.";
             };
             case "bee" -> switch (r) {
-                case PAIN -> "Adds more bees and makes their poison last longer.";
+                case PAIN -> "Adds another sting and makes the swarm last longer.";
                 case GRACE -> "Adds another bee to protect more allies.";
                 case BOUNTY -> "Adds more exploding bees to the hive.";
                 case CHAOS -> "Makes the honey storm larger.";
                 default -> "Makes poison stronger and last longer.";
             };
             case "blossom" -> switch (r) {
+                case BOUNTY -> "Finds enemies farther from the impact.";
                 case PAIN -> "Makes the damaging petal ring larger.";
                 case GRACE -> "Makes the support puddle larger and last longer.";
                 case CHAOS -> "Makes the koi cover a larger area and circle faster.";
@@ -60,7 +61,7 @@ public final class BowTooltipPages {
             case "earth" -> switch (r) {
                 case PAIN -> "Widens the spike field. The fissure's length stays the same.";
                 case GRACE -> "Makes the protective wall cover a larger area.";
-                case CHAOS -> "Makes the sweeping spikes wider and last longer.";
+                case CHAOS -> "Makes the crushing stone pairs reach farther.";
                 default -> "Makes the spike field larger.";
             };
             default -> "Improves the reach of the ability.";
@@ -78,28 +79,32 @@ public final class BowTooltipPages {
                 case CHAOS -> "Makes the spore field last longer.";
             };
             case "ice" -> switch (r) {
-                case BOUNTY -> "Increases arrow damage. The freeze stays at 3 seconds.";
+                case BOUNTY -> "Increases damage each second while the enemy is trapped.";
                 case CHAOS -> "Makes the frost wall last longer.";
                 case GRACE -> "Makes sanctuary buffs last longer after leaving.";
                 default -> "Increases arrow damage.";
             };
             case "bubble" -> switch (r) {
-                case PAIN -> "Increases axolotl shot damage.";
+                case PAIN -> "Increases rain pulse and final burst damage.";
                 case CHAOS -> "Increases the water wave's damage.";
                 case BOUNTY -> "Makes the column wider and taller, and slightly increases swarm damage.";
                 default -> "Makes the bubble column wider and taller.";
             };
             case "bee" -> switch (r) {
+                case PAIN -> "Increases damage from each swarm sting.";
                 case GRACE -> "Lets each bee protect another ally before disappearing.";
                 case BOUNTY -> "Increases explosion damage and poison strength.";
                 default -> "Increases bee damage.";
             };
             case "blossom" -> switch (r) {
+                case BOUNTY -> "Increases each blossom's closing burst damage.";
                 case GRACE -> "Makes the Strength buff last longer.";
                 case CHAOS -> "Adds more koi and makes them last longer.";
                 default -> "Increases petal damage.";
             };
-            case "earth" -> r == RuneEtching.GRACE ? "Makes the protective wall last longer." : "Increases spike damage and knockback.";
+            case "earth" -> switch (r) { case GRACE -> "Makes the protective wall last longer.";
+                case CHAOS -> "Increases the stone jaws' crush damage."; case BOUNTY -> "Increases damage from each star eruption.";
+                default -> "Increases spike damage and knockback."; };
             default -> "Improves the ability's strength.";
         };
     }

@@ -32,7 +32,8 @@ public class BeeHiveVisualEntityRenderer extends EntityRenderer<BeeHiveVisualEnt
 
         matrices.push();
         matrices.translate(-0.5, 0.0, -0.5);
-        matrices.scale(0.9F, Math.max(0.05F, heightScale), 0.9F);
+        matrices.multiply(net.minecraft.util.math.RotationAxis.POSITIVE_Y.rotationDegrees((float)Math.sin((entity.age+tickDelta)*.1)*4));
+        matrices.scale(0.9F*heightScale, Math.max(0.05F, heightScale), 0.9F*heightScale);
         MinecraftClient.getInstance().getBlockRenderManager().renderBlockAsEntity(
                 Blocks.BEE_NEST.getDefaultState(),
                 matrices,

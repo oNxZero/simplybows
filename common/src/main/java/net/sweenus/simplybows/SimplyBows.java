@@ -125,6 +125,7 @@ public final class SimplyBows {
             EntityRendererRegistry.register(EntityRegistry.BUBBLE_BOUNTY_VISUAL, BubbleBountyVisualEntityRenderer::new);
             EntityRendererRegistry.register(EntityRegistry.BUBBLE_GRACE_VISUAL, BubbleGraceVisualEntityRenderer::new);
             EntityRendererRegistry.register(EntityRegistry.BUBBLE_CHAOS_WAVE_VISUAL, BubbleChaosWaveVisualEntityRenderer::new);
+            EntityRendererRegistry.register(EntityRegistry.RUNE_EFFECT, net.sweenus.simplybows.client.renderer.RuneEffectEntityRenderer::new);
             EntityRendererRegistry.register(EntityRegistry.KOI_FISH_VISUAL, KoiFishVisualEntityRenderer::new);
 
             ParticleProviderRegistry.register(ParticleRegistry.JAPANESE_WAVE, WaveParticle.Factory::new);

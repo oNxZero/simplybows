@@ -52,6 +52,7 @@ public final class SimplyBowsNeoForgeClient {
         event.registerEntityRenderer(EntityRegistry.BUBBLE_BOUNTY_VISUAL.get(), BubbleBountyVisualEntityRenderer::new);
         event.registerEntityRenderer(EntityRegistry.BUBBLE_GRACE_VISUAL.get(), BubbleGraceVisualEntityRenderer::new);
         event.registerEntityRenderer(EntityRegistry.BUBBLE_CHAOS_WAVE_VISUAL.get(), BubbleChaosWaveVisualEntityRenderer::new);
+            event.registerEntityRenderer(EntityRegistry.RUNE_EFFECT.get(), net.sweenus.simplybows.client.renderer.RuneEffectEntityRenderer::new);
         event.registerEntityRenderer(EntityRegistry.KOI_FISH_VISUAL.get(), KoiFishVisualEntityRenderer::new);
     }
 }

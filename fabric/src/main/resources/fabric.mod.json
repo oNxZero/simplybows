@@ -3,16 +3,19 @@
   "id": "simplybows",
   "version": "${version}",
   "name": "Simply Bows Reforged",
-  "description": "",
+  "description": "Six elemental bows, four runes, and upgradeable strings and frames. Simply Bows Reforged is a maintained fork of Simply Bows by Sweenus and Hootea.",
   "authors": [
     "Sweenus",
-    "Hootea"
+    "Hootea",
+    "oNxZero"
   ],
   "contact": {
-    "homepage": ""
+    "homepage": "https://github.com/oNxZero/simplybows",
+    "sources": "https://github.com/oNxZero/simplybows",
+    "issues": "https://github.com/oNxZero/simplybows/issues"
   },
   "license": "Timefall Development License 1.2",
-  "icon": "icon.png",
+  "icon": "assets/simplybows/logo.png",
   "environment": "*",
   "entrypoints": {
     "main": [

@@ -61,7 +61,7 @@ public final class RuneUseCooldown {
             return true;
         }
         Long end = globalEnds(world).get(ownerId);
-        return end == null || end <= world.getTime();
+        return end == null || end <= world.getServer().getOverworld().getTime();
     }
 
     /**
@@ -84,7 +84,7 @@ public final class RuneUseCooldown {
             return;
         }
         ticks = cooldownForBow(bowKey, ticks);
-        long now = world.getTime();
+        long now = world.getServer().getOverworld().getTime();
         long newEnd = now + ticks;
         Long existing = globalEnds(world).get(ownerId);
         if (existing != null && existing > newEnd) {

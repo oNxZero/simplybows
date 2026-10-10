@@ -22,7 +22,7 @@ public abstract class FrozenPlayerNetworkMixin {
 
     @Inject(method = "onPlayerMove", at = @At("HEAD"), cancellable = true)
     private void simplybows$denyMove(PlayerMoveC2SPacket packet, CallbackInfo ci) {
-        if (!frozen()) return;
+        if (!frozen() && !(player.getServer()!=null && player.getServer().isOnThread() && net.sweenus.simplybows.world.StoneRootManager.isRooted(player))) return;
         player.setYaw(packet.getYaw(player.getYaw()));
         player.setPitch(packet.getPitch(player.getPitch()));
         if (Math.abs(packet.getX(player.getX()) - player.getX()) > 0.001

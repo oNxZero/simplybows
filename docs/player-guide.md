@@ -58,3 +58,36 @@ Numbers display at most one decimal: `6.785` becomes `6.8`. Calculations retain 
 Arrow hit values are estimates before armor, enchantments, and other mods. Impact speed and vanilla critical randomness can change the final hit. Ability damage is separate from the arrow hit and does not automatically receive arrow critical damage. Multiple enemies, time in the area, missed shots, and cooldowns all change real DPS: a single theoretical total is not a universal ranking.
 
 Grace effects support eligible allies; targeting and friendly-fire rules differ between abilities. Everbloom's garden heals players and animals and damages monsters. Read the individual bow descriptions for direct-hit support and area effects.
+
+### Bow enchantments
+
+Power increases direct projectile hit damage, Punch adds hit knockback, and Flame ignites damaging shots and their victims. Ability damage (storms, swarms, frost splashes, and prison pulses) keeps its own scaling. Winterfang Grace remains harmless, including fire and tipped/spectral effects. Support shots do not ignite protected allies. Winterfang Bounty still holds its prisoner in place despite Punch. Infinity, Unbreaking, and Mending retain their existing handling. Enchantments are saved with newly fired custom arrows, including across chunk unloading; old arrows fired before this fix have no recoverable bow snapshot.
+
+Equipped enchantments appear on the first bow tooltip page as named level bars beside String and Frame. Filled squares show the current level and empty squares show remaining levels. Curses appear red; other enchantments use the bow color. Hold Alt to see the numeric enchantment level. Enchantments do not use String/Frame upgrade slots.
+
+Infinity-created normal arrows cannot be recovered in Survival, including extra arrows in Winterfang and other volleys. Creative-fired arrows are Creative-only pickups. Consumed tipped/spectral ammunition remains recoverable when the projectile survives, matching vanilla Infinity restrictions.
+
+## Reworked offensive runes
+
+Tremorstrike Chaos crushes enemies between rising stone jaws. Bounty grows and shrinks a filled star three times. Grace's wall now blocks you and your allies too: move around its open side.
+
+Buzzkill Pain sends one homing bee that attaches a damaging swarm. Bubbleveil Pain creates a particle raincloud at impact, including ground hits; it drops three water crystals per volley, with splash damage and Slowness I for 2s. Petalwind Bounty opens a gathering blossom, draws enemies together, then releases a focused burst. Their String upgrades improve duration or reach, and Frame increases ability damage. The upgrade and combat tooltip pages show the equipped values.
+
+## Effect sounds
+
+Bow effects use positional Minecraft sounds, so nearby players can hear an ability form, strike, or fade away. No extra sound pack is required. Adjust **Players** in Minecraft's sound settings to change their volume.
+
+| Bow | Sound character |
+|:---|:---|
+| Everbloom | Grass, moss and leaves for flowers and vines; darker Wither sounds for Pain; leaf rustling for Bounty trees; crystal and moss sounds for Chaos. |
+| Winterfang | Frost cracks and shattering ice for attacks, walls and prisons; soft crystal chimes for Grace's sanctuary. Bounty's damage pulses have quiet ice taps. |
+| Tremorstrike | Dripstone and stone impacts for fissures and walls. Chaos has a grinding windup and a heavier crushing impact. Bounty's three stars sound as they rise and retract. |
+| Buzzkill | Bee buzzing, stings, hive sounds and honey drips. Pain's attached swarm buzzes quietly and sounds its stings; Grace uses softer pollination cues. |
+| Bubbleveil | Bubbles, moving water and splashes. Pain's raincloud sounds moving water while active and splashes at its final downpour; Grace's shield pops bubbles when blocking projectiles. |
+| Petalwind | Cherry leaves, blossom sounds and gentle support chimes. Bounty's lotus rustles as it opens, sounds its strike, and rustles as it closes. Chaos retains its koi movement and impact sounds. |
+
+New repeating cues are quieter than formation and impact sounds. Nearby overlapping effects share a short sound limit, reducing repeated stings, water pops and impacts during crowded fights. Ambient cues are short sounds rather than permanently running audio loops, so unloading or ending an effect cannot leave a new loop playing.
+
+Every bow/rune build has an ability sound palette: Everbloom uses plants, Wither and spores; Winterfang uses frost/crystal cues; Tremorstrike uses stone and dripstone; Buzzkill uses buzzing/stings/honey; Bubbleveil uses water/bubbles; Petalwind uses blossoms/leaves and sweep sounds. These are existing and new finite positional sounds, rather than one added generic sound for every effect.
+
+Tremorstrike Bounty sounds five successive growing layers and five returning layers in each of its three cycles. Chaos sounds each pair forming and each pair breaking; its limiter permits the eight-tick sequence. Bubbleveil Pain has an overlapping translucent 3D cloud body, particle edges, formation/fade animations and homing water drops. Petalwind Bounty's three glass petals leave the visible crown at 1.2s, 1.8s and 2.4s, travel outward briefly, then seek their selected enemies.

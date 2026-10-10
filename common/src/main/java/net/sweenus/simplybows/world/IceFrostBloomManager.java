@@ -51,7 +51,9 @@ public final class IceFrostBloomManager {
 
     public static void spawnGraceSanctuary(ServerWorld world, Vec3d center, LivingEntity owner, int stringLevel, int frameLevel) {
         if (owner == null) return;
+        BowEffectSounds.start(world,center,BowEffectSounds.Theme.SUPPORT_FROST);
         double radius = 3.25 + Math.max(0, stringLevel) * 0.35;
+        net.sweenus.simplybows.entity.RuneEffectEntity.spawnSupport(world,7,center,owner,radius,graceZoneDurationTicks());
         GRACE_ZONES.computeIfAbsent(world, w -> new ArrayList<>()).add(new GraceZone(center, owner.getUuid(), radius,
                 world.getTime() + graceZoneDurationTicks(), 100 + Math.max(0, frameLevel) * 20));
         applyGracePulse(world, center, owner, radius, 100 + Math.max(0, frameLevel) * 20);
@@ -67,7 +69,8 @@ public final class IceFrostBloomManager {
         List<GraceZone> zones = GRACE_ZONES.get(world);
         if (zones == null) return;
         zones.removeIf(zone -> {
-            if (zone.expires <= world.getTime()) return true;
+            if (zone.expires <= world.getTime()) { BowEffectSounds.end(world,zone.center,BowEffectSounds.Theme.SUPPORT_FROST); return true; }
+            if (world.getTime()%40 == 0) BowEffectSounds.ambient(world,zone.center,BowEffectSounds.Theme.SUPPORT_FROST);
             if (world.getTime() % 4 == 0) spawnFrostFloor(world, zone.center, zone.radius, 0.65F);
             if (world.getTime() % 20 == 0 && world.getEntity(zone.owner) instanceof LivingEntity owner)
                 applyGracePulse(world, zone.center, owner, zone.radius, zone.buffTicks);
@@ -80,8 +83,7 @@ public final class IceFrostBloomManager {
         for (LivingEntity target : world.getEntitiesByClass(LivingEntity.class, Box.of(center, radius * 2, 3.5, radius * 2),
                 LivingEntity::isAlive)) {
             if (target.squaredDistanceTo(center) > radius * radius || !GraceProjectile.isSupportTarget(target)) continue;
-            if (target != owner && target instanceof net.minecraft.entity.player.PlayerEntity
-                    && !CombatTargeting.isFriendlyTo(target, owner)) continue;
+
             target.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, buffTicks, 0), owner);
             target.addStatusEffect(new StatusEffectInstance(StatusEffects.SPEED, buffTicks, 0), owner);
             target.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION, buffTicks, 0), owner);

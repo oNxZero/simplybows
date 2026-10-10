@@ -51,17 +51,12 @@ public class BeeBowItem extends SimplyBowItem {
         try {
             if (upgrades.runeEtching() == RuneEtching.PAIN
                     && RuneUseCooldown.isReady(serverWorld, ownerId, "bee-pain")) {
-                int quantity = Math.max(1, upgrades.stringLevel() + 1);
-                // Total fan damage ≈ ~20% of one normal Buzzkill shot when every bee lands.
-                float painDamageScale = 0.20F / quantity;
-                float painSpeed = Math.min(speed, 0.8F);
-                BeeArrowEntity.setPainHoming(true, painDamageScale);
+                BeeArrowEntity.setPainHoming(true, 1.0F);
                 try {
-                    this.shootFan(this, serverWorld, shooter, hand, stack, projectiles, painSpeed, SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), critical, target, quantity);
-                } finally {
-                    BeeArrowEntity.setPainHoming(false);
-                }
-                RuneUseCooldown.startForEffect(serverWorld, ownerId, "bee-pain", "bee", RuneUseCooldown.BURST_EFFECT_TICKS);
+                    this.shootAll(serverWorld, shooter, hand, stack, projectiles, Math.min(speed, 1.2F), SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), critical, target);
+                } finally { BeeArrowEntity.setPainHoming(false); }
+                // Buzzkill's shared cooldown applies its usual 3x multiplier.
+                RuneUseCooldown.start(serverWorld, ownerId, "bee-pain", "bee", 120);
                 return;
             }
             this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.buzzkill.arrowDivergence.get(), critical, target);
@@ -72,6 +67,9 @@ public class BeeBowItem extends SimplyBowItem {
 
     @Override
     protected ProjectileEntity createArrowEntity(World world, LivingEntity shooter, ItemStack weaponStack, ItemStack arrowStack, boolean critical) {
+        if (simplybows$isForcingVanillaArrow()) {
+            return super.createArrowEntity(world, shooter, weaponStack, arrowStack, critical);
+        }
         ItemStack firedArrowStack = arrowStack;
         if (firedArrowStack == null || firedArrowStack.isEmpty()) {
             firedArrowStack = new ItemStack(Items.ARROW);

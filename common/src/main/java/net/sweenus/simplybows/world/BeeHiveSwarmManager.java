@@ -81,7 +81,7 @@ public final class BeeHiveSwarmManager {
         long expiry = now + (long) beeCount * BEE_INTERVAL_TICKS;
 
         BeeHiveVisualEntity visual = new BeeHiveVisualEntity(world, hiveCenter.x, hiveCenter.y, hiveCenter.z);
-        visual.setHeightScale(1.0F);
+        visual.setHeightScale(0.0F);
         visual.addCommandTag(HIVE_VISUAL_TAG);
         UUID visualId = null;
         if (world.spawnEntity(visual)) {
@@ -119,7 +119,7 @@ public final class BeeHiveSwarmManager {
             ActiveHive hive = it.next();
             Entity visual = hive.visualId == null ? null : world.getEntity(hive.visualId);
             if (visual instanceof BeeHiveVisualEntity beeVisual) {
-                beeVisual.setHeightScale(1.0F);
+                beeVisual.setHeightScale((float)Math.min(1,(world.getTime()-hive.spawnTick)/8.0) * (float)Math.min(1,Math.max(0,hive.expiryTick+12-world.getTime())/12.0));
                 beeVisual.setPos(hive.center.x, hive.center.y, hive.center.z);
             }
 
@@ -141,7 +141,8 @@ public final class BeeHiveSwarmManager {
                 world.spawnParticles(ParticleTypes.POOF, hive.center.x, hive.center.y + 0.2, hive.center.z, 1, 0.15, 0.05, 0.15, 0.0);
             }
 
-            if (hive.beesRemaining <= 0 && world.getTime() >= hive.expiryTick) {
+            if (hive.beesRemaining <= 0 && world.getTime() >= hive.expiryTick+12) {
+                BowEffectSounds.end(world,hive.center,BowEffectSounds.Theme.BEE);
                 if (visual != null) {
                     visual.discard();
                 }
@@ -221,6 +222,7 @@ public final class BeeHiveSwarmManager {
         private final float beeDamage;
         private final UUID visualId;
         private final long expiryTick;
+        private final long spawnTick;
         private int beesRemaining;
         private long nextBeeTick;
 
@@ -232,7 +234,7 @@ public final class BeeHiveSwarmManager {
             this.beeCount = beeCount;
             this.beeDamage = beeDamage;
             this.visualId = visualId;
-            this.expiryTick = expiryTick;
+            this.expiryTick = expiryTick; this.spawnTick=spawnTick;
             this.beesRemaining = beeCount;
             this.nextBeeTick = nextBeeTick;
         }

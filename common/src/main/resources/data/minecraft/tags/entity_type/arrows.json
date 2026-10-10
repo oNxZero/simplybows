@@ -1,0 +1,13 @@
+{
+  "replace": false,
+  "values": [
+    "simplybows:homing_arrow",
+    "simplybows:homing_spectral_arrow",
+    "simplybows:vine_arrow",
+    "simplybows:bubble_arrow",
+    "simplybows:bubble_pain_arrow",
+    "simplybows:bee_arrow",
+    "simplybows:blossom_arrow",
+    "simplybows:earth_arrow"
+  ]
+}

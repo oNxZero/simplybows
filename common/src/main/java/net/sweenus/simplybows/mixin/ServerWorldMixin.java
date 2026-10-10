@@ -43,6 +43,7 @@ public abstract class ServerWorldMixin {
     private void simplybows$tickVineFields(BooleanSupplier shouldKeepTicking, CallbackInfo ci) {
         ServerWorld world = (ServerWorld) (Object) this;
         net.sweenus.simplybows.world.IcePrisonManager.tick(world);
+        net.sweenus.simplybows.world.StoneRootManager.tick(world);
         net.sweenus.simplybows.world.IceFrostSlowManager.tick(world);
         if (VineFlowerFieldManager.hasActive(world)) {
             VineFlowerFieldManager.tick(world);

@@ -40,6 +40,7 @@ public class BlossomArrowEntity extends ArrowEntity {
         this.prevY = owner.getEyeY() - 0.1;
         this.prevZ = owner.getZ();
         this.upgrades = BowUpgradeData.from(weaponStack);
+        net.sweenus.simplybows.util.BowProjectileEnchantments.initialize(this, weaponStack, arrowStack);
     }
 
     @Override

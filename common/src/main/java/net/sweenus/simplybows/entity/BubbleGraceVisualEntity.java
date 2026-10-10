@@ -84,4 +84,19 @@ public class BubbleGraceVisualEntity extends Entity {
         nbt.putFloat("radius", this.getRadius());
         nbt.putFloat("column_height", this.getColumnHeight());
     }
+    @Override public void tick() {
+        super.tick();
+        if(getWorld().isClient && age%3==0) {
+            double fade=Math.max(0,Math.min(1,getHeightScale()));
+            for(int i=0;i<20;i++) {
+                double angle=i*Math.PI/10+age*.025;
+                double ring=getRadius()*fade*(i%2==0 ? 1 : .65);
+                getWorld().addParticle(net.minecraft.particle.ParticleTypes.BUBBLE_POP,
+                    getX()+Math.cos(angle)*ring,getY()+.08,getZ()+Math.sin(angle)*ring,0,.025,0);
+                if(i%4==0) getWorld().addParticle(net.minecraft.particle.ParticleTypes.SPLASH,
+                    getX()+Math.cos(angle)*ring,getY()+.12,getZ()+Math.sin(angle)*ring,0,.03,0);
+            }
+        }
+    }
+
 }

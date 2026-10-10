@@ -103,6 +103,7 @@ public final class BubbleChaosWaveManager {
 
         int step = wave.currentStep++;
         if (step > wave.maxSteps) {
+            BowEffectSounds.splash(world,wave.start.add(wave.forward.multiply(wave.maxTravel)));
             return true;
         }
 
@@ -113,7 +114,7 @@ public final class BubbleChaosWaveManager {
         applyWaveDamage(world, center, wave);
 
         if (step % 2 == 0) {
-            world.playSound(null, center.x, center.y, center.z, SoundEvents.ENTITY_PLAYER_SPLASH, SoundCategory.PLAYERS, 0.35F, 1.15F + world.random.nextFloat() * 0.15F);
+            BowEffectSounds.hit(world, center, BowEffectSounds.Theme.WATER);
         }
         return step > wave.maxSteps;
     }

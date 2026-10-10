@@ -87,7 +87,7 @@ public class IceBowItem extends SimplyBowItem {
         }
         if (painReady) quantity = net.sweenus.simplybows.util.WinterfangAbilityRules.painArrowCount(upgrades.stringLevel());
         // Soft Frame curve — global 0.55/level made headshots nuclear vs abilities.
-        double damageMultiplier = 1.0 + upgrades.frameLevel() * 0.18;
+        double damageMultiplier = net.sweenus.simplybows.util.WinterfangAbilityRules.arrowDamageMultiplier(rune, upgrades.frameLevel());
 
         NbtCompound customData = getOrCreateCustomData(stack);
         customData.putDouble(NBT_DAMAGE_MULTIPLIER, damageMultiplier);
@@ -114,7 +114,7 @@ public class IceBowItem extends SimplyBowItem {
             int graceCd = RuneUseCooldown.fromEffectDuration(IceFrostBloomManager.graceZoneDurationTicks()) * 2;
             RuneUseCooldown.start(serverWorld, ownerId, "ice-grace", "ice", graceCd);
         } else if (bountyReady) {
-            RuneUseCooldown.start(serverWorld, ownerId, "ice-bounty", "ice");
+            RuneUseCooldown.start(serverWorld, ownerId, "ice-bounty", "ice", net.sweenus.simplybows.util.WinterfangAbilityRules.bountyCooldownTicks(upgrades.frameLevel()));
         }
 
         if (painReady) PAIN_VOLLEY.set(new net.sweenus.simplybows.world.IcePainVolley(serverWorld, shooter));
@@ -123,8 +123,7 @@ public class IceBowItem extends SimplyBowItem {
         if (chaosWallReady) {
             this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.chaosWallArrowDivergence.get() * 0.01F, false, livingEntity);
         } else if (rune == RuneEtching.BOUNTY || rune == RuneEtching.GRACE) {
-            this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get()
-                    * (rune == RuneEtching.BOUNTY ? 1 + upgrades.stringLevel() * 0.05F : 1), 0.0F, false, livingEntity);
+            this.shootAll(serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), 0.0F, false, livingEntity);
         } else {
             this.shootFan(this, serverWorld, shooter, hand, stack, list, f * SimplyBowsConfig.INSTANCE.winterfang.arrowSpeed.get(), SimplyBowsConfig.INSTANCE.winterfang.arrowDivergence.get(), false, livingEntity, quantity);
         }
@@ -194,7 +193,7 @@ public class IceBowItem extends SimplyBowItem {
             if (chaosWallOnImpact) {
                 spectralArrow.setChaosWallUpgradeLevels(chaosWallStringLevel, chaosWallFrameLevel);
             }
-            if (stackSlow || BowUpgradeData.from(weaponStack).runeEtching() == RuneEtching.BOUNTY) spectralArrow.setHomingEnabled(false);
+            if (BowUpgradeData.from(weaponStack).runeEtching() == RuneEtching.BOUNTY) spectralArrow.setHomingEnabled(false);
             if (stackSlow) spectralArrow.setGraceSanctuaryEnabled(customData != null && customData.copyNbt().getBoolean("simplybows_ice_grace_ready"), frameLevel);
             var volley = PAIN_VOLLEY.get();
             if (painFrost && volley != null) {
@@ -220,7 +219,7 @@ public class IceBowItem extends SimplyBowItem {
             if (chaosWallOnImpact) {
                 homingArrow.setChaosWallUpgradeLevels(chaosWallStringLevel, chaosWallFrameLevel);
             }
-            if (stackSlow || BowUpgradeData.from(weaponStack).runeEtching() == RuneEtching.BOUNTY) homingArrow.setHomingEnabled(false);
+            if (BowUpgradeData.from(weaponStack).runeEtching() == RuneEtching.BOUNTY) homingArrow.setHomingEnabled(false);
             if (stackSlow) homingArrow.setGraceSanctuaryEnabled(customData != null && customData.copyNbt().getBoolean("simplybows_ice_grace_ready"), frameLevel);
             var volley = PAIN_VOLLEY.get();
             if (painFrost && volley != null) {

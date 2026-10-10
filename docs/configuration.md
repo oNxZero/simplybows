@@ -37,8 +37,8 @@ Shared upgrade formulas: size = `1 + String × sizeMultiplierPerString`; damage 
 | `winterfang.painFrostDamageMultiplier` | `0.175` | `0.0` | `10.0` | Pain impact splash damage multiplier. Frost applies Slowness III for five seconds. |
 | `winterfang.graceSlownessDuration` | `200` | `1` | `600` | Legacy key: unused. Grace is a harmless support sanctuary. |
 | `winterfang.graceMaxSlownessStacks` | `4` | `0` | `10` | Legacy key: unused. Grace no longer applies enemy debuffs. |
-| `winterfang.bountyFrostRadius` | `3.75` | `1.0` | `14.0` | Legacy key: unused. Bounty now freezes the struck target for exactly three seconds. |
-| `winterfang.bountyFrostRadiusPerString` | `0.4` | `0.0` | `3.0` | Legacy key: unused. Bounty String now adds 5% base shot speed per level. |
+| `winterfang.bountyFrostRadius` | `3.75` | `1.0` | `14.0` | Legacy key: unused. Bounty freezes the struck target for 3 seconds plus 0.5 seconds per String. |
+| `winterfang.bountyFrostRadiusPerString` | `0.4` | `0.0` | `3.0` | Legacy key: unused. Bounty String now adds 0.5 seconds of freeze duration per level. |
 | `winterfang.bountyFrostDamageMultiplier` | `0.14` | `0.05` | `5.0` | Legacy key: unused. Bounty no longer produces frost damage pulses. |
 | `winterfang.bountyFrostPulseCount` | `3` | `1` | `8` | Legacy key: unused. Bounty no longer emits frost pulses. |
 | `winterfang.chaosWallDurationTicks` | `160` | `20` | `1200` | How long the Chaos ice wall remains active before melting. |
@@ -239,10 +239,10 @@ Shared upgrade formulas: size = `1 + String × sizeMultiplierPerString`; damage 
 | :--- | :--- | :--- | :--- | :--- |
 | `loot.baseStringChance` | `20.0` | `0.0` | `1000.0` | Base chest drop chance for Enchanted String upgrades. Example: 20 = 2.0%. |
 | `loot.baseFrameChance` | `20.0` | `0.0` | `1000.0` | Base chest drop chance for Reinforced Frame upgrades. Example: 20 = 2.0%. |
-| `loot.baseRuneChance` | `3.0` | `0.0` | `1000.0` | Base chest drop chance for rune upgrade items. Example: 3 = 0.3%. |
+| `loot.baseRuneChance` | `30.0` | `0.0` | `1000.0` | Base chest drop chance for rune upgrade items. Example: 30 = 3.0%. |
 | `loot.baseUniqueBowChance` | `50.0` | `0.0` | `1000.0` | Chance for one random unique bow in vanilla and modded loot chests. Example: 50 = 5.0%. |
 | `loot.boostedBowChance` | `15.0` | `0.0` | `1000.0` | Structure-specific boosted drop chance for selected bows. Example: 15 = 1.5%. |
-| `loot.boostedRuneChanceAncientCity` | `20.0` | `0.0` | `1000.0` | Boosted rune drop chance in Ancient City chests. Example: 20 = 2.0%. |
+| `loot.boostedRuneChanceAncientCity` | `30.0` | `0.0` | `1000.0` | Additional independent rune drop chance in Ancient City chests. Example: 30 = 3.0%. |
 
 ## upgrades
 
@@ -274,3 +274,7 @@ Shared upgrade formulas: size = `1 + String × sizeMultiplierPerString`; damage 
 | `general.nonPlayerBowDamageToPlayersModifier` | `0.5` | `0.0` | `100.0` | Extra multiplier applied when a mob's bow damages a player. |
 
 Coverage: **212 validated settings** across 9 sections. ConfigGroup objects and static constants are not user-editable validated settings.
+
+### Replaced rune settings
+
+The new formation variants use `RuneEffectRules` for their timing and damage. Old Tremorstrike Chaos sunder and Bounty center multipliers, Buzzkill Pain volley settings, Bubbleveil Pain volley scaling, and Petalwind Bounty tracking-storm settings no longer tune the replaced formations. Existing config keys remain readable for backward compatibility. Direct projectile base damage, speeds/divergence, common upgrade slots, friendly-fire rules and external ability damage modifiers still apply. See [bows.md](bows.md#new-rune-formations) for current scaling.

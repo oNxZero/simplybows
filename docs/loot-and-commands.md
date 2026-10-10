@@ -11,9 +11,9 @@ Eligible loot tables have a chest context or a path beginning with `chests/`. Gl
 | Random bow | 50 | 5% |
 | String | 20 | 2% |
 | Frame | 20 | 2% |
-| Random rune | 3 | 0.3% |
+| Random rune | 30 | 3% |
 | Additional structure bow | 15 | 1.5% |
-| Additional Ancient City rune | 20 | 2% |
+| Additional Ancient City rune | 30 | 3% |
 
 **All chance settings divide by 1000.** `1` means 0.1%, `0.5` means 0.05%, and `1000` means 100%. The former raw-probability exception is removed. Convert a legacy raw chance by multiplying it by 1000: old `0.02` becomes `20` to retain 2%. Current defaults remain unchanged.
 
@@ -73,3 +73,5 @@ Syntax: `/simplybows spawn_hostile [count] [bow] [rune]`. Count is 1–50. Rune 
 Mobs are selected from skeleton, stray, bogged, wither skeleton, and husk and placed within three blocks horizontally of the source. An unspecified bow is random; an unspecified rune has a 50% chance to be a random rune. Strings and Frames each receive a random level from 0–2. Test bows are unbreakable and do not drop; spawned mobs are persistent. Remove test mobs after testing.
 
 Mob bow use is configurable: enabled by default, a roll every 60 ticks with 50% firing chance, 0.5 ability damage and 0.5 projectile damage modifiers, with an extra 0.5 modifier for damage to players. These settings permit bow use; they do not guarantee every mob's AI behaves like a skeleton.
+
+For existing worlds, set `loot.baseRuneChance = 30`, `loot.baseUniqueBowChance = 50`, and `loot.boostedRuneChanceAncientCity = 30` in the server config: updating the jar does not overwrite saved settings. Ancient City rune rolls are independent, giving a 5.91% chance of at least one rune and a 0.09% chance of two.

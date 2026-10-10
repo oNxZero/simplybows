@@ -63,6 +63,20 @@ public abstract class TooltipRendererMixin {
         return original.call(context, font, text, x, y, color, shadow);
     }
 
+    @WrapOperation(method = RENDER_WITH_COMPONENTS, at = @At(value = "INVOKE",
+            target = "Lnet/sweenus/simplytooltips/client/render/PipAnimator;drawAnimatedPip(Lnet/minecraft/class_332;IIIZJI)V"), remap = false)
+    private static void simplybows$squareLevelPips(DrawContext context, int x, int y, int color,
+            boolean filled, long elapsed, int sequence, Operation<Void> original,
+            @Local(argsOnly = true) TooltipProvider provider) {
+        if (!(provider instanceof SimplyBowsTooltipProvider)) {
+            original.call(context, x, y, color, filled, elapsed, sequence);
+            return;
+        }
+        int opaque = color | 0xFF000000;
+        context.fill(x, y, x + 5, y + 5, opaque);
+        if (filled) context.fill(x, y, x + 5, y + 1, 0xFFBBDFFF);
+    }
+
     @ModifyVariable(method = RENDER_WITH_COMPONENTS, at = @At("HEAD"), argsOnly = true, ordinal = 0, remap = false)
     private static List<Text> simplybows$pageCacheKey(List<Text> rawLines,
             @Local(argsOnly = true) ItemStack stack,

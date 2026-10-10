@@ -74,7 +74,6 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
             } else {
                 pages.add(new Page("Bow Description", overview));
             }
-            appendEnchantmentLines(overview, rawLines);
             pages.add(new Page("Upgrade Description", net.sweenus.simplybows.util.BowUpgradeTooltip.previewLines(bowKey, upgrades)));
             var player = net.minecraft.client.MinecraftClient.getInstance().player;
             pages.add(new Page("Combat Stats", net.sweenus.simplybows.util.BowCombatStats.lines(bowKey, upgrades,
@@ -104,11 +103,12 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
             var theme = TooltipTheme.defaultTheme();
             int maxSlots = BowUpgradeData.getMaxTotalUpgradeSlots();
             int maxLevel = BowUpgradeData.getMaxLevelPerType();
-            var rows = List.of(
+            var rows = new ArrayList<net.sweenus.simplytooltips.api.UpgradeRow>(List.of(
                     new net.sweenus.simplytooltips.api.UpgradeRow("◇", "String", theme.stringColor(), upgrades.stringLevel(),
                             Math.max(0, Math.min(maxLevel, maxSlots - upgrades.frameLevel())), altDown ? net.sweenus.simplybows.util.BowUpgradeTooltip.stringGain(bowKey, upgrades) : ""),
                     new net.sweenus.simplytooltips.api.UpgradeRow("◇", "Frame", theme.frameColor(), upgrades.frameLevel(),
-                            Math.max(0, Math.min(maxLevel, maxSlots - upgrades.stringLevel())), altDown ? net.sweenus.simplybows.util.BowUpgradeTooltip.frameGain(bowKey, upgrades) : ""));
+                            Math.max(0, Math.min(maxLevel, maxSlots - upgrades.stringLevel())), altDown ? net.sweenus.simplybows.util.BowUpgradeTooltip.frameGain(bowKey, upgrades) : "")));
+            appendEnchantmentRows(stack, rows, bowColor(bowKey));
             var rune = new net.sweenus.simplytooltips.api.UpgradeRune(
                     Text.translatable("tooltip.simplybows.rune." + upgrades.runeEtching().id()).getString(),
                     upgrades.runeEtching() == RuneEtching.NONE, theme.runeColor(), List.of());
@@ -117,7 +117,7 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
         }
         return new ModernTooltipModel(stack.getName().getString(), List.of(stack.getItem() instanceof SimplyBowItem ? "UNIQUE BOW" : "BOW UPGRADE"), TooltipBorderStyle.DEFAULT,
                 lines, List.of(), List.of(), TooltipTheme.defaultTheme(), upgradeSection,
-                "|page:" + pageIndex + "|" + upgrades, bowKey,
+                "|page:" + pageIndex + "|" + upgrades + "|ench:" + stack.getOrDefault(net.minecraft.component.DataComponentTypes.ENCHANTMENTS, net.minecraft.component.type.ItemEnchantmentsComponent.DEFAULT), bowKey,
                 null);
     }
 
@@ -200,53 +200,25 @@ public final class SimplyBowsTooltipProvider implements TooltipProvider {
         return pageIndex;
     }
 
-    private static void appendEnchantmentLines(List<String> abilityLines, List<Text> rawLines) {
-        List<String> enchantmentLines = getEnchantmentLines(rawLines);
-        if (enchantmentLines.isEmpty()) {
-            return;
-        }
-
-        abilityLines.add(ModernTooltipModel.SECTION_MARKER + "Enchantments");
-        abilityLines.addAll(enchantmentLines);
-    }
-
-    private static List<String> getEnchantmentLines(List<Text> rawLines) {
-        if (rawLines.size() < 2) return List.of();
-
-        String holdAltText = Text.translatable("tooltip.simplybows.hold_alt").getString().trim();
-        boolean afterBowSections = false;
-        boolean inAttributeBlock = false;
-        List<String> result = new ArrayList<>();
-
-        for (int i = 1; i < rawLines.size(); i++) {
-            Text line = rawLines.get(i);
-            String trimmed = line.getString().trim();
-
-            if (!afterBowSections) {
-                if (trimmed.equals(holdAltText)) {
-                    afterBowSections = true;
-                }
-                continue;
-            }
-
-            if (trimmed.isEmpty()) {
-                inAttributeBlock = false;
-                continue;
-            }
-            if (isAttributeContextLine(line)) {
-                inAttributeBlock = true;
-                continue;
-            }
-            if (inAttributeBlock) {
-                continue;
-            }
-
-            if (!trimmed.isEmpty()) {
-                result.add(trimmed);
-            }
-        }
-
-        return result;
+    private static void appendEnchantmentRows(ItemStack stack,
+            List<net.sweenus.simplytooltips.api.UpgradeRow> rows, int color) {
+        var enchantments = stack.getOrDefault(net.minecraft.component.DataComponentTypes.ENCHANTMENTS,
+                net.minecraft.component.type.ItemEnchantmentsComponent.DEFAULT);
+        enchantments.getEnchantmentEntries().stream()
+                .sorted(java.util.Comparator.comparing(entry -> entry.getKey().value().description().getString()))
+                .forEach(entry -> {
+                    int level = entry.getIntValue();
+                    if (level <= 0) return;
+                    var enchantment = entry.getKey().value();
+                    String name = enchantment.description().getString();
+                    // Keep command-created levels readable without an enormous tooltip.
+                    if (level > 10) name += " (" + level + ")";
+                    int max = Math.min(10, Math.max(level, enchantment.getMaxLevel()));
+                    boolean curse = entry.getKey().isIn(net.minecraft.registry.tag.EnchantmentTags.CURSE);
+                    rows.add(new net.sweenus.simplytooltips.api.UpgradeRow("◇", name,
+                            curse ? 0xFFFF5555 : color, Math.min(level, 10), max,
+                            "Level " + level + " / " + enchantment.getMaxLevel()));
+                });
     }
 
     private static boolean isAttributeContextLine(Text line) {

@@ -98,7 +98,7 @@ public final class BeeChaosHoneyStormManager {
         }
 
         world.playSound(null, cloudCenter.x, cloudCenter.y, cloudCenter.z, SoundEvents.ITEM_HONEY_BOTTLE_DRINK, SoundCategory.PLAYERS, 0.8F, 0.8F + world.random.nextFloat() * 0.1F);
-        world.playSound(null, cloudCenter.x, cloudCenter.y, cloudCenter.z, SoundEvents.ENTITY_BEE_LOOP, SoundCategory.PLAYERS, 0.9F, 0.85F + world.random.nextFloat() * 0.1F);
+        world.playSound(null, cloudCenter.x, cloudCenter.y, cloudCenter.z, SoundEvents.ENTITY_BEE_POLLINATE, SoundCategory.PLAYERS, 0.9F, 0.85F + world.random.nextFloat() * 0.1F);
         world.spawnParticles(ParticleTypes.FALLING_HONEY, cloudCenter.x, cloudCenter.y, cloudCenter.z, 18, radius * 0.2, 0.2, radius * 0.2, 0.01);
         world.spawnParticles(ParticleTypes.POOF, cloudCenter.x, cloudCenter.y, cloudCenter.z, 24, radius * 0.4, 0.2, radius * 0.4, 0.01);
         world.spawnParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE, cloudCenter.x, cloudCenter.y + 0.2, cloudCenter.z, 16, radius * 0.35, 0.12, radius * 0.35, 0.01);
@@ -237,7 +237,7 @@ public final class BeeChaosHoneyStormManager {
         world.spawnEntity(diveBee);
 
         world.spawnParticles(ParticleTypes.CRIT, start.x, start.y, start.z, 4, 0.06, 0.06, 0.06, 0.0);
-        world.playSound(null, start.x, start.y, start.z, SoundEvents.ENTITY_BEE_LOOP, SoundCategory.PLAYERS, 0.4F, 1.25F + world.random.nextFloat() * 0.15F);
+        world.playSound(null, start.x, start.y, start.z, SoundEvents.ENTITY_BEE_POLLINATE, SoundCategory.PLAYERS, 0.4F, 1.25F + world.random.nextFloat() * 0.15F);
     }
 
     private static void spawnAmbientParticles(ServerWorld world, ActiveHoneyStorm storm, float presence) {

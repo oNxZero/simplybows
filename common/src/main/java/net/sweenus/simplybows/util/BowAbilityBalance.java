@@ -16,16 +16,20 @@ public final class BowAbilityBalance {
     public static float petalDamageScale(RuneEtching rune, int frame) {
         return switch (rune) {
             case NONE -> 0.5F;
-            case PAIN -> 0.35F;
+            case PAIN -> 0.14F;
             case BOUNTY -> 0.7F * petalBonusScale(rune, frame);
             case GRACE -> 0.0F;
             case CHAOS -> 1.0F;
         };
     }
 
+    public static double petalFrameMultiplier(RuneEtching rune,int frame,double ordinary) {
+        return rune==RuneEtching.PAIN ? 1+.1*Math.max(0,Math.min(5,frame)) : ordinary;
+    }
     public static float petalBonusScale(RuneEtching rune, int frame) {
         return switch (rune) {
             case NONE -> 0.5F;
+            case PAIN -> .4F;
             case BOUNTY -> 1.0F - 0.06F * Math.max(0, Math.min(5, frame));
             case GRACE -> 0.0F;
             default -> 1.0F;

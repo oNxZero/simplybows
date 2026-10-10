@@ -26,17 +26,15 @@ public final class BowCombatStats {
                 speed = 3 * cfg.everbloom.arrowSpeedMultiplier.get() * (1 + s * 0.05);
             }
             case "ice" -> {
-                power = cfg.winterfang.baseDamage.get() * (1 + f * 0.18) * (r == RuneEtching.GRACE ? 0 : 1);
+                power = cfg.winterfang.baseDamage.get() * WinterfangAbilityRules.arrowDamageMultiplier(r, f);
                 speed = 3 * cfg.winterfang.arrowSpeed.get();
                 count = r == RuneEtching.NONE ? cfg.winterfang.baseQuantity.get() + s : r == RuneEtching.PAIN ? 1 + s : 1;
-                if (r == RuneEtching.BOUNTY) speed *= 1 + s * 0.05;
             }
             case "bubble" -> {
                 power = cfg.bubbleveil.baseDamage.get() * (1 + f * cfg.upgrades.damageMultiplierPerFrame.get() * 0.5);
                 speed = 3 * cfg.bubbleveil.arrowSpeedMultiplier.get();
                 if (r == RuneEtching.PAIN) {
-                    count = Math.max(1, s + 1);
-                    power *= BowAbilityBalance.bubblePainVolleyScale(s) / count;
+                    count = 1;
                     // Pain uses different speeds on land and in water; show both below.
                     speed = 3 * cfg.bubbleveil.painShotSpeedLand.get();
                 }
@@ -45,9 +43,8 @@ public final class BowCombatStats {
                 power = cfg.buzzkill.baseDamage.get() * u.damageMultiplier() * (r == RuneEtching.BOUNTY ? 0.5 : 1);
                 speed = 3 * cfg.buzzkill.arrowSpeedMultiplier.get();
                 if (r == RuneEtching.PAIN) {
-                    count = Math.max(1, s + 1);
-                    power *= Math.max(0.05, 0.20 / count);
-                    speed = Math.min(speed, 0.8);
+                    count = 1;
+                    speed = Math.min(speed, 1.2);
                 }
             }
             case "blossom" -> { power = cfg.petalwind.baseDamage.get(); speed = 3 * cfg.petalwind.arrowSpeedMultiplier.get(); }
@@ -66,7 +63,7 @@ public final class BowCombatStats {
             out.add("Arrow damage (about): " + hit + (count > 1 ? " per projectile" : ""));
             if (count > 1) out.add("Projectiles per shot: " + count);
             if (bow.equals("bubble") && r == RuneEtching.PAIN) {
-                out.add("Underwater hit damage: about " + (int) Math.ceil(3 * cfg.bubbleveil.painShotSpeedWater.get() * (power + projectileBonus)) + " per axolotl");
+                out.add("Underwater hit damage: about " + (int) Math.ceil(3 * cfg.bubbleveil.painShotSpeedWater.get() * (power + projectileBonus)) + "");
             }
             boolean crit = !bow.equals("ice") && !(bow.equals("bee") && r == RuneEtching.BOUNTY);
             out.add(crit ? "Critical hit: adds 0 to " + (hit / 2 + 1) + " damage"
@@ -79,7 +76,7 @@ public final class BowCombatStats {
         } else if (r == RuneEtching.GRACE) {
             out.add(switch (bow) {
                 case "ice" -> "No direct damage. Creates a sanctuary with Resistance I, Speed I, and Regeneration I.";
-                case "bubble" -> "No direct damage. Creates a protective column that grants Resistance II.";
+                case "bubble" -> "No direct damage. Creates a restorative water ward with Resistance II and Regeneration I.";
                 case "bee" -> "No direct damage. Sends protection bees; each sting grants Resistance II for 3s.";
                 case "blossom" -> "No direct damage. Creates a puddle that grants Strength II for " + seconds(100 + f * 20) + ".";
                 case "earth" -> "No direct damage. Grants Absorption III: 6 extra hearts for 6s, and creates the protective wall.";
@@ -126,9 +123,9 @@ public final class BowCombatStats {
             double undead = bounty ? (0.3 + f * 0.1) * 0.125 : c.undeadBonusDamage.get() * u.damageMultiplier() * (r == RuneEtching.PAIN ? BowAbilityBalance.EVERBLOOM_PAIN_DAMAGE_SCALE : 1);
             double scaledBonus = bonus * (bounty ? 0.5 : r == RuneEtching.PAIN ? BowAbilityBalance.EVERBLOOM_PAIN_BONUS_SCALE : 1);
             out.add((bounty ? "Damage per tree bolt: " : "Damage per pulse: ") + num(damage + scaledBonus));
-            out.add("Against undead: " + num(damage + undead + scaledBonus * (bounty ? 2 : 1)) + " damage");
+            out.add("Against undead: " + num(damage + undead + scaledBonus) + " damage");
             interval(out, Math.max(5, r == RuneEtching.PAIN ? c.painAuraInterval.get() : bounty ? c.bountyAuraInterval.get() : c.auraIntervalTicks.get()));
-            if (bounty) out.add("Trees: 3, each attacks a different nearby enemy.");
+            if (bounty) { out.add("Trees: 3, each attacks a different nearby enemy."); out.add("Travelling magic bolts ignore armor."); }
             if (r == RuneEtching.PAIN) out.add("Rose damage bypasses armor. No lingering Wither after leaving.");
         }
         duration(out, c.fieldDurationTicks.get());
@@ -145,11 +142,14 @@ public final class BowCombatStats {
                 out.add("Frost: Slowness III for 5s. No lasting damage field.");
             }
             case BOUNTY -> {
-                out.add("Ice prison: 3s. No homing, no repeated damage.");
+                out.add("Ice prison: " + seconds(WinterfangAbilityRules.bountyFreezeTicks(u.stringLevel())) + ". No homing.");
+                out.add("Ability cooldown: " + seconds(WinterfangAbilityRules.bountyCooldownTicks(u.frameLevel())) + ".");
+                out.add("Frost I: Slowness I for 10s from impact. Released shards apply Frost I / Slowness I for 5s.");
+                out.add("Prison damage: " + num(WinterfangAbilityRules.bountyDamagePerPulse(u.frameLevel())) + " every 1s while trapped.");
                 out.add("Struck enemy cannot move, attack, or use items while frozen.");
             }
             case GRACE -> {
-                out.add("Sanctuary lasts: 7s");
+                out.add("Sanctuary lasts: 7s. Supports nearby players, animals, villagers and golems.");
                 out.add("Resistance I, Speed I, Regeneration I: refreshed for " + seconds(100 + u.frameLevel() * 20) + " while inside.");
                 out.add("Regeneration I heals half a heart every 2.5s.");
                 out.add("No damage or harmful effects against enemies.");
@@ -164,6 +164,7 @@ public final class BowCombatStats {
     }
 
     private static void bubble(List<String> out, BowUpgradeData u, double bonus) {
+        if (RuneEffectRules.kind("bubble", u.runeEtching()) >= 0) { out.addAll(formationLines("bubble", u, bonus)); return; }
         var c = SimplyBowsConfig.INSTANCE.bubbleveil;
         int duration = c.columnDurationTicks.get() + u.stringLevel() * c.columnDurationBonusPerString.get();
         switch (u.runeEtching()) {
@@ -174,7 +175,7 @@ public final class BowCombatStats {
             case GRACE -> {
                 duration(out, duration);
                 out.add("Resistance II: refreshed for " + seconds(c.graceResistanceDuration.get()) + ".");
-                out.add("Slows enemies and blocks incoming shots.");
+                out.add("Regeneration I: refreshed for 4s. Blocks hostile projectiles.");
             }
             case CHAOS -> {
                 out.add("Wave hit damage: " + num(c.chaosBaseDamage.get() + u.frameLevel() * c.chaosDamagePerFrame.get() * 0.5 + bonus));
@@ -188,6 +189,7 @@ public final class BowCombatStats {
     }
 
     private static void bee(List<String> out, BowUpgradeData u, double bonus) {
+        if (RuneEffectRules.kind("bee", u.runeEtching()) >= 0) { out.addAll(formationLines("bee", u, bonus)); return; }
         var c = SimplyBowsConfig.INSTANCE.buzzkill;
         int f = u.frameLevel(), s = u.stringLevel();
         switch (u.runeEtching()) {
@@ -221,6 +223,7 @@ public final class BowCombatStats {
     }
 
     private static void blossom(List<String> out, BowUpgradeData u, double bonus) {
+        if (RuneEffectRules.kind("blossom", u.runeEtching()) >= 0) { out.addAll(formationLines("blossom", u, bonus)); return; }
         var c = SimplyBowsConfig.INSTANCE.petalwind;
         RuneEtching r = u.runeEtching();
         int f = u.frameLevel(), s = u.stringLevel();
@@ -235,7 +238,7 @@ public final class BowCombatStats {
             duration(out, Math.max(40, c.chaosDurationTicks.get() + f * c.chaosDurationPerFrameTicks.get()));
             out.add("Reflects incoming projectiles.");
         } else {
-            damage(out, c.stormDamage.get() * u.damageMultiplier() * BowAbilityBalance.petalDamageScale(r, f) + bonus * BowAbilityBalance.petalBonusScale(r, f));
+            damage(out, c.stormDamage.get() * BowAbilityBalance.petalFrameMultiplier(r, f, u.damageMultiplier()) * BowAbilityBalance.petalDamageScale(r, f) + bonus * BowAbilityBalance.petalBonusScale(r, f));
             interval(out, r == RuneEtching.PAIN ? Math.max(8, c.damageIntervalTicks.get() - 2) : c.damageIntervalTicks.get());
             duration(out, c.stormDurationTicks.get() + s * c.stormDurationBonusPerString.get() + (r == RuneEtching.PAIN ? 20 : 0));
             if (r == RuneEtching.BOUNTY) out.add("Separate storms: up to " + c.bountyMaxStorms.get());
@@ -243,6 +246,7 @@ public final class BowCombatStats {
     }
 
     private static void earth(List<String> out, BowUpgradeData u, double bonus) {
+        if (RuneEffectRules.kind("earth", u.runeEtching()) >= 0) { out.addAll(formationLines("earth", u, bonus)); return; }
         var c = SimplyBowsConfig.INSTANCE.tremorstrike;
         int f = u.frameLevel(), s = u.stringLevel();
         double damage = c.spikeDamage.get() * u.damageMultiplier();
@@ -269,6 +273,28 @@ public final class BowCombatStats {
             }
             default -> out.add("Spike burst damage: " + num(damage + bonus) + ". Knocks enemies upward.");
         }
+    }
+
+    public static List<String> formationLines(String bow, BowUpgradeData u, double bonus) {
+        int kind = RuneEffectRules.kind(bow, u.runeEtching());
+        if (kind < 0) return List.of();
+        List<String> out = new ArrayList<>();
+        double d = RuneEffectRules.damage(kind, u.frameLevel()) + bonus;
+        int duration = RuneEffectRules.duration(kind, u.stringLevel());
+        switch (kind) {
+            case RuneEffectRules.STONE -> { out.add("Crush damage: " + num(d)); out.add("Five pairs close in sequence. One hit per enemy. Roots movement for 5s."); }
+            case RuneEffectRules.STAR -> { out.add("Eruptions: 3, every 1.5s."); out.add("Damage per eruption: " + num(d)); out.add("The low star hill expands and contracts. Each cycle can hit once and launch enemies about 2 blocks."); }
+            case RuneEffectRules.SWARM -> { out.add("Sting damage: " + num(d) + " every 0.6s."); out.add("Stings: " + duration / 12); out.add("Total swarm damage: " + num(d * (duration / 12))); out.add("One homing shot attaches the swarm to one enemy."); }
+            case RuneEffectRules.VORTEX -> { out.add("Crystal volley damage: " + num(d) + " every 1s."); out.add("Pulses: " + duration / 20); out.add("Final burst: " + num(RuneEffectRules.finisher(u.frameLevel()) + bonus)); out.add("Ignores armor. Three falling crystals split the volley damage. Each splash reaches 2 blocks and gives Slowness I for 2s."); }
+            default -> { out.add("Homing blades: up to 3 different enemies."); out.add("Burst damage: " + num(d) + " per blade."); out.add("Pulls nearby enemies together, then releases a burst after 2s."); }
+        }
+        out.add("");
+        if (kind == RuneEffectRules.SWARM || kind == RuneEffectRules.VORTEX) out.add("Lasts: " + seconds(duration));
+        if (kind == RuneEffectRules.VORTEX) out.add("Rain radius: " + num(RuneEffectRules.radius(kind,u.stringLevel())) + " blocks");
+        else out.add((kind == RuneEffectRules.LOTUS ? "Finds enemies within: " : "Radius: ") + num(RuneEffectRules.radius(kind, u.stringLevel())) + " blocks");
+        out.add("Ability cooldown: " + seconds(RuneEffectRules.cooldown(kind, u.stringLevel())));
+        out.add("Ability damage is separate from Power, Punch and Flame.");
+        return out;
     }
 
     private static void damage(List<String> out, double value) { out.add("Damage per pulse: " + num(value)); }

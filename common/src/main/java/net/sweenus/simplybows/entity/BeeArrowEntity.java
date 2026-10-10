@@ -36,6 +36,7 @@ import net.sweenus.simplybows.world.RuneUseCooldown;
 import java.util.List;
 
 public class BeeArrowEntity extends ArrowEntity {
+    private final net.sweenus.simplybows.util.HomingPursuit pursuit = new net.sweenus.simplybows.util.HomingPursuit();
 
     private static int basePoisonDuration() { return SimplyBowsConfig.INSTANCE.buzzkill.basePoisonDuration.get(); }
     private static int stringPoisonDurationBonus() { return SimplyBowsConfig.INSTANCE.buzzkill.stringPoisonDurationBonus.get(); }
@@ -121,6 +122,7 @@ public class BeeArrowEntity extends ArrowEntity {
 
     public BeeArrowEntity(World world, LivingEntity owner, ItemStack arrowStack, ItemStack weaponStack) {
         this(world, owner, arrowStack, BowUpgradeData.from(weaponStack));
+        net.sweenus.simplybows.util.BowProjectileEnchantments.initialize(this, weaponStack, arrowStack);
     }
 
     public BeeArrowEntity(World world, LivingEntity owner, ItemStack arrowStack, BowUpgradeData upgrades) {
@@ -137,6 +139,11 @@ public class BeeArrowEntity extends ArrowEntity {
 
     @Override
     public void tick() {
+        // Also bound pursuit when teleports keep preventing any collision at all.
+        if (!this.inGround && this.painHoming && this.age >= 200) {
+            this.discard();
+            return;
+        }
         super.tick();
 
         if (!this.getWorld().isClient() && this.painHoming && !this.inGround) {
@@ -165,7 +172,7 @@ public class BeeArrowEntity extends ArrowEntity {
 
         if (this.getWorld() instanceof ServerWorld serverWorld && !this.spawnSoundPlayed) {
             this.spawnSoundPlayed = true;
-            serverWorld.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.ENTITY_BEE_HURT, SoundCategory.PLAYERS, 0.6F, 1.0F + this.random.nextFloat() * 0.2F);
+            serverWorld.playSound(null, this.getX(), this.getY(), this.getZ(), SoundEvents.ENTITY_BEE_POLLINATE, SoundCategory.PLAYERS, 0.4F, 1.0F + this.random.nextFloat() * 0.2F);
         }
 
         if (this.inGround && this.getWorld() instanceof ServerWorld serverWorld) {
@@ -205,6 +212,7 @@ public class BeeArrowEntity extends ArrowEntity {
             return;
         }
 
+        if (pursuit.targetTeleported(this.homingTarget)) { this.discard(); return; }
         this.setNoGravity(true);
         Vec3d targetPos = this.homingTarget.getPos().add(0.0, this.homingTarget.getStandingEyeHeight() * 0.65, 0.0);
         Vec3d direction = targetPos.subtract(this.getPos());
@@ -273,6 +281,15 @@ public class BeeArrowEntity extends ArrowEntity {
     }
 
     @Override
+    protected void onHit(LivingEntity target) {
+        super.onHit(target);
+        if (painHoming && !hiveBee && getWorld() instanceof ServerWorld world) {
+            net.sweenus.simplybows.world.RuneEffectManager.cast(world, net.sweenus.simplybows.util.RuneEffectRules.SWARM,
+                    target.getPos(), getOwner(), target, upgrades, false);
+        }
+    }
+
+    @Override
     protected void onEntityHit(EntityHitResult entityHitResult) {
         if (this.chaosDiveBomb) {
             if (this.getWorld() instanceof ServerWorld serverWorld) {
@@ -311,6 +328,11 @@ public class BeeArrowEntity extends ArrowEntity {
             livingEntity.timeUntilRegen = 0;
         }
         super.onEntityHit(entityHitResult);
+        // A homing shot gets one impact attempt, including rejected hits on modded enemies.
+        if (this.painHoming) {
+            this.discard();
+            return;
+        }
         if (!this.painHoming) {
             livingEntity.hurtTime = 0;
             livingEntity.timeUntilRegen = 0;
@@ -332,7 +354,7 @@ public class BeeArrowEntity extends ArrowEntity {
         }
 
         if (this.getWorld() instanceof ServerWorld serverWorld) {
-            serverWorld.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), SoundEvents.ENTITY_BEE_HURT, SoundCategory.PLAYERS, 0.9F, 0.95F + this.random.nextFloat() * 0.2F);
+            serverWorld.playSound(null, livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(), SoundEvents.ENTITY_BEE_STING, SoundCategory.PLAYERS, 0.9F, 0.95F + this.random.nextFloat() * 0.2F);
             serverWorld.spawnParticles(ParticleTypes.POOF, livingEntity.getX(), livingEntity.getBodyY(0.5), livingEntity.getZ(), 10, 0.15, 0.12, 0.15, 0.02);
             serverWorld.spawnParticles(ParticleTypes.FALLING_HONEY, livingEntity.getX(), livingEntity.getBodyY(0.5), livingEntity.getZ(), 8, 0.2, 0.2, 0.2, 0.0);
             serverWorld.spawnParticles(ParticleTypes.CRIT, livingEntity.getX(), livingEntity.getBodyY(0.5), livingEntity.getZ(), 6, 0.15, 0.15, 0.15, 0.02);
@@ -555,7 +577,7 @@ public class BeeArrowEntity extends ArrowEntity {
 
     @Override
     protected SoundEvent getHitSound() {
-        return SoundEvents.ENTITY_BEE_HURT;
+        return SoundEvents.ENTITY_BEE_STING;
     }
 
     private static ItemStack sanitizeArrowStack(ItemStack arrowStack) {

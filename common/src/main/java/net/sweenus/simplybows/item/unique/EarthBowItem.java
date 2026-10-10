@@ -12,7 +12,6 @@ import net.sweenus.simplybows.config.SimplyBowsConfig;
 import net.sweenus.simplybows.entity.EarthArrowEntity;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
-import net.sweenus.simplybows.world.EarthChaosSunderManager;
 import net.sweenus.simplybows.world.RuneUseCooldown;
 import org.jetbrains.annotations.Nullable;
 
@@ -38,20 +37,13 @@ public class EarthBowItem extends SimplyBowItem {
         UUID ownerId = shooter != null ? shooter.getUuid() : null;
         boolean chaosSunderReady = upgrades.runeEtching() == RuneEtching.CHAOS
                 && ownerId != null
-                && EarthChaosSunderManager.isSunderReady(serverWorld, ownerId);
-
-        if (upgrades.runeEtching() == RuneEtching.CHAOS && ownerId != null) {
-            int durationTicks = Math.max(200, Math.min(360,
-                    Math.max(200, SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationTicks.get())
-                            + Math.max(0, upgrades.stringLevel()) * Math.max(20, SimplyBowsConfig.INSTANCE.tremorstrike.chaosSunderDurationPerStringTicks.get())));
-            if (chaosSunderReady) {
-                simplybows$startAbilityItemCooldown(shooter, RuneUseCooldown.fromEffectDuration(durationTicks));
-            }
-        }
+                && RuneUseCooldown.isPlayerReady(serverWorld, ownerId);
 
         CHAOS_SUNDER_ON_IMPACT.set(chaosSunderReady);
         try {
             this.shootAll(serverWorld, shooter, hand, stack, projectiles, speed, SimplyBowsConfig.INSTANCE.tremorstrike.arrowDivergence.get(), critical, target);
+            if (chaosSunderReady) RuneUseCooldown.start(serverWorld, ownerId, "earth-chaos", "earth",
+                    net.sweenus.simplybows.util.RuneEffectRules.cooldown(0, upgrades.stringLevel()));
         } finally {
             CHAOS_SUNDER_ON_IMPACT.set(false);
         }
@@ -72,6 +64,7 @@ public class EarthBowItem extends SimplyBowItem {
         EarthArrowEntity arrowEntity = new EarthArrowEntity(world, shooter, firedArrowStack, weaponStack);
         arrowEntity.setDamage(SimplyBowsConfig.INSTANCE.tremorstrike.baseDamage.get() * upgrades.damageMultiplier());
         arrowEntity.setChaosSunderOnImpact(CHAOS_SUNDER_ON_IMPACT.get());
+        CHAOS_SUNDER_ON_IMPACT.set(false);
         //arrowEntity.setPunch(upgrades.bonusKnockback());
         arrowEntity.setCritical(critical);
         return arrowEntity;

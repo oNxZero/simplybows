@@ -17,7 +17,7 @@ def javap(jar, class_name, *flags):
 mix = javap(sys.argv[1], "net.sweenus.simplybows.mixin.client.TooltipRendererMixin", "-v")
 renderer = javap(sys.argv[2], "net.sweenus.simplytooltips.client.render.TooltipRenderer", "-s", "-c")
 selectors = re.findall(r'method=\["(render\([^"\n]+)"\]', mix)
-assert len(selectors) == 4, "All renderer injections must use explicit overload selectors"
+assert len(selectors) == 5, "All renderer injections must use explicit overload selectors"
 assert len(set(selectors)) == 1, "All renderer injections must target the same overload"
 descriptor = selectors[0][len("render"):]
 methods = re.split(r"\n  (?=(?:public|private|protected) )", renderer)

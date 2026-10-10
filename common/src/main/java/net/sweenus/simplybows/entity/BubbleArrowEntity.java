@@ -41,6 +41,7 @@ public class BubbleArrowEntity extends ArrowEntity {
         this.prevZ = owner.getZ();
         this.columnOwnerId = owner != null ? owner.getUuid() : null;
         this.columnUpgrades = BowUpgradeData.from(weaponStack);
+        net.sweenus.simplybows.util.BowProjectileEnchantments.initialize(this, weaponStack, arrowStack);
     }
 
     @Override

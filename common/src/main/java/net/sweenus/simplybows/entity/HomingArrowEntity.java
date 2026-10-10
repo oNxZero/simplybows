@@ -26,6 +26,7 @@ import java.util.List;
 import java.util.UUID;
 
 public class HomingArrowEntity extends ArrowEntity {
+    private final net.sweenus.simplybows.util.HomingPursuit pursuit = new net.sweenus.simplybows.util.HomingPursuit();
 
     private static double homingRadius() { return SimplyBowsConfig.INSTANCE.winterfang.homingRadius.get(); }
     private static double homingAccel() { return SimplyBowsConfig.INSTANCE.winterfang.homingAccel.get(); }
@@ -69,6 +70,7 @@ public class HomingArrowEntity extends ArrowEntity {
         this.prevX = owner.getX();
         this.prevY = owner.getEyeY() - 0.1;
         this.prevZ = owner.getZ();
+        net.sweenus.simplybows.util.BowProjectileEnchantments.initialize(this, weaponStack, arrowStack);
     }
 
     @Override
@@ -118,6 +120,11 @@ public class HomingArrowEntity extends ArrowEntity {
 
     @Override
     public void tick() {
+        // Also bound pursuit when teleports keep preventing any collision at all.
+        if (!this.inGround && this.homingEnabled && this.age >= 200) {
+            this.discard();
+            return;
+        }
         super.tick();
 
         if (!this.homingEnabled) {
@@ -176,6 +183,7 @@ public class HomingArrowEntity extends ArrowEntity {
             }
 
             // Adjust arrow trajectory toward the target
+            if (pursuit.targetTeleported(target)) { this.discard(); return; }
             if (target != null) {
                 adjustTrajectoryTowardTarget();
             }
@@ -189,8 +197,9 @@ public class HomingArrowEntity extends ArrowEntity {
         LivingEntity owner = this.getOwner() instanceof LivingEntity livingOwner ? livingOwner : null;
 
         List<LivingEntity> entities = getEntityWorld().getEntitiesByClass(LivingEntity.class, searchBox, entity ->
-                CombatTargeting.isOffensiveTargetCandidate(entity)
-                        && (owner == null || CombatTargeting.checkFriendlyFire(entity, owner)));
+                this.stackingSlowness
+                        ? entity instanceof net.minecraft.entity.player.PlayerEntity && entity!=owner
+                        : CombatTargeting.isOffensiveTargetCandidate(entity) && (owner == null || CombatTargeting.checkFriendlyFire(entity, owner)));
 
         if (!entities.isEmpty()) {
             // All fan arrows home the nearest hostile — avoid spreading onto empty air.
@@ -326,6 +335,8 @@ public class HomingArrowEntity extends ArrowEntity {
             spawnImpactParticles(serverWorld, target);
         }
         super.onHit(target);
+        if (!this.painFrostBloom && !this.bountyFrostBloom && !this.chaosWallOnImpact && !this.lockSingleTarget && getWorld() instanceof ServerWorld soundWorld)
+            net.sweenus.simplybows.world.BowEffectSounds.hit(soundWorld,target.getPos(),net.sweenus.simplybows.world.BowEffectSounds.Theme.FROST);
     }
 
     @Override
@@ -344,11 +355,16 @@ public class HomingArrowEntity extends ArrowEntity {
                 IceFrostBloomManager.spawnPainImpact(world, victim, owner, (float) this.getDamage(), this.painVolleyId);
                 this.spawnedFrostBloom = true;
             } else if (this.bountyFrostBloom) {
-                net.sweenus.simplybows.world.IcePrisonManager.freeze(world, owner, victim);
+                net.sweenus.simplybows.world.IcePrisonManager.freeze(world, owner, victim, this.frostStringLevel, this.frostFrameLevel);
                 this.spawnedFrostBloom = true;
             }
         }
         super.onEntityHit(entityHitResult);
+        // A homing shot gets one impact attempt, including rejected hits on modded enemies.
+        if (this.homingEnabled) {
+            this.discard();
+            return;
+        }
     }
 
     @Override

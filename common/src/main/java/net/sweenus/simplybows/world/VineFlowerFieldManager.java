@@ -922,11 +922,9 @@ public final class VineFlowerFieldManager {
             Vec3d tree = trees.get(i);
             Vec3d from = tree.add(0.0, 2.4, 0.0);
             Vec3d to = target.getPos().add(0.0, target.getStandingEyeHeight() * 0.6, 0.0);
-            spawnBountyTreeBolt(world, from, to);
-            CombatTargeting.applyAbilityDamage(world, owner, target, tuning.hostileDamage(), true, false, 0.5F, false);
-            if (target.getType().isIn(EntityTypeTags.UNDEAD)) {
-                CombatTargeting.applyAbilityDamage(world, owner, target, tuning.undeadBonusDamage(), true, false, 0.5F, false);
-            }
+            float damage=tuning.hostileDamage()+(target.getType().isIn(EntityTypeTags.UNDEAD) ? tuning.undeadBonusDamage() : 0);
+            if(owner!=null) net.sweenus.simplybows.entity.RuneEffectEntity.spawnProjectile(world,9,from,owner,target,damage,Vec3d.ZERO);
+
         }
         if (shots > 0) {
             world.playSound(null, center.x, center.y, center.z, SoundEvents.BLOCK_CHERRY_LEAVES_BREAK, SoundCategory.PLAYERS, 0.85F, 0.85F);
@@ -1063,7 +1061,7 @@ public final class VineFlowerFieldManager {
             double y = findGroundTopY(world, x, z, center.y) + 0.03;
             int flowerType;
             if (painMode) {
-                flowerType = FLOWER_TYPE_WITHER_ROSE;
+                flowerType = switch (i % 4) { case 0 -> FLOWER_TYPE_WITHER_ROSE; case 1 -> 18; case 2 -> 19; default -> 20; };
             } else if (i % 4 == 0) {
                 flowerType = FLOWER_TYPE_DANDELION;
             } else if (i % 5 == 0) {
@@ -1353,6 +1351,9 @@ public final class VineFlowerFieldManager {
             case FLOWER_TYPE_POPPY -> Blocks.POPPY.getDefaultState();
             case FLOWER_TYPE_FERN -> Blocks.FERN.getDefaultState();
             case FLOWER_TYPE_WITHER_ROSE -> Blocks.WITHER_ROSE.getDefaultState();
+            case 18 -> Blocks.ALLIUM.getDefaultState();
+            case 19 -> Blocks.CORNFLOWER.getDefaultState();
+            case 20 -> Blocks.RED_TULIP.getDefaultState();
             case FLOWER_TYPE_CHERRY_LOG -> Blocks.CHERRY_LOG.getDefaultState();
             case FLOWER_TYPE_CHERRY_LEAVES -> Blocks.CHERRY_LEAVES.getDefaultState();
             case FLOWER_TYPE_SPORE_BLOSSOM -> Blocks.SPORE_BLOSSOM.getDefaultState();
@@ -1398,6 +1399,8 @@ public final class VineFlowerFieldManager {
         if (field == null || field.retracting) {
             return;
         }
+        if (!field.tuning().chaosMode()) BowEffectSounds.end(world,field.center(),
+                field.tuning().bountyThorns() ? BowEffectSounds.Theme.TREE : BowEffectSounds.Theme.GARDEN);
         field.retracting = true;
         field.retractCursor = field.placedVisuals.size();
         field.spawnCursor = field.pendingPoints.size();

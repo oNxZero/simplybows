@@ -128,6 +128,10 @@ public class EntityRegistry {
                     .trackingTickInterval(1)
                     .build(SimplyBows.MOD_ID + ":koi_fish_visual"));
 
+    public static final RegistrySupplier<EntityType<net.sweenus.simplybows.entity.RuneEffectEntity>> RUNE_EFFECT = ENTITY_TYPES.register("rune_effect",
+            () -> EntityType.Builder.<net.sweenus.simplybows.entity.RuneEffectEntity>create(net.sweenus.simplybows.entity.RuneEffectEntity::new, SpawnGroup.MISC)
+                    .dimensions(1F, 1F).maxTrackingRange(64).trackingTickInterval(1).build(SimplyBows.MOD_ID + ":rune_effect"));
+
     public static void registerEntities() {
         ENTITY_TYPES.register();
     }

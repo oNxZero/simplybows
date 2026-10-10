@@ -64,7 +64,7 @@ public final class BubbleColumnFieldManager {
         }
         ColumnTuning tuning = buildTuning(upgrades);
         boolean runeColumn = tuning.bountyMode() || tuning.graceMode();
-        if (runeColumn && ownerId != null && !RuneUseCooldown.isReady(world, ownerId, "bubble-column")) {
+        if (ownerId != null && !RuneUseCooldown.isReady(world, ownerId, "bubble-column")) {
             return false;
         }
 
@@ -94,7 +94,7 @@ public final class BubbleColumnFieldManager {
             }
         } else if (tuning.graceMode()) {
             BubbleGraceVisualEntity visual = new BubbleGraceVisualEntity(world, anchoredCenter.x, anchoredCenter.y, anchoredCenter.z);
-            visual.setHeightScale(1.0F);
+            visual.setHeightScale(0.0F);
             visual.setRadius((float) tuning.radius());
             visual.setColumnHeight((float) tuning.height());
             visual.addCommandTag(BUBBLE_GRACE_VISUAL_TAG);
@@ -107,9 +107,7 @@ public final class BubbleColumnFieldManager {
         ACTIVE_COLUMNS.put(world, new ActiveBubbleColumn(anchoredCenter, expiryTick, ownerId, tuning, firstEffectTick, visualId));
         spawnBurstParticles(world, anchoredCenter, tuning);
         playSpawnSound(world, anchoredCenter);
-        if (runeColumn) {
-            RuneUseCooldown.startForEffect(world, ownerId, "bubble-column", "bubble", tuning.durationTicks());
-        }
+        RuneUseCooldown.startForEffect(world, ownerId, "bubble-column", "bubble", tuning.durationTicks());
         return true;
     }
 
@@ -123,11 +121,13 @@ public final class BubbleColumnFieldManager {
         }
 
         if (world.getTime() >= column.expiryTick) {
+            BowEffectSounds.end(world,column.center,BowEffectSounds.Theme.WATER);
             discardVisual(world, column.visualId);
             ACTIVE_COLUMNS.remove(world);
             return;
         }
 
+        if (world.getTime()%40 == 0) BowEffectSounds.ambient(world,column.center,BowEffectSounds.Theme.WATER);
         spawnAmbientParticles(world, column.center, column.tuning);
         updateVisual(world, column);
 
@@ -212,6 +212,7 @@ public final class BubbleColumnFieldManager {
     }
 
     private static void applyBountySwarmDamage(ServerWorld world, ActiveBubbleColumn column) {
+        BowEffectSounds.hit(world,column.center,BowEffectSounds.Theme.WATER);
         LivingEntity owner = getLivingEntity(world, column.ownerId);
         double radius = column.tuning.radius();
         double height = column.tuning.height();
@@ -245,10 +246,9 @@ public final class BubbleColumnFieldManager {
             if (candidate.squaredDistanceTo(column.center.x, candidate.getY(), column.center.z) > radius * radius) {
                 continue;
             }
-            if (CombatTargeting.isFriendlyTo(candidate, owner)) {
+            if (candidate instanceof PlayerEntity || CombatTargeting.isFriendlyTo(candidate, owner)) {
                 candidate.addStatusEffect(new StatusEffectInstance(StatusEffects.RESISTANCE, graceResistanceDurationTicks(), GRACE_RESISTANCE_AMPLIFIER), owner);
-            } else if (CombatTargeting.isOffensiveTargetCandidate(candidate)) {
-                candidate.addStatusEffect(new StatusEffectInstance(StatusEffects.SLOWNESS, graceSlownessDurationTicks(), GRACE_SLOWNESS_AMPLIFIER), owner);
+                candidate.addStatusEffect(new StatusEffectInstance(StatusEffects.REGENERATION,80,0),owner);
             }
         }
     }
@@ -272,7 +272,7 @@ public final class BubbleColumnFieldManager {
             Vec3d pos = projectile.getPos();
             world.spawnParticles(ParticleTypes.BUBBLE_POP, pos.x, pos.y, pos.z, 7, 0.12, 0.08, 0.12, 0.01);
             world.spawnParticles(ParticleTypes.ENCHANT, pos.x, pos.y, pos.z, 5, 0.12, 0.08, 0.12, 0.0);
-            world.playSound(null, pos.x, pos.y, pos.z, SoundEvents.BLOCK_AMETHYST_BLOCK_HIT, SoundCategory.PLAYERS, 0.6F, 1.35F + world.random.nextFloat() * 0.15F);
+            BowEffectSounds.hit(world, pos, BowEffectSounds.Theme.SUPPORT_WATER);
             projectile.discard();
         }
     }
@@ -298,7 +298,7 @@ public final class BubbleColumnFieldManager {
             visual.setRadius((float) column.tuning.radius());
             visual.setColumnHeight((float) column.tuning.height());
             long ticksRemaining = column.expiryTick - world.getTime();
-            float fade = Math.max(0.0F, Math.min(1.0F, ticksRemaining / 15.0F));
+            float fade = Math.max(0.0F, Math.min(1.0F, ticksRemaining / 15.0F)) * Math.min(1F,visual.age/8F);
             visual.setHeightScale(fade);
             return;
         }
@@ -307,7 +307,7 @@ public final class BubbleColumnFieldManager {
             visual.setRadius((float) column.tuning.radius());
             visual.setColumnHeight((float) column.tuning.height());
             long ticksRemaining = column.expiryTick - world.getTime();
-            float fade = Math.max(0.0F, Math.min(1.0F, ticksRemaining / 15.0F));
+            float fade = Math.max(0.0F, Math.min(1.0F, ticksRemaining / 15.0F)) * Math.min(1F,visual.age/8F);
             visual.setHeightScale(fade);
         }
     }

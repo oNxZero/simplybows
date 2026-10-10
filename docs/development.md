@@ -96,7 +96,7 @@ Winterfang's arrow NBT also stores the Pain volley UUID and Grace sanctuary enab
 Additional rune regression:
 
 ```bash
-javac -d /tmp/simplybows-winterfang-check common/src/main/java/net/sweenus/simplybows/util/WinterfangAbilityRules.java tests/winterfang/WinterfangRegression.java
+javac -d /tmp/simplybows-winterfang-check common/src/main/java/net/sweenus/simplybows/upgrade/RuneEtching.java common/src/main/java/net/sweenus/simplybows/util/WinterfangAbilityRules.java tests/winterfang/WinterfangRegression.java
 java -cp /tmp/simplybows-winterfang-check WinterfangRegression
 ```
 
@@ -107,3 +107,7 @@ python3 tests/winterfang/check_freeze_hooks.py /path/to/production-bows.jar /pat
 ```
 
 This verifies every new freeze/action hook names a method in the runtime namespace. It does not execute the injection or validate other mods' overrides.
+
+### Rune formations
+
+`RuneEffectRules` owns timing and numeric scaling for the replaced variants. `RuneEffectManager` selects targets and reserves shared cooldowns; `RuneEffectEntity` ticks damage, follows attached targets and saves cast progress. `RuneEffectEntityRenderer` renders all five kinds with stepped blocks and animated Minecraft bees. Each cast has one server entity, except Petalwind Bounty's maximum of three target-attached entities. Both client entry points register the renderer. Tooltip and combat pages read the same rules.

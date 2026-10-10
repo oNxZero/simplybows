@@ -19,6 +19,11 @@ public class IceChaosWallVisualEntity extends Entity {
     private static final TrackedData<Float> PRISON_WIDTH = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.FLOAT);
     private static final TrackedData<Float> PRISON_DEPTH = DataTracker.registerData(IceChaosWallVisualEntity.class, TrackedDataHandlerRegistry.FLOAT);
     private int prisonLifetime;
+    private int prisonElapsed;
+    private float previousHeightScale;
+    public float getAnimatedHeightScale(float tickDelta) {
+        return net.minecraft.util.math.MathHelper.lerp(tickDelta, previousHeightScale, getHeightScale());
+    }
 
     public void setPrisonStyle(float width, float depth) {
         dataTracker.set(PRISON_STYLE, true);
@@ -31,7 +36,26 @@ public class IceChaosWallVisualEntity extends Entity {
     public void setPrisonLifetime(int ticks) { prisonLifetime = ticks; }
     @Override public void tick() {
         super.tick();
-        if (!getWorld().isClient() && isPrisonStyle() && --prisonLifetime <= 0) discard();
+        previousHeightScale = getHeightScale();
+        if (!getWorld().isClient() && isPrisonStyle()) {
+            prisonElapsed++;
+            prisonLifetime--;
+            float grow = Math.min(1.0F, prisonElapsed / 6.0F);
+            float shrink = Math.min(1.0F, Math.max(0, prisonLifetime) / 8.0F);
+            float scale = grow * shrink;
+            setHeightScale(scale * scale * (3 - 2 * scale));
+            if (prisonLifetime <= 0) {
+                if (getWorld() instanceof net.minecraft.server.world.ServerWorld world) {
+                    world.spawnParticles(new net.minecraft.particle.BlockStateParticleEffect(
+                            net.minecraft.particle.ParticleTypes.BLOCK, net.minecraft.block.Blocks.ICE.getDefaultState()),
+                            getX(), getY()+getTargetHeight()*0.5, getZ(), 35,
+                            getPrisonWidth()*0.5, getTargetHeight()*0.4, getPrisonDepth()*0.5, 0.12);
+                    world.playSound(null, getX(), getY(), getZ(), net.minecraft.sound.SoundEvents.BLOCK_GLASS_BREAK,
+                            net.minecraft.sound.SoundCategory.PLAYERS, 0.7F, 1.2F);
+                }
+                discard();
+            }
+        }
     }
 
     public IceChaosWallVisualEntity(EntityType<? extends IceChaosWallVisualEntity> type, World world) {
@@ -90,6 +114,8 @@ public class IceChaosWallVisualEntity extends Entity {
     protected void readCustomDataFromNbt(NbtCompound nbt) {
         if (nbt.getBoolean("prison_style")) setPrisonStyle(nbt.getFloat("prison_width"), nbt.getFloat("prison_depth"));
         prisonLifetime = nbt.getInt("prison_lifetime");
+        prisonElapsed = nbt.getInt("prison_elapsed");
+        previousHeightScale = nbt.getFloat("height_scale");
         if (nbt.contains("target_height")) {
             this.setTargetHeight(nbt.getFloat("target_height"));
         }
@@ -107,6 +133,7 @@ public class IceChaosWallVisualEntity extends Entity {
         nbt.putFloat("prison_width", getPrisonWidth());
         nbt.putFloat("prison_depth", getPrisonDepth());
         nbt.putInt("prison_lifetime", prisonLifetime);
+        nbt.putInt("prison_elapsed", prisonElapsed);
         nbt.putFloat("target_height", this.getTargetHeight());
         nbt.putFloat("height_scale", this.getHeightScale());
         nbt.putBoolean("dripstone_style", this.isDripstoneStyle());

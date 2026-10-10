@@ -16,7 +16,7 @@ import java.util.UUID;
 import java.util.WeakHashMap;
 import java.util.HashMap;
 
-/** Three-second server-enforced stun. No AI flags or terrain are modified. */
+/** String-scaled server-enforced stun. No AI flags or terrain are modified. */
 public final class IcePrisonManager {
     public static final int FREEZE_TICKS = net.sweenus.simplybows.util.WinterfangAbilityRules.FREEZE_TICKS;
     private static final Map<ServerWorld, Map<UUID, Prison>> PRISONS = new WeakHashMap<>();
@@ -29,7 +29,8 @@ public final class IcePrisonManager {
         return prison != null && world.getTime() < prison.expires;
     }
 
-    public static void freeze(ServerWorld world, LivingEntity owner, LivingEntity target) {
+    public static void freeze(ServerWorld world, LivingEntity owner, LivingEntity target, int stringLevel, int frameLevel) {
+        int duration = net.sweenus.simplybows.util.WinterfangAbilityRules.bountyFreezeTicks(stringLevel);
         if (!target.isAlive() || isFrozen(target) || owner == null
                 || !CombatTargeting.checkFriendlyFire(target, owner)) return;
         target.stopRiding();
@@ -39,14 +40,16 @@ public final class IcePrisonManager {
         Vec3d anchor = target.getPos();
         IceChaosWallVisualEntity shell = new IceChaosWallVisualEntity(world, anchor.x, anchor.y, anchor.z, target.getHeight() + 0.35F);
         shell.setPrisonStyle(target.getWidth() + 0.45F, target.getWidth() + 0.45F);
-        shell.setHeightScale(1.0F);
+        shell.setHeightScale(0.0F);
         // A prison visual expires independently if its victim unloads or the server restarts.
-        shell.setPrisonLifetime(FREEZE_TICKS);
+        shell.setPrisonLifetime(duration + 8);
         world.spawnEntity(shell);
         PRISONS.computeIfAbsent(world, w -> new HashMap<>()).put(target.getUuid(),
-                new Prison(anchor, world.getTime() + FREEZE_TICKS, shell.getUuid()));
+                new Prison(anchor, world.getTime(), world.getTime() + duration, shell.getUuid(), owner.getUuid(), frameLevel));
+        applyFrost(target, owner, 200);
         hold(target, anchor);
-        world.playSound(null, anchor.x, anchor.y, anchor.z, SoundEvents.BLOCK_GLASS_BREAK, SoundCategory.PLAYERS, 0.8F, 0.65F);
+        world.playSound(null, anchor.x, anchor.y, anchor.z, SoundEvents.BLOCK_GLASS_PLACE, SoundCategory.PLAYERS, 1.0F, 0.65F);
+        world.playSound(null,anchor.x,anchor.y,anchor.z,SoundEvents.BLOCK_POWDER_SNOW_BREAK,SoundCategory.PLAYERS,.75F,.7F);
     }
 
     public static void tick(ServerWorld world) {
@@ -57,12 +60,36 @@ public final class IcePrisonManager {
             Entity target = world.getEntity(entry.getKey());
             if (target == null || !target.isAlive() || world.getTime() >= prison.expires) {
                 Entity shell = world.getEntity(prison.visual);
-                if (shell != null) shell.discard();
+                if (target == null || !target.isAlive()) {
+                    if (shell != null) shell.discard();
+                } else if (target instanceof LivingEntity living) {
+                    if(world.getEntity(prison.owner) instanceof LivingEntity owner) {
+                        for(int shard=0;shard<8;shard++) {
+                            double a=shard*Math.PI/4;
+                            net.sweenus.simplybows.entity.RuneEffectEntity.spawnProjectile(world,10,prison.anchor.add(Math.cos(a)*.8,.9,Math.sin(a)*.8),owner,null,0,new Vec3d(Math.cos(a)*.5,.04,Math.sin(a)*.5));
+                        }
+                        world.playSound(null,prison.anchor.x,prison.anchor.y+1,prison.anchor.z,SoundEvents.ENTITY_PLAYER_ATTACK_SWEEP,SoundCategory.PLAYERS,.85F,.85F);
+                    }
+                    if (living.getStatusEffect(net.minecraft.entity.effect.StatusEffects.SLOWNESS) != null
+                            && living.getStatusEffect(net.minecraft.entity.effect.StatusEffects.SLOWNESS).getAmplifier() == 0)
+                        living.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.SLOWNESS);
+                    applyFrost(living, world.getEntity(prison.owner), (int) Math.max(1, 200 - (world.getTime() - prison.started)));
+                }
                 return true;
             }
             // Keep damage immunity timers moving while AI/action ticks are paused.
             if (target.timeUntilRegen > 0) target.timeUntilRegen--;
             if (target instanceof LivingEntity living && living.hurtTime > 0) living.hurtTime--;
+            if (target instanceof LivingEntity living) {
+                // Frozen entities do not tick their status effects: update remaining time explicitly.
+                applyFrost(living, world.getEntity(prison.owner), (int) Math.max(1, 200 - (world.getTime() - prison.started)));
+                long elapsed = world.getTime() - prison.started;
+                if (elapsed > 0 && elapsed % 20 == 0) {
+                    BowEffectSounds.hit(world, prison.anchor, BowEffectSounds.Theme.FROST);
+                    CombatTargeting.applyDamage(world, world.getEntity(prison.owner), living,
+                            net.sweenus.simplybows.util.WinterfangAbilityRules.bountyDamagePerPulse(prison.frame), true, false);
+                }
+            }
             hold(target, prison.anchor);
             if (world.getTime() % 5 == 0) world.spawnParticles(ParticleTypes.SNOWFLAKE,
                     prison.anchor.x, prison.anchor.y + target.getHeight() * 0.5, prison.anchor.z,
@@ -91,5 +118,14 @@ public final class IcePrisonManager {
             NetworkCompat.sendVelocityUpdate(player);
         } else target.setPosition(anchor);
     }
-    private record Prison(Vec3d anchor, long expires, UUID visual) {}
+    private static void applyFrost(LivingEntity target, Entity owner, int duration) {
+        var current = target.getStatusEffect(net.minecraft.entity.effect.StatusEffects.SLOWNESS);
+        // Preserve stronger slows from other abilities.
+        if (current != null && current.getAmplifier() > 0) return;
+        if (current != null && current.getDuration() >= duration && current.getDuration() < duration + 20) return;
+        target.removeStatusEffect(net.minecraft.entity.effect.StatusEffects.SLOWNESS);
+        target.addStatusEffect(new net.minecraft.entity.effect.StatusEffectInstance(
+                net.minecraft.entity.effect.StatusEffects.SLOWNESS, duration, 0), owner);
+    }
+    private record Prison(Vec3d anchor, long started, long expires, UUID visual, UUID owner, int frame) {}
 }

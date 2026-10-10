@@ -47,6 +47,56 @@ When reporting an issue, include loader/version, exact jar filenames, relevant c
 
 Test Pain with zero and five Strings against spaced enemies, overlapping groups, a hostile player, a wither, and an ender dragon. Confirm distinct assignments, five-second slowing, no lingering damage zone, and no repeated splash damage to a single victim within one volley. Test an arrow unloading before impact.
 
-Test Bounty against a moving player and bosses: three seconds of no movement, jumping, punching, item use, block breaking, or inventory actions, followed by normal control. Confirm it does not extend when another arrow hits during the freeze and that the frozen target can still take follow-up damage. Check shields, dragon body parts, mounts, death, disconnect, chunk unload, and restart cleanup. Confirm the crystal shell matches the target's size and never places real blocks.
+Test Bounty against a moving player and bosses: 3 seconds plus 0.5 seconds per String of no movement, jumping, punching, item use, block breaking, or inventory actions, followed by normal control. Confirm it does not extend when another arrow hits during the freeze and that the frozen target can still take follow-up damage. Check shields, dragon body parts, mounts, death, disconnect, chunk unload, and restart cleanup. Confirm the crystal shell matches the target's size and never places real blocks.
 
 Test Grace against hostile mobs and players, allies, and the caster, with normal, tipped, and spectral arrows and external damage attributes. Health must never decrease because of the shot; enemies must receive no debuffs. Partial shots consume no ammo. Fully drawn cooldown shots remain harmless and do not place another sanctuary. Verify String radius and Frame buff duration in tooltips and gameplay.
+
+Bounty follow-up: check fixed 18-second cooldown at every Frame level, Frost I expires 10 seconds after impact despite paused victim ticks, and damage pulses occur every second while trapped (1 damage plus 0.5 per Frame before mitigation). Verify six-tick growth and eight-tick release/shatter, including unloading during either animation.
+
+### Projectile enchantment checks
+
+For each bow, compare unenchanted and Power V direct hits at the same draw, distance and upgrade level; test normal and spectral Winterfang arrows and Bubbleveil Pain shots. Compare Punch II knockback and Flame ignition. Verify ability damage does not increase, ability-spawned bees do not inherit these enchants, Winterfang Grace never damages or ignites enemies/allies, and other support shots never burn protected allies. Check Bounty remains anchored despite Punch, and newly fired arrows keep their enchantments after unload/reload. Existing arrows cannot recover enchantments they never saved.
+
+### Infinity pickup checks
+
+In Survival, fire Infinity normal arrows into a wall using every bow, including Winterfang fans and special rune shots. Neither the shooter nor another Survival player should collect free arrows. Without Infinity, spent recoverable arrows should still be collected. Repeat with consumed tipped/spectral arrows, Creative shots, and chunk unload/reload; pickup permissions must survive reload. Projectiles that discard on impact cannot be recovered regardless of enchantments.
+
+### Homing Enderman checks
+
+Shoot Endermen with Winterfang normal/Pain arrows, both normal and spectral ammo, and Buzzkill Pain bees. After an attempted entity hit the homing projectile must disappear even when the Enderman teleports and rejects damage. Check ordinary targets still receive normal hits and effects; Enderman subclasses should follow the same rule.
+
+Also verify airborne homing arrows expire by 10 seconds when no collision happens, while grounded arrows keep normal recovery behavior.
+
+Test the Legendary Monsters Pursuer and other modded teleporters: after acquiring a target, a position jump over four blocks in one tick must discard the homing projectile. Failed entity impacts also discard it regardless of entity class. Verify ordinary movement and switching targets do not trigger this cleanup. Verify bow enchantment rows use square pips in both loaders with Simply Tooltips 0.1.5.
+
+## Rune formation regression and manual checks
+
+Run the standalone cast-schedule regression:
+
+```bash
+javac -d /tmp/simplybows-rune-tests common/src/main/java/net/sweenus/simplybows/upgrade/RuneEtching.java common/src/main/java/net/sweenus/simplybows/util/RuneEffectRules.java tests/rune-formations/RuneFormationRegression.java
+java -cp /tmp/simplybows-rune-tests RuneFormationRegression
+```
+
+It checks sting/pulse counts, continuation from saved elapsed times, reachable five-slot damage budgets, exactly three star waves, filled-star tips/interior/indentations and outward/inward motion, and rune routing. This does not start Minecraft or prove rendering/collision behavior.
+
+Manual checks still required on each loader:
+
+- Grace: walk into the wall from both sides as caster, ally and enemy. Try sprinting, jumping and riding. Shoot normal and high-speed arrows and an ender pearl through a segment. Go around the open side.
+- Chaos: inspect stone growth, pull, closing hit at 1.5s and sinking animation; verify protected players are unaffected.
+- Bounty star: inspect the filled eight-point shape on flat ground and steps. Watch three out/in cycles. A stationary target should take at most three hits; returning spikes must not add extra hits. Check targets between the old rays.
+- Pain swarm: one delivery bee should attach seven animated visual bees only after a successful hit; count five stings at String 0, ten at String 5. Check rejected hits, target death and teleport cleanup.
+- Pain vortex: inspect water-textured projectile, downward-flowing water, falling droplets and draining finish. Count four pulses plus a burst at String 0, six plus burst at String 5; compare one moving target against multiple targets.
+- Bounty blossom: strike a group with more than three enemies. Exactly three distinct eligible enemies should receive blossoms; each takes one closing burst. Walk/run during the opening animation.
+- Reload active formations and verify earlier damage does not repeat. Confirm new effects disappear after their durations and with absent owners. Existing manager effects retain their previous restart limitations.
+- Compare tooltip String/Frame values at 0 and 5, and confirm no old axolotl-volley or rotating-sunder descriptions remain in the active pages.
+
+Check Chaos while shooting as a player: the 7.5s cooldown should start once at launch, and the stone jaws must still appear on impact. During cooldown, subsequent arrows should have no new jaws. If Multishot is supplied by another mod, only the first arrow carries the Chaos effect. For each attached formation, kill its target or teleport it far away: damage stops immediately, but the visual should finish over 0.6s rather than disappear. Count all normal final pulses before the finish begins; save/reload during the finish must not resume damage.
+
+`python3 tests/rune-formations/check_cast_lifecycle.py <production-bows.jar>` checks the packaged launch/impact cooldown contract, saved finish marker and water renderer for each platform. It also checks all six projectile factories honor the partial-draw vanilla fallback. In multiplayer, spam partial draws with Bubbleveil Pain during cooldown: no new clouds should appear. Repeat with Buzzkill runes, and verify full draws during cooldown cannot add ability fields. Switch bows and dimensions while cooling down: the shared lock should remain active.
+
+### Area raincloud and hunting blades
+
+Run `python3 tests/rune-formations/check_area_projectiles.py <production jar>` for each loader. It checks both impact entry points, the guarded area cast, saved projectile damage/target state, terrain collision, flight/teleport limits and packaged water geometry. The renderer source check rejects wool geometry. This does not launch Minecraft.
+
+In Minecraft, shoot Bubbleveil Pain into the floor with several enemies nearby: check the continuous 3D cloud shape and particle edges, three visible homing drops per volley, terrain cover, final downpour at all six String levels, and fading. Shoot Tremorstrike Pain through a crowd and verify each enemy is damaged/launched once, including the directly struck enemy. Check Bounty's audible rise/retract on all three cycles, Chaos teeth breaking on collision, and Petalwind Bounty's three distinct hunting blades. Visual quality, sound mixing and PvP balance remain in-game checks.

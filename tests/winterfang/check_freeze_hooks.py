@@ -15,7 +15,7 @@ with zipfile.ZipFile(sys.argv[1]) as jar:
     config = json.loads(jar.read('simplybows.mixins.json'))
     refmap = json.loads(jar.read(config['refmap']))['mappings'] if 'refmap' in config else {}
 count = 0
-for simple in ['ServerWorldMixin', 'ServerPlayerEntityMixin', 'FrozenPlayerNetworkMixin', 'LivingEntityMixin']:
+for simple in ['ServerWorldMixin', 'ServerPlayerEntityMixin', 'FrozenPlayerNetworkMixin', 'LivingEntityMixin', 'ProjectileSupportHitMixin', 'ProjectileWallCollisionMixin', 'RootedEntityMovementMixin']:
     mix = inspect(sys.argv[1], 'net.sweenus.simplybows.mixin.' + simple, '-v')
     target = re.search(r'org.spongepowered.asm.mixin.Mixin\(\s*value=\[class L([^;]+);\]', mix)
     assert target, simple + ': missing target class'

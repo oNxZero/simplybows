@@ -76,6 +76,10 @@ public final class BlossomStormManager {
     }
 
     public static void createStorm(ServerWorld world, Vec3d startPos, LivingEntity directTarget, Entity owner, BowUpgradeData upgrades) {
+        if (upgrades.runeEtching() == RuneEtching.BOUNTY) {
+            RuneEffectManager.cast(world, net.sweenus.simplybows.util.RuneEffectRules.LOTUS, startPos, owner, directTarget, upgrades, true);
+            return;
+        }
         List<ActiveStorm> existing = ACTIVE_STORMS.computeIfAbsent(world, w -> new ArrayList<>());
         UUID ownerId = owner != null ? owner.getUuid() : null;
         StormTuning tuning = buildTuning(upgrades);
@@ -154,6 +158,7 @@ public final class BlossomStormManager {
             double z = directTarget != null ? directTarget.getZ() : startPos.z;
             initialCenter = new Vec3d(x, groundY, z);
             initialTargetId = null;
+            if(ownerLiving!=null) net.sweenus.simplybows.entity.RuneEffectEntity.spawnSupport(world,8,initialCenter,ownerLiving,tuning.graceAuraRadius(),tuning.durationTicks());
         } else if (directTarget != null && directTarget.isAlive() && ownerLiving != null && CombatTargeting.checkFriendlyFire(directTarget, ownerLiving)) {
             initialTargetId = directTarget.getUuid();
         }
@@ -203,6 +208,7 @@ public final class BlossomStormManager {
         }
         if (now >= storm.expiryTick) {
             storm.fadeStartTick = now;
+            BowEffectSounds.end(world,storm.center,BowEffectSounds.Theme.BLOSSOM);
             spawnVortexParticles(world, storm, now, 1.0F);
             return false;
         }
@@ -214,6 +220,8 @@ public final class BlossomStormManager {
             storm.center = currentTarget.getPos().add(0.0, currentTarget.getHeight() * 0.5, 0.0);
         }
 
+        if (now%40 == 0) BowEffectSounds.ambient(world,storm.center,
+                storm.tuning.graceSupportMode() ? BowEffectSounds.Theme.SUPPORT_BLOSSOM : BowEffectSounds.Theme.BLOSSOM);
         spawnVortexParticles(world, storm, now, 1.0F);
 
         if (now >= storm.nextDamageTick) {
@@ -276,6 +284,7 @@ public final class BlossomStormManager {
     }
 
     private static void applyGraceSupportPulse(ServerWorld world, ActiveStorm storm, LivingEntity owner) {
+        if (world.getTime()%40 == 0) BowEffectSounds.hit(world,storm.center,BowEffectSounds.Theme.SUPPORT_BLOSSOM);
         double radius = storm.tuning.graceAuraRadius();
         int buffTicks = storm.tuning.graceBuffTicks();
         Box hitBox = Box.of(storm.center, radius * 2.0, 3.5, radius * 2.0);
@@ -390,7 +399,7 @@ public final class BlossomStormManager {
         List<LivingEntity> candidates = world.getEntitiesByClass(
                 LivingEntity.class,
                 search,
-                entity -> entity.isAlive() && CombatTargeting.isFriendlyTo(entity, owner)
+                entity -> entity.isAlive() && (GraceProjectile.isSupportTarget(entity) || CombatTargeting.isFriendlyTo(entity, owner))
         );
         candidates.add(owner);
 
@@ -413,7 +422,7 @@ public final class BlossomStormManager {
     }
 
     private static LivingEntity resolveGraceInitialAnchor(ServerWorld world, Vec3d impact, LivingEntity owner, LivingEntity directTarget) {
-        if (directTarget != null && directTarget.isAlive() && (owner == null || CombatTargeting.isFriendlyTo(directTarget, owner))) {
+        if (directTarget != null && directTarget.isAlive() && (GraceProjectile.isSupportTarget(directTarget) || owner == null || CombatTargeting.isFriendlyTo(directTarget, owner))) {
             return directTarget;
         }
         if (world == null || impact == null || owner == null) {
@@ -423,7 +432,7 @@ public final class BlossomStormManager {
         LivingEntity best = null;
         double bestDist = Double.MAX_VALUE;
         for (LivingEntity candidate : world.getEntitiesByClass(LivingEntity.class, search, entity ->
-                entity.isAlive() && CombatTargeting.isFriendlyTo(entity, owner))) {
+                entity.isAlive() && (GraceProjectile.isSupportTarget(entity) || CombatTargeting.isFriendlyTo(entity, owner)))) {
             double dist = candidate.squaredDistanceTo(impact);
             if (dist < bestDist) {
                 bestDist = dist;
@@ -576,7 +585,7 @@ public final class BlossomStormManager {
 
     private static StormTuning buildTuning(BowUpgradeData upgrades) {
         RuneEtching rune = upgrades.runeEtching();
-        float damage = (float) (stormDamage() * upgrades.damageMultiplier());
+        float damage = (float) (stormDamage() * BowAbilityBalance.petalFrameMultiplier(rune,upgrades.frameLevel(),upgrades.damageMultiplier()));
         boolean painAreaMode = rune == RuneEtching.PAIN;
         boolean graceSupportMode = rune == RuneEtching.GRACE;
         boolean bountyTrapMode = rune == RuneEtching.BOUNTY;

@@ -20,7 +20,6 @@ import net.sweenus.simplybows.registry.EntityRegistry;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.util.GraceProjectile;
-import net.sweenus.simplybows.world.EarthChaosSunderManager;
 import net.sweenus.simplybows.world.EarthSpikeFieldManager;
 
 public class EarthArrowEntity extends ArrowEntity {
@@ -44,6 +43,7 @@ public class EarthArrowEntity extends ArrowEntity {
         this.prevY = owner.getEyeY() - 0.1;
         this.prevZ = owner.getZ();
         this.upgrades = BowUpgradeData.from(weaponStack);
+        net.sweenus.simplybows.util.BowProjectileEnchantments.initialize(this, weaponStack, arrowStack);
     }
 
     @Override
@@ -117,14 +117,8 @@ public class EarthArrowEntity extends ArrowEntity {
             // Chaos replaces the spike field entirely — never fall back to the normal ability on CD.
             if (this.upgrades.runeEtching() == RuneEtching.CHAOS) {
                 if (this.chaosSunderOnImpact) {
-                    EarthChaosSunderManager.spawnAtImpact(
-                            serverWorld,
-                            pos,
-                            this.getOwner() != null ? this.getOwner().getUuid() : null,
-                            this.upgrades.stringLevel(),
-                            this.upgrades.frameLevel(),
-                            this.getVelocity()
-                    );
+                    net.sweenus.simplybows.world.RuneEffectManager.cast(serverWorld,
+                            net.sweenus.simplybows.util.RuneEffectRules.STONE, pos, getOwner(), hitTarget, upgrades, false);
                 }
             } else {
                 EarthSpikeFieldManager.createOrReplaceField(

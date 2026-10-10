@@ -105,7 +105,7 @@ public final class BeeGraceShieldManager {
         int duration = SimplyBowsConfig.INSTANCE.buzzkill.graceBaseDuration.get()
                 + Math.max(0, upgrades.stringLevel()) * SimplyBowsConfig.INSTANCE.buzzkill.graceStringDurationBonus.get();
         startGraceCooldown(world, owner, Math.max(40, duration));
-        world.playSound(null, impactPos.x, impactPos.y, impactPos.z, SoundEvents.ENTITY_BEE_LOOP_AGGRESSIVE, SoundCategory.PLAYERS, 0.55F, 1.25F);
+        world.playSound(null, impactPos.x, impactPos.y, impactPos.z, SoundEvents.ENTITY_BEE_POLLINATE, SoundCategory.PLAYERS, 0.55F, 1.25F);
         world.spawnParticles(ParticleTypes.WAX_ON, impactPos.x, impactPos.y + 0.3, impactPos.z, 10, 0.25, 0.2, 0.25, 0.01);
     }
 
@@ -129,6 +129,7 @@ public final class BeeGraceShieldManager {
             Entity visualEntity = world.getEntity(bee.visualId);
             if (!(visualEntity instanceof BeeGraceVisualEntity visual) || world.getTime() > bee.expiryTick || bee.hopsLeft <= 0) {
                 if (visualEntity != null) {
+                    BowEffectSounds.end(world,visualEntity.getPos(),BowEffectSounds.Theme.SUPPORT_BEE);
                     visualEntity.discard();
                 }
                 it.remove();

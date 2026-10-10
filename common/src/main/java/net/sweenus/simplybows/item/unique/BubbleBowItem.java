@@ -14,7 +14,6 @@ import net.sweenus.simplybows.entity.BubblePainArrowEntity;
 import net.sweenus.simplybows.upgrade.BowUpgradeData;
 import net.sweenus.simplybows.upgrade.RuneEtching;
 import net.sweenus.simplybows.config.SimplyBowsConfig;
-import net.sweenus.simplybows.util.BowUser;
 import net.sweenus.simplybows.util.HelperMethods;
 import net.sweenus.simplybows.world.BubbleChaosWaveManager;
 import net.sweenus.simplybows.world.RuneUseCooldown;
@@ -61,9 +60,8 @@ public class BubbleBowItem extends SimplyBowItem {
             float painShotSpeed = shooter.isTouchingWater()
                     ? SimplyBowsConfig.INSTANCE.bubbleveil.painShotSpeedWater.get()
                     : SimplyBowsConfig.INSTANCE.bubbleveil.painShotSpeedLand.get();
-            int quantity = Math.max(1, upgrades.stringLevel() + 1);
-            this.shootLine(serverWorld, shooter, hand, stack, projectiles, f * painShotSpeed, critical, target, quantity);
-            RuneUseCooldown.startForEffect(serverWorld, ownerId, "bubble-pain", "bubble", RuneUseCooldown.BURST_EFFECT_TICKS);
+            this.shootAll(serverWorld, shooter, hand, stack, projectiles, f * painShotSpeed, SimplyBowsConfig.INSTANCE.bubbleveil.painDivergence.get(), critical, target);
+            RuneUseCooldown.start(serverWorld, ownerId, "bubble-pain", "bubble", net.sweenus.simplybows.util.RuneEffectRules.cooldown(3, upgrades.stringLevel()));
             return;
         } else if (upgrades.runeEtching() == RuneEtching.PAIN) {
             FORCE_DEFAULT_BUBBLE_ARROW.set(true);
@@ -79,6 +77,9 @@ public class BubbleBowItem extends SimplyBowItem {
 
     @Override
     protected ProjectileEntity createArrowEntity(World world, LivingEntity shooter, ItemStack weaponStack, ItemStack arrowStack, boolean critical) {
+        if (simplybows$isForcingVanillaArrow()) {
+            return super.createArrowEntity(world, shooter, weaponStack, arrowStack, critical);
+        }
         ItemStack firedArrowStack = arrowStack;
         if (firedArrowStack == null || firedArrowStack.isEmpty()) {
             firedArrowStack = new ItemStack(Items.ARROW);
@@ -94,56 +95,10 @@ public class BubbleBowItem extends SimplyBowItem {
         if (arrowEntity instanceof net.minecraft.entity.projectile.PersistentProjectileEntity persistent) {
             double damage = SimplyBowsConfig.INSTANCE.bubbleveil.baseDamage.get()
                     * (1.0 + upgrades.frameLevel() * SimplyBowsConfig.INSTANCE.upgrades.damageMultiplierPerFrame.get() * 0.5);
-            if (upgrades.runeEtching() == RuneEtching.PAIN && !FORCE_DEFAULT_BUBBLE_ARROW.get()) {
-                // Divide a bounded total volley budget across its projectiles.
-                int quantity = Math.max(1, upgrades.stringLevel() + 1);
-                damage *= net.sweenus.simplybows.util.BowAbilityBalance.bubblePainVolleyScale(upgrades.stringLevel()) / quantity;
-            }
             persistent.setDamage(damage);
             persistent.setCritical(critical);
         }
         return arrowEntity;
     }
 
-    private void shootLine(ServerWorld world, LivingEntity shooter, Hand hand, ItemStack stack, List<ItemStack> projectiles,
-                           float speed, boolean critical, @Nullable LivingEntity target, int quantity) {
-        int additionalArrowsNeeded = Math.max(0, quantity - 1) * projectiles.size();
-        BowUser.ExtraArrowSupply extraArrows = BowUser.extraArrows(shooter, stack, additionalArrowsNeeded);
-        Vec3d forward = shooter.getRotationVec(1.0F).normalize();
-        Vec3d horizontalForward = new Vec3d(forward.x, 0.0, forward.z);
-        if (horizontalForward.lengthSquared() <= 1.0E-6) {
-            horizontalForward = Vec3d.fromPolar(0.0F, shooter.getYaw());
-        } else {
-            horizontalForward = horizontalForward.normalize();
-        }
-        Vec3d right = new Vec3d(-horizontalForward.z, 0.0, horizontalForward.x).normalize();
-
-        for (int j = 0; j < projectiles.size(); ++j) {
-            for (int p = 0; p < quantity; ++p) {
-                ItemStack arrowForProjectile;
-                if (p == 0) {
-                    arrowForProjectile = projectiles.get(j);
-                } else {
-                    arrowForProjectile = extraArrows.next(projectiles.get(j));
-                    if (arrowForProjectile == null || arrowForProjectile.isEmpty()) {
-                        break;
-                    }
-                }
-
-                ProjectileEntity projectileEntity = this.createArrowEntity(world, shooter, stack, arrowForProjectile, critical);
-                this.simplybows$applyRangedWeaponProjectileBonus(shooter, projectileEntity);
-                this.shoot(shooter, projectileEntity, j, speed, SimplyBowsConfig.INSTANCE.bubbleveil.painDivergence.get(), 0.0F, target);
-                double centerOffset = (quantity - 1) * 0.5;
-                double lateralOffset = (p - centerOffset) * BUBBLE_PAIN_LINE_SPACING;
-                Vec3d spawnOffset = horizontalForward.multiply(BUBBLE_PAIN_LINE_FORWARD_OFFSET).add(right.multiply(lateralOffset));
-                projectileEntity.setPosition(projectileEntity.getX() + spawnOffset.x, projectileEntity.getY() + spawnOffset.y, projectileEntity.getZ() + spawnOffset.z);
-                world.spawnEntity(projectileEntity);
-
-                stack.damage(this.getWeaponStackDamage(arrowForProjectile), shooter, LivingEntity.getSlotForHand(hand));
-                if (stack.isEmpty()) {
-                    return;
-                }
-            }
-        }
-    }
 }

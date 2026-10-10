@@ -1,17 +1,18 @@
 modLoader = "javafml"
 loaderVersion = "[2,)"
-#issueTrackerURL = ""
+issueTrackerURL = "https://github.com/oNxZero/simplybows/issues"
 license = "Timefall Development License 1.2"
 
 [[mods]]
 modId = "simplybows"
 version = "${version}"
 displayName = "Simply Bows Reforged"
-authors = "Sweenus, Hootea"
+authors = "Sweenus, Hootea, oNxZero"
 description = '''
-
+Six elemental bows, four runes, and upgradeable strings and frames. Simply Bows Reforged is a maintained fork of Simply Bows by Sweenus and Hootea.
 '''
-logoFile = "assets/simplybows/icon.png"
+logoFile = "assets/simplybows/logo.png"
+displayURL = "https://github.com/oNxZero/simplybows"
 
 [[dependencies.simplybows]]
 modId = "neoforge"

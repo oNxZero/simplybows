@@ -15,11 +15,15 @@
     "AnvilScreenHandlerMixin",
     "BowAttackGoalMixin",
     "EntityAccessor",
+    "ProjectileWeaponAccessor",
+    "ProjectileSupportHitMixin",
     "LivingEntityMixin",
     "MobEntityMixin",
     "ServerPlayerEntityMixin",
     "ServerWorldMixin",
-    "FrozenPlayerNetworkMixin"
+    "FrozenPlayerNetworkMixin",
+    "RootedEntityMovementMixin",
+    "ProjectileWallCollisionMixin"
   ],
   "injectors": {
     "defaultRequire": 1

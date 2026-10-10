@@ -1,5 +1,5 @@
 <div align="center">
-<img src="common/src/main/resources/assets/simplybows/icon.png" width="112" alt="Simply Bows icon">
+<img src="docs/assets/simply-bows-reforged-logo.png" width="420" alt="Simply Bows Reforged logo">
 
 # Simply Bows Reforged
 
