@@ -6,7 +6,7 @@ This catalog covers all six normal abilities and all 24 rune variants. Upgrade d
 
 ## Everbloom
 
-<img src="../common/src/main/resources/assets/simplybows/textures/item/vine_bow/vine_bow.png" width="64" alt="Everbloom">
+<img src="assets/bows/everbloom.png" width="64" height="64" alt="Everbloom">
 
 | Build | Ability | String | Frame |
 | :--- | :--- | :--- | :--- |
@@ -18,7 +18,7 @@ This catalog covers all six normal abilities and all 24 rune variants. Upgrade d
 
 ## Winterfang
 
-<img src="../common/src/main/resources/assets/simplybows/textures/item/ice_bow/ice_bow.png" width="64" alt="Winterfang">
+<img src="assets/bows/winterfang.png" width="64" height="64" alt="Winterfang">
 
 | Build | Ability | String | Frame |
 | :--- | :--- | :--- | :--- |
@@ -30,7 +30,7 @@ This catalog covers all six normal abilities and all 24 rune variants. Upgrade d
 
 ## Bubbleveil
 
-<img src="../common/src/main/resources/assets/simplybows/textures/item/bubble_bow/bubble_bow.png" width="64" alt="Bubbleveil">
+<img src="assets/bows/bubbleveil.png" width="64" height="64" alt="Bubbleveil">
 
 | Build | Ability | String | Frame |
 | :--- | :--- | :--- | :--- |
@@ -42,7 +42,7 @@ This catalog covers all six normal abilities and all 24 rune variants. Upgrade d
 
 ## Buzzkill
 
-<img src="../common/src/main/resources/assets/simplybows/textures/item/bee_bow/bee_bow.png" width="64" alt="Buzzkill">
+<img src="assets/bows/buzzkill.png" width="64" height="64" alt="Buzzkill">
 
 | Build | Ability | String | Frame |
 | :--- | :--- | :--- | :--- |
@@ -54,7 +54,7 @@ This catalog covers all six normal abilities and all 24 rune variants. Upgrade d
 
 ## Petalwind
 
-<img src="../common/src/main/resources/assets/simplybows/textures/item/blossom_bow/blossom_bow.png" width="64" alt="Petalwind">
+<img src="assets/bows/petalwind.png" width="64" height="64" alt="Petalwind">
 
 | Build | Ability | String | Frame |
 | :--- | :--- | :--- | :--- |
@@ -66,7 +66,7 @@ This catalog covers all six normal abilities and all 24 rune variants. Upgrade d
 
 ## Tremorstrike
 
-<img src="../common/src/main/resources/assets/simplybows/textures/item/earth_bow/earth_bow.png" width="64" alt="Tremorstrike">
+<img src="assets/bows/tremorstrike.png" width="64" height="64" alt="Tremorstrike">
 
 | Build | Ability | String | Frame |
 | :--- | :--- | :--- | :--- |
