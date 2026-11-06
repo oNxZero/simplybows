@@ -3,7 +3,7 @@
 
 # Simply Bows Reforged
 
-**Six bows. Four runes. A different way to fight with every build.**
+Minecraft 1.21.1 bow mod with six bows, four rune types, and configurable upgrades.
 
 ![Minecraft 1.21.1](https://img.shields.io/badge/Minecraft-1.21.1-62b47a)
 ![Java 21](https://img.shields.io/badge/Java-21-orange)
@@ -13,7 +13,7 @@
 [Player guide](docs/player-guide.md) · [All bows and runes](docs/bows.md) · [Installation](docs/installation.md) · [Configuration](docs/configuration.md)
 </div>
 
-## Meet the bows
+## Bows
 
 | Bow | Specialty | Default full draw |
 | :--- | :--- | :--- |
